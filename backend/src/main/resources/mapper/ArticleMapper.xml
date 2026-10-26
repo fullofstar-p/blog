@@ -1,0 +1,289 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<!--
+  文章 Mapper：列表 / 搜索 / 详情 / 归档 / 上一篇下一篇。
+  列表类查询不再在 SQL 中聚合标签：按当前页 articleId 由
+  ArticleTagAssembler 批量查询一次，分页 COUNT 也单独走 selectSummaryCount /
+  selectSearchCount，避免分页插件把复杂 SQL 包成子查询全量统计。
+-->
+<mapper namespace="com.blog.mapper.ArticleMapper">
+
+    <resultMap id="ArticleSummaryMap" type="com.blog.vo.ArticleSummaryVO">
+        <id column="id" property="id"/>
+        <result column="title" property="title"/>
+        <result column="summary" property="summary"/>
+        <result column="cover" property="cover"/>
+        <result column="category_id" property="categoryId"/>
+        <result column="category_name" property="categoryName"/>
+        <result column="author_id" property="authorId"/>
+        <result column="author_name" property="authorName"/>
+        <result column="author_avatar" property="authorAvatar"/>
+        <result column="status" property="status"/>
+        <result column="is_top" property="isTop"/>
+        <result column="view_count" property="viewCount"/>
+        <result column="create_time" property="createTime"/>
+        <result column="update_time" property="updateTime"/>
+    </resultMap>
+
+    <resultMap id="ArticleDetailMap" type="com.blog.vo.ArticleDetailVO" extends="ArticleSummaryMap">
+        <result column="content" property="content"/>
+    </resultMap>
+
+    <resultMap id="ArticleNavMap" type="com.blog.vo.ArticleNavVO">
+        <id column="id" property="id"/>
+        <result column="title" property="title"/>
+    </resultMap>
+
+    <resultMap id="ArchiveRowMap" type="com.blog.dto.ArchiveRowDTO">
+        <result column="stat_year" property="year"/>
+        <result column="stat_month" property="month"/>
+        <result column="stat_count" property="count"/>
+    </resultMap>
+
+    <!-- 公共查询列：联表取分类名、作者名/头像。
+         标签不再用相关子查询聚合：分页/搜索页只查文章本体，
+         标签由 ArticleTagAssembler 按当前页 articleId 批量查询（每次 1 条 SQL）。 -->
+    <sql id="BaseColumns">
+        a.id,
+        a.title,
+        a.summary,
+        a.cover,
+        a.category_id,
+        a.author_id,
+        a.status,
+        a.is_top,
+        a.view_count,
+        a.create_time,
+        a.update_time,
+        c.name AS category_name,
+        COALESCE(u.nickname, u.username) AS author_name,
+        u.avatar AS author_avatar
+    </sql>
+
+    <sql id="BaseFrom">
+        FROM article a
+        LEFT JOIN category c ON c.id = a.category_id
+        LEFT JOIN `user` u ON u.id = a.author_id
+    </sql>
+
+    <!-- 公共过滤条件（列表 / 我的文章 / 管理端共用） -->
+    <sql id="BaseWhere">
+        <where>
+            a.deleted = 0
+            <if test="status != null">
+                AND a.status = #{status}
+            </if>
+            <if test="categoryId != null">
+                AND a.category_id = #{categoryId}
+            </if>
+            <if test="tagId != null">
+                AND EXISTS (SELECT 1 FROM article_tag at4 WHERE at4.article_id = a.id AND at4.tag_id = #{tagId})
+            </if>
+            <if test="authorId != null">
+                AND a.author_id = #{authorId}
+            </if>
+            <if test="keyword != null and keyword != ''">
+                AND (a.title LIKE CONCAT('%', #{keyword}, '%')
+                     OR a.summary LIKE CONCAT('%', #{keyword}, '%')
+                     OR a.content LIKE CONCAT('%', #{keyword}, '%'))
+            </if>
+            <if test="year != null">
+                AND YEAR(a.create_time) = #{year}
+            </if>
+            <if test="month != null">
+                AND MONTH(a.create_time) = #{month}
+            </if>
+        </where>
+    </sql>
+
+    <!-- 通用分页列表 -->
+    <select id="selectSummaryPage" resultMap="ArticleSummaryMap">
+        SELECT
+        <include refid="BaseColumns"/>
+        <include refid="BaseFrom"/>
+        <include refid="BaseWhere"/>
+        <choose>
+            <when test="sort == 'views'">
+                ORDER BY a.view_count DESC, a.create_time DESC, a.id DESC
+            </when>
+            <when test="sort == 'update'">
+                ORDER BY a.update_time DESC, a.id DESC
+            </when>
+            <otherwise>
+                <choose>
+                    <when test="pinFirst">
+                        ORDER BY a.is_top DESC, a.create_time DESC, a.id DESC
+                    </when>
+                    <otherwise>
+                        ORDER BY a.create_time DESC, a.id DESC
+                    </otherwise>
+                </choose>
+            </otherwise>
+        </choose>
+    </select>
+
+    <!-- 列表总数：单独 COUNT，避免分页插件把带相关子查询的列表 SQL 回退成
+         "SELECT COUNT(*) FROM (整段列表查询)"，那会把标签聚合/联表完整跑一遍。
+         这是文章分页响应慢（约 5s）的根因。 -->
+    <select id="selectSummaryCount" resultType="long">
+        SELECT COUNT(*)
+        FROM article a
+        <include refid="BaseWhere"/>
+    </select>
+
+    <!-- 搜索：标题/摘要/正文/标签 LIKE 匹配，按权重加总排序 -->
+    <select id="selectSearchPage" resultMap="ArticleSummaryMap">
+        SELECT
+        <include refid="BaseColumns"/>,
+        (
+            (CASE WHEN a.title LIKE CONCAT('%', #{keyword}, '%') THEN 5 ELSE 0 END)
+            + (CASE WHEN a.summary LIKE CONCAT('%', #{keyword}, '%') THEN 3 ELSE 0 END)
+            + (CASE WHEN a.content LIKE CONCAT('%', #{keyword}, '%') THEN 1 ELSE 0 END)
+            + (CASE WHEN EXISTS (
+                        SELECT 1
+                          FROM article_tag at5
+                          INNER JOIN tag t5 ON t5.id = at5.tag_id
+                         WHERE at5.article_id = a.id
+                           AND t5.name LIKE CONCAT('%', #{keyword}, '%')
+                     ) THEN 2 ELSE 0 END)
+        ) AS relevance
+        <include refid="BaseFrom"/>
+        WHERE a.deleted = 0
+          AND a.status = 1
+          AND (
+                a.title LIKE CONCAT('%', #{keyword}, '%')
+                OR a.summary LIKE CONCAT('%', #{keyword}, '%')
+                OR a.content LIKE CONCAT('%', #{keyword}, '%')
+                OR EXISTS (
+                    SELECT 1
+                      FROM article_tag at6
+                      INNER JOIN tag t6 ON t6.id = at6.tag_id
+                     WHERE at6.article_id = a.id
+                       AND t6.name LIKE CONCAT('%', #{keyword}, '%')
+                )
+          )
+        <choose>
+            <when test="sort == 'time'">
+                ORDER BY a.create_time DESC, a.id DESC
+            </when>
+            <otherwise>
+                ORDER BY relevance DESC, a.create_time DESC, a.id DESC
+            </otherwise>
+        </choose>
+    </select>
+
+    <!-- 搜索结果总数：条件与 selectSearchPage 一致，但不计算相关度 -->
+    <select id="selectSearchCount" resultType="long">
+        SELECT COUNT(*)
+        FROM article a
+        WHERE a.deleted = 0
+          AND a.status = 1
+          AND (
+                a.title LIKE CONCAT('%', #{keyword}, '%')
+                OR a.summary LIKE CONCAT('%', #{keyword}, '%')
+                OR a.content LIKE CONCAT('%', #{keyword}, '%')
+                OR EXISTS (
+                    SELECT 1
+                      FROM article_tag at6
+                      INNER JOIN tag t6 ON t6.id = at6.tag_id
+                     WHERE at6.article_id = a.id
+                       AND t6.name LIKE CONCAT('%', #{keyword}, '%')
+                )
+          )
+    </select>
+
+    <!-- 置顶文章（首页） -->
+    <select id="selectTop" resultMap="ArticleSummaryMap">
+        SELECT
+        <include refid="BaseColumns"/>
+        <include refid="BaseFrom"/>
+        WHERE a.deleted = 0
+          AND a.status = 1
+          AND a.is_top = 1
+        ORDER BY a.create_time DESC, a.id DESC
+        LIMIT #{limit}
+    </select>
+
+    <!-- 文章详情（含正文） -->
+    <select id="selectDetailById" resultMap="ArticleDetailMap">
+        SELECT
+        <include refid="BaseColumns"/>,
+        a.content
+        <include refid="BaseFrom"/>
+        WHERE a.id = #{id}
+          AND a.deleted = 0
+    </select>
+
+    <!-- 摘要信息（创建/更新后回显） -->
+    <select id="selectSummaryById" resultMap="ArticleSummaryMap">
+        SELECT
+        <include refid="BaseColumns"/>
+        <include refid="BaseFrom"/>
+        WHERE a.id = #{id}
+          AND a.deleted = 0
+    </select>
+
+    <!-- 上一篇（id 更小、已发布） -->
+    <select id="selectPrevArticle" resultMap="ArticleNavMap">
+        SELECT a.id, a.title
+        FROM article a
+        WHERE a.deleted = 0
+          AND a.status = 1
+          AND a.id &lt; #{id}
+        ORDER BY a.id DESC
+        LIMIT 1
+    </select>
+
+    <!-- 下一篇（id 更大、已发布） -->
+    <select id="selectNextArticle" resultMap="ArticleNavMap">
+        SELECT a.id, a.title
+        FROM article a
+        WHERE a.deleted = 0
+          AND a.status = 1
+          AND a.id &gt; #{id}
+        ORDER BY a.id ASC
+        LIMIT 1
+    </select>
+
+    <!-- 只取阅读量：详情命中缓存时与 Redis 增量合并，避免缓存旧值导致阅读量回跳 -->
+    <select id="selectViewCountById" resultType="java.lang.Integer">
+        SELECT a.view_count
+        FROM article a
+        WHERE a.id = #{id}
+          AND a.deleted = 0
+    </select>
+
+    <!-- 按年月归档 -->
+    <select id="selectArchive" resultMap="ArchiveRowMap">
+        SELECT YEAR(a.create_time) AS stat_year,
+               MONTH(a.create_time) AS stat_month,
+               COUNT(*) AS stat_count
+        FROM article a
+        WHERE a.deleted = 0
+          AND a.status = 1
+        GROUP BY YEAR(a.create_time), MONTH(a.create_time)
+        ORDER BY stat_year DESC, stat_month DESC
+    </select>
+
+    <!-- 按当前页文章 ID 批量取标签（含标签的已发布文章数），替代原先逐行相关子查询。
+         一次请求只跑这一条，且只扫当前页涉及的标签，列表不再随总文章数变慢。 -->
+    <select id="selectTagsByArticleIds" resultType="com.blog.dto.ArticleTagRowDTO">
+        SELECT at.article_id,
+               t.id   AS tag_id,
+               t.name AS tag_name,
+               (SELECT COUNT(*)
+                  FROM article_tag x
+                  INNER JOIN article a2
+                          ON a2.id = x.article_id
+                         AND a2.status = 1
+                         AND a2.deleted = 0
+                 WHERE x.tag_id = t.id) AS article_count
+        FROM article_tag at
+        INNER JOIN tag t ON t.id = at.tag_id
+        WHERE at.article_id IN
+        <foreach collection="articleIds" item="articleId" open="(" separator="," close=")">
+            #{articleId}
+        </foreach>
+        ORDER BY at.article_id ASC, t.id ASC
+    </select>
+</mapper>

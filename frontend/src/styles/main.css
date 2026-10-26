@@ -1,0 +1,226 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* ==========================================================================
+   Sketch Style 全局样式：纸张底色 / 铅笔灰 / 手绘边框与阴影
+   ========================================================================== */
+
+@layer base {
+  :root {
+    color-scheme: light;
+  }
+
+  html {
+    scroll-behavior: smooth;
+  }
+
+  body {
+    @apply bg-paper font-serif text-pencil antialiased;
+    background-color: #f5f0e8;
+    /* SVG 纸张纹理：fractalNoise 模拟纸面颗粒 */
+    background-image: url("data:image/svg+xml,%3Csvg%20xmlns='http://www.w3.org/2000/svg'%20width='220'%20height='220'%20viewBox='0%200%20220%20220'%3E%3Cfilter%20id='n'%3E%3CfeTurbulence%20type='fractalNoise'%20baseFrequency='0.82'%20numOctaves='2'%20stitchTiles='stitch'/%3E%3CfeColorMatrix%20type='saturate'%20values='0'/%3E%3C/filter%3E%3Crect%20width='220'%20height='220'%20filter='url(%23n)'%20opacity='0.05'/%3E%3C/svg%3E");
+    background-repeat: repeat;
+    min-height: 100vh;
+  }
+
+  h1,
+  h2,
+  h3,
+  h4,
+  h5,
+  h6 {
+    @apply font-serif italic text-pencil;
+  }
+
+  ::selection {
+    background-color: #2c2c2c;
+    color: #f5f0e8;
+  }
+
+  :focus-visible {
+    outline: 2px dashed #2c2c2c;
+    outline-offset: 3px;
+  }
+
+  /* Sketch Style 默认边框：全局用虚线替代 Tailwind Preflight 的 border-style: solid */
+  *,
+  ::before,
+  ::after {
+    border-style: dashed;
+  }
+
+  /* 自定义滚动条：纸色轨道 + 虚线铅笔滑块 */
+  ::-webkit-scrollbar {
+    width: 10px;
+    height: 10px;
+  }
+  ::-webkit-scrollbar-track {
+    background-color: #efe7d8;
+  }
+  ::-webkit-scrollbar-thumb {
+    background-color: #c9bfa9;
+    border: 2px dashed #2c2c2c;
+    border-radius: 2px;
+  }
+  ::-webkit-scrollbar-thumb:hover {
+    background-color: #8c8578;
+  }
+}
+
+@layer components {
+  /* ---------- 卡片 ---------- */
+  .sketch-card {
+    @apply relative border-2 border-dashed border-pencil bg-paper-soft/80 shadow-sketch;
+  }
+
+  .sketch-card-hover {
+    @apply transition-transform duration-150 ease-out hover:-translate-y-1 hover:rotate-[-0.3deg] hover:shadow-sketch-lg;
+  }
+
+  /* 手绘胶带装饰 */
+  .sketch-tape {
+    position: relative;
+  }
+  .sketch-tape::before {
+    content: '';
+    position: absolute;
+    top: -11px;
+    left: 50%;
+    width: 72px;
+    height: 20px;
+    transform: translateX(-50%) rotate(-2deg);
+    background-color: #e4dac8;
+    border: 1px dashed rgba(44, 44, 44, 0.35);
+    opacity: 0.85;
+    pointer-events: none;
+  }
+
+  /* ---------- 按钮（Pencil Shading / Paper Press）---------- */
+  .sketch-btn {
+    @apply inline-flex min-h-[44px] min-w-[44px] select-none items-center justify-center gap-2 rounded-sketch border-2 border-dashed border-pencil bg-paper px-5 py-2 font-serif text-base italic text-pencil shadow-sketch transition-all duration-150 ease-out;
+  }
+  .sketch-btn:hover {
+    @apply -rotate-1 bg-pencil text-paper shadow-sketchsm;
+  }
+  .sketch-btn:active {
+    @apply rotate-1 translate-x-[1px] translate-y-[1px] shadow-press;
+  }
+  .sketch-btn:disabled {
+    @apply cursor-not-allowed opacity-50;
+  }
+  .sketch-btn:disabled:hover {
+    @apply rotate-0 bg-paper text-pencil shadow-sketch;
+  }
+
+  .sketch-btn-primary {
+    @apply bg-pencil text-paper;
+  }
+  .sketch-btn-primary:hover {
+    @apply bg-paper text-pencil;
+  }
+  .sketch-btn-danger {
+    @apply border-[#b23b2e] text-[#b23b2e];
+  }
+  .sketch-btn-danger:hover {
+    @apply bg-[#b23b2e] text-paper;
+  }
+  .sketch-btn-ghost {
+    @apply border-pencil/60 shadow-sketchsm;
+  }
+  .sketch-btn-sm {
+    @apply min-h-[44px] min-w-[44px] px-3 py-1 text-sm;
+  }
+
+  /* ---------- 表单控件 ---------- */
+  .sketch-input {
+    @apply min-h-[44px] w-full rounded-sketch border-2 border-dashed border-pencil/70 bg-paper px-4 py-2 font-serif text-base text-pencil shadow-sketchsm transition-all duration-150 placeholder:italic placeholder:text-pencil-faint;
+  }
+  .sketch-input:hover {
+    @apply border-pencil;
+  }
+  .sketch-input:focus {
+    @apply border-pencil bg-paper-soft shadow-sketch outline-none;
+  }
+  .sketch-input:disabled {
+    @apply cursor-not-allowed bg-paper-edge/50 text-pencil-faint;
+  }
+  .sketch-input-error {
+    @apply border-[#b23b2e];
+  }
+
+  .sketch-label {
+    @apply mb-1.5 block font-serif text-sm italic text-ink-700;
+  }
+
+  /* ---------- 文本 / 链接 ---------- */
+  /* 手绘波浪下划线（Scribble Reveal） */
+  .sketch-wavy {
+    background-image: url("data:image/svg+xml,%3Csvg%20xmlns='http://www.w3.org/2000/svg'%20width='16'%20height='6'%20viewBox='0%200%2016%206'%3E%3Cpath%20d='M0%204%20Q%204%201%208%204%20T%2016%204'%20fill='none'%20stroke='%232c2c2c'%20stroke-width='1.2'%20stroke-linecap='round'/%3E%3C/svg%3E");
+    background-repeat: repeat-x;
+    background-position: 0 100%;
+    background-size: 16px 6px;
+    padding-bottom: 0.4rem;
+  }
+
+  .sketch-link {
+    @apply text-pencil underline decoration-dashed decoration-1 underline-offset-4 transition-colors duration-150 hover:text-ink-900 hover:decoration-2;
+  }
+
+  .sketch-hr {
+    @apply my-8 border-t-2 border-dashed border-pencil/40;
+  }
+
+  /* ---------- 徽章 / 标签（非交互）---------- */
+  .sketch-badge {
+    @apply inline-flex items-center gap-1 rounded-sketch border border-dashed border-pencil/60 px-2.5 py-1 font-serif text-xs italic text-ink-700;
+  }
+
+  /* ---------- 加载骨架 ---------- */
+  .sketch-skeleton {
+    @apply animate-pulse rounded-sketch border border-dashed border-pencil/20 bg-pencil-line/60;
+  }
+}
+
+@layer utilities {
+  .text-balance {
+    text-wrap: balance;
+  }
+}
+
+/* ==========================================================================
+   Stroke Jitter / Scribble 动画 & prefers-reduced-motion 降级
+   ========================================================================== */
+@keyframes sketch-jitter {
+  0%,
+  100% {
+    transform: rotate(-0.4deg) translateY(0);
+  }
+  25% {
+    transform: rotate(0.5deg) translateY(-1px);
+  }
+  50% {
+    transform: rotate(-0.2deg) translateY(0);
+  }
+  75% {
+    transform: rotate(0.6deg) translateY(0.5px);
+  }
+}
+
+.sketch-jitter {
+  animation: sketch-jitter 3s ease-in-out infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
+
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+  }
+}

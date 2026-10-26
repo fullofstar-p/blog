@@ -1,0 +1,66 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<!--
+  评论 Mapper：前台已通过评论（组装两级树）与后台分页联查。
+-->
+<mapper namespace="com.blog.mapper.CommentMapper">
+
+    <resultMap id="CommentVOMap" type="com.blog.vo.CommentVO">
+        <id column="id" property="id"/>
+        <result column="article_id" property="articleId"/>
+        <result column="user_id" property="userId"/>
+        <result column="nickname" property="nickname"/>
+        <result column="avatar" property="avatar"/>
+        <result column="parent_id" property="parentId"/>
+        <result column="content" property="content"/>
+        <result column="like_count" property="likeCount"/>
+        <result column="create_time" property="createTime"/>
+    </resultMap>
+
+    <resultMap id="CommentAdminVOMap" type="com.blog.vo.CommentAdminVO" extends="CommentVOMap">
+        <result column="status" property="status"/>
+        <result column="article_title" property="articleTitle"/>
+        <result column="username" property="username"/>
+    </resultMap>
+
+    <sql id="CommentColumns">
+        c.id,
+        c.article_id,
+        c.user_id,
+        c.parent_id,
+        c.content,
+        c.like_count,
+        c.create_time,
+        COALESCE(u.nickname, u.username) AS nickname,
+        u.avatar
+    </sql>
+
+    <!-- 前台：某篇文章下已通过的评论（一级 + 二级），由 Service 组装树 -->
+    <select id="selectApprovedByArticle" resultMap="CommentVOMap">
+        SELECT
+        <include refid="CommentColumns"/>
+        FROM comment c
+        LEFT JOIN `user` u ON u.id = c.user_id
+        WHERE c.article_id = #{articleId}
+          AND c.status = 1
+        ORDER BY c.create_time ASC, c.id ASC
+    </select>
+
+    <!-- 后台：全量评论分页（可按审核状态过滤） -->
+    <select id="selectAdminPage" resultMap="CommentAdminVOMap">
+        SELECT
+        <include refid="CommentColumns"/>,
+        c.status,
+        a.title AS article_title,
+        u.username AS username
+        FROM comment c
+        LEFT JOIN `user` u ON u.id = c.user_id
+        LEFT JOIN article a ON a.id = c.article_id
+        <where>
+            <if test="status != null">
+                c.status = #{status}
+            </if>
+        </where>
+        ORDER BY c.create_time DESC, c.id DESC
+    </select>
+</mapper>

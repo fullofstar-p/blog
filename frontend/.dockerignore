@@ -1,0 +1,11 @@
+node_modules
+dist
+.npm-cache
+public/vditor
+.git
+.gitignore
+*.log
+build.log
+.DS_Store
+.vscode
+.idea

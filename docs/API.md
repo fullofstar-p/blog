@@ -1,0 +1,229 @@
+# 技术分享博客 · 前后端接口契约
+
+> 本文件是前后端唯一接口契约。前端 `src/api/*` 与后端 Controller 必须严格按此实现，字段名不得随意改动。
+
+## 通用约定
+
+- 基础路径：`/api`
+- 认证：除放行清单外，请求头携带 `Authorization: Bearer <accessToken>`
+- 时间格式：`yyyy-MM-dd HH:mm:ss`（字符串）
+- 分页请求参数：`pageNum`（从 1 开始，默认 1）、`pageSize`（默认 10，最大 50）
+- 统一响应体：
+
+```json
+{ "code": 200, "message": "success", "data": null }
+```
+
+- 分页数据体：
+
+```json
+{ "records": [], "total": 0, "pageNum": 1, "pageSize": 10 }
+```
+
+- 业务错误码（HTTP 状态码仍为 200，业务码在 body 的 `code` 中）：
+
+| code | 含义 |
+| ---- | ---- |
+| 200 | 成功 |
+| 400 | 参数校验失败 / 业务参数错误 |
+| 401 | 未登录、Token 无效或已过期 |
+| 403 | 已登录但无权限 |
+| 404 | 资源不存在 |
+| 409 | 资源冲突（重名、重复操作等） |
+| 500 | 服务器内部错误 |
+
+> 说明：登录态失效时后端返回 HTTP 401 + `code=401`，前端 Axios 拦截器据此跳转登录页。
+
+## 放行清单（无需 Token）
+
+- `POST /api/auth/**`
+- `GET /api/articles/**`（公开文章列表、详情、归档、置顶）
+- `GET /api/categories`、`GET /api/tags`
+- `GET /api/search`
+- `GET /api/articles/{id}/comments`
+- `/doc.html`、`/swagger-ui/**`、`/v3/api-docs/**`、`/actuator/health`
+
+其余接口均需登录；管理接口需 `ADMIN` 角色。
+
+## 枚举约定
+
+- 用户角色 `role`：`ADMIN` | `USER`
+- 用户状态 `status`：`1` 启用 | `0` 禁用
+- 文章状态 `status`：`0` 草稿 | `1` 已发布
+- 置顶 `isTop`：`0` 否 | `1` 是
+- 评论状态 `status`：`0` 待审核 | `1` 已通过 | `2` 已拒绝
+- 上传分类 `category`：`avatar` | `cover` | `content`
+
+## 视图对象（VO）
+
+```ts
+UserVO      { id, username, nickname, avatar, email, role, status, createTime }
+TokenVO     { accessToken, refreshToken, tokenType: "Bearer", expiresIn, user: UserVO }
+TagVO       { id, name, articleCount }
+CategoryVO  { id, name, sort, articleCount }
+ArticleSummaryVO {
+  id, title, summary, cover, categoryId, categoryName,
+  authorId, authorName, authorAvatar,
+  status, isTop, viewCount,
+  tags: TagVO[], createTime, updateTime
+}
+ArticleDetailVO = ArticleSummaryVO & {
+  content, prev: { id, title } | null, next: { id, title } | null
+}
+CommentVO   { id, articleId, userId, nickname, avatar, parentId, content, likeCount, liked, createTime, replies: CommentVO[] }
+CommentAdminVO = CommentVO & { articleTitle, status, username }
+ArchiveVO   { year, months: [{ month, count }] }
+FileVO      { url, objectKey, originalName, size, contentType }
+```
+
+## 1. 认证模块 `/api/auth`
+
+| 方法 | 路径 | 入参 | 出参 data |
+| ---- | ---- | ---- | --------- |
+| POST | `/api/auth/register` | `{ username, password, nickname?, email? }` | `null` |
+| POST | `/api/auth/login` | `{ username, password }` | `TokenVO` |
+| POST | `/api/auth/refresh` | `{ refreshToken }` | `TokenVO` |
+| POST | `/api/auth/logout` | 请求头 Token；body 可选 `{ refreshToken }` | `null` |
+
+- 注册：`username` 4-20 位字母/数字/下划线；`password` 6-32 位；用户名重复返回 `409`。
+- 登录：用户名不存在 / 密码错误返回 `400`；账号禁用返回 `403`。
+- 刷新：refreshToken 无效、过期或已登出返回 `401`。
+- 登出：accessToken 加入 Redis 黑名单（TTL = 剩余有效期），refreshToken 从白名单删除。
+
+## 2. 用户模块 `/api/users`
+
+| 方法 | 路径 | 权限 | 入参 | 出参 data |
+| ---- | ---- | ---- | ---- | --------- |
+| GET | `/api/users/me` | 登录 | - | `UserVO` |
+| PUT | `/api/users/me` | 登录 | `{ nickname?, email?, avatar? }` | `UserVO` |
+| PUT | `/api/users/me/password` | 登录 | `{ oldPassword, newPassword }` | `null` |
+
+## 3. 文章模块 `/api/articles`
+
+| 方法 | 路径 | 权限 | 入参 | 出参 data |
+| ---- | ---- | ---- | ---- | --------- |
+| GET | `/api/articles` | 公开 | `pageNum, pageSize, categoryId?, tagId?, keyword?, year?, month?, sort?`（`sort=time\|views`，默认 time） | `PageResult<ArticleSummaryVO>` |
+| GET | `/api/articles/top` | 公开 | `limit?`（默认 5，最大 10） | `ArticleSummaryVO[]` |
+| GET | `/api/articles/{id}` | 公开 | - | `ArticleDetailVO`（阅读量 +1） |
+| GET | `/api/articles/archive` | 公开 | - | `ArchiveVO[]` |
+| GET | `/api/articles/mine` | 登录 | `pageNum, pageSize, status?` | `PageResult<ArticleSummaryVO>` |
+| POST | `/api/articles` | 登录 | `ArticleSaveDTO` | `ArticleSummaryVO` |
+| PUT | `/api/articles/{id}` | 登录（作者或 ADMIN） | `ArticleSaveDTO` | `ArticleSummaryVO` |
+| DELETE | `/api/articles/{id}` | 登录（作者或 ADMIN） | - | `null`（逻辑删除） |
+
+`ArticleSaveDTO`：
+
+```json
+{
+  "title": "必填，<= 200 字",
+  "summary": "可选，<= 500 字；为空时取正文前 120 字",
+  "content": "Markdown 正文；发布时必填",
+  "cover": "可选，MinIO 图片 URL",
+  "categoryId": 1,
+  "tagIds": [1, 2],
+  "status": 1,
+  "isTop": 0
+}
+```
+
+- 未发布草稿仅作者本人与 ADMIN 可见；公开列表只返回 `status=1`。
+- `isTop` 仅 ADMIN 可设置，普通用户传入忽略。
+- 阅读量：Redis 先自增，定时任务每 60 秒批量落库；缓存文章详情 10 分钟，更新/删除时失效。
+
+## 4. 分类模块
+
+| 方法 | 路径 | 权限 | 入参 | 出参 data |
+| ---- | ---- | ---- | ---- | --------- |
+| GET | `/api/categories` | 公开 | - | `CategoryVO[]`（含 articleCount） |
+| POST | `/api/admin/categories` | ADMIN | `{ name, sort? }` | `CategoryVO` |
+| PUT | `/api/admin/categories/{id}` | ADMIN | `{ name, sort? }` | `CategoryVO` |
+| DELETE | `/api/admin/categories/{id}` | ADMIN | - | `null`（有文章引用时返回 400） |
+
+## 5. 标签模块
+
+| 方法 | 路径 | 权限 | 入参 | 出参 data |
+| ---- | ---- | ---- | ---- | --------- |
+| GET | `/api/tags` | 公开 | - | `TagVO[]`（含 articleCount） |
+| POST | `/api/admin/tags` | ADMIN | `{ name }` | `TagVO` |
+| PUT | `/api/admin/tags/{id}` | ADMIN | `{ name }` | `TagVO` |
+| DELETE | `/api/admin/tags/{id}` | ADMIN | - | `null` |
+
+## 6. 评论模块
+
+| 方法 | 路径 | 权限 | 入参 | 出参 data |
+| ---- | ---- | ---- | ---- | --------- |
+| GET | `/api/articles/{articleId}/comments` | 公开 | - | `CommentVO[]`（仅已通过，一级 + 二级树） |
+| POST | `/api/comments` | 登录 | `{ articleId, parentId?, content }` | `CommentVO`（状态为待审核） |
+| DELETE | `/api/comments/{id}` | 登录（本人或 ADMIN） | - | `null` |
+| POST | `/api/comments/{id}/like` | 登录 | - | `{ liked: true, likeCount }` |
+| DELETE | `/api/comments/{id}/like` | 登录 | - | `{ liked: false, likeCount }` |
+| GET | `/api/admin/comments` | ADMIN | `pageNum, pageSize, status?` | `PageResult<CommentAdminVO>` |
+| PUT | `/api/admin/comments/{id}/audit` | ADMIN | `{ status: 1 \| 2 }` | `null` |
+| DELETE | `/api/admin/comments/{id}` | ADMIN | - | `null` |
+
+- 二级回复：`parentId` 必须指向同一文章下的一级评论；若指向二级回复，则自动挂到其父评论下（避免三级）。
+- 点赞可取消：再次点击调用 `DELETE /api/comments/{id}/like`；`DELETE` 幂等（未点赞时直接返回当前计数）。
+  `CommentVO.liked` 表示当前登录用户是否已赞，未登录时为 `null`。
+
+## 7. 搜索模块 `/api/search`
+
+| 方法 | 路径 | 权限 | 入参 | 出参 data |
+| ---- | ---- | ---- | ---- | --------- |
+| GET | `/api/search` | 公开 | `keyword, pageNum, pageSize, sort?`（`relevance\|time`，默认 relevance） | `PageResult<ArticleSummaryVO>` |
+
+- 匹配范围：标题、摘要、正文、标签名；只搜已发布文章。
+- 相关度排序：标题命中权重 5，摘要 3，标签 2，正文 1，按命中字段数加总降序；`sort=time` 时按发布时间降序。
+- 当前实现 `MysqlSearchService`（LIKE），预留 `SearchService` 接口与 `ElasticsearchSearchServiceImpl` 扩展点（本次不实现）。
+
+## 8. 文件模块 `/api/files`
+
+| 方法 | 路径 | 权限 | 入参 | 出参 data |
+| ---- | ---- | ---- | ---- | --------- |
+| POST | `/api/files/upload` | 登录 | `multipart/form-data`：`file`、`category`（avatar/cover/content） | `FileVO` |
+| DELETE | `/api/files/{objectKey}` | 登录（上传者或 ADMIN） | - | `null` |
+
+- 允许类型：`image/jpeg`、`image/png`、`image/webp`、`image/gif`，后缀 `jpg/jpeg/png/webp/gif`。
+- 大小限制：5 MB（`spring.servlet.multipart.max-file-size=5MB`）。
+- objectKey 规则：`{category}-{uuid}.{ext}`（扁平、随机、不含 `/`，不可遍历）。
+- 返回的 `url` 使用 `minio.public-endpoint + / + bucket + / + objectKey` 拼接。
+- bucket 由后端启动时自动创建，并设置为公共读策略（见 README 部署说明）。
+
+## 9. 管理端用户模块
+
+| 方法 | 路径 | 权限 | 入参 | 出参 data |
+| ---- | ---- | ---- | ---- | --------- |
+| GET | `/api/admin/users` | ADMIN | `pageNum, pageSize, keyword?, role?, status?` | `PageResult<UserVO>` |
+| PUT | `/api/admin/users/{id}/status` | ADMIN | `{ status: 0 \| 1 }` | `null` |
+| PUT | `/api/admin/users/{id}/role` | ADMIN | `{ role: "ADMIN" \| "USER" }` | `null` |
+
+## 10. 管理端文章模块
+
+| 方法 | 路径 | 权限 | 入参 | 出参 data |
+| ---- | ---- | ---- | ---- | --------- |
+| GET | `/api/admin/articles` | ADMIN | `pageNum, pageSize, status?, keyword?, categoryId?` | `PageResult<ArticleSummaryVO>` |
+| PUT | `/api/admin/articles/{id}/top` | ADMIN | `{ isTop: 0 \| 1 }` | `null` |
+| DELETE | `/api/admin/articles/{id}` | ADMIN | - | `null` |
+
+## 11. 健康检查
+
+| 方法 | 路径 | 权限 | 出参 |
+| ---- | ---- | ---- | ---- |
+| GET | `/actuator/health` | 公开 | `{ "status": "UP" }` |
+
+## 前端路由与页面映射
+
+| 路由 | 页面 | 说明 |
+| ---- | ---- | ---- |
+| `/` | Home | 文章列表 + 置顶 + 分类/标签侧栏 |
+| `/article/:id` | ArticleDetail | Markdown 渲染、评论 |
+| `/category/:id` | CategoryPage | 分类下文章 |
+| `/tag/:id` | TagPage | 标签下文章 |
+| `/archive` | ArchivePage | 按年月归档 |
+| `/search` | SearchPage | `?keyword=` 搜索 |
+| `/about` | AboutPage | 关于 |
+| `/login`、`/register` | Login / Register | 认证 |
+| `/profile` | Profile | 个人资料、头像上传 |
+| `/admin` | AdminLayout | 需 ADMIN |
+| `/admin/articles`、`/admin/articles/new`、`/admin/articles/:id/edit` | 文章管理/编辑 |
+| `/admin/comments` | 评论审核 |
+| `/admin/categories`、`/admin/tags`、`/admin/users` | 分类/标签/用户管理 |

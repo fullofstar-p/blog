@@ -1,0 +1,10 @@
+node_modules
+dist
+.npm-cache
+public/vditor
+*.local
+*.log
+.DS_Store
+.vscode
+.idea
+build.log

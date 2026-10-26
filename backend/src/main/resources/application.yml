@@ -1,0 +1,103 @@
+server:
+  port: ${SERVER_PORT:8080}
+  shutdown: graceful
+  servlet:
+    encoding:
+      charset: UTF-8
+      force: true
+
+spring:
+  application:
+    name: blog-backend
+
+  datasource:
+    driver-class-name: com.mysql.cj.jdbc.Driver
+    url: "jdbc:mysql://${MYSQL_HOST:192.168.200.200}:${MYSQL_PORT:3306}/${MYSQL_DATABASE:blog}?useUnicode=true&characterEncoding=utf8&serverTimezone=Asia/Shanghai&useSSL=false&allowPublicKeyRetrieval=true&rewriteBatchedStatements=true"
+    username: ${MYSQL_USERNAME:root}
+    password: ${MYSQL_PASSWORD:blog_dev_123456}
+    hikari:
+      minimum-idle: 2
+      maximum-pool-size: 10
+      connection-timeout: 30000
+      idle-timeout: 600000
+      max-lifetime: 1800000
+
+  data:
+    redis:
+      host: ${REDIS_HOST:192.168.200.200}
+      port: ${REDIS_PORT:6379}
+      database: ${REDIS_DATABASE:0}
+      timeout: 3s
+      # 如 Redis 开启了密码，取消下一行注释并配置环境变量
+      # password: ${REDIS_PASSWORD}
+
+  servlet:
+    multipart:
+      max-file-size: 5MB
+      max-request-size: 6MB
+
+  jackson:
+    date-format: yyyy-MM-dd HH:mm:ss
+    time-zone: Asia/Shanghai
+    serialization:
+      write-dates-as-timestamps: false
+
+mybatis-plus:
+  mapper-locations: classpath*:/mapper/**/*.xml
+  type-aliases-package: com.blog.entity
+  configuration:
+    map-underscore-to-camel-case: true
+  global-config:
+    banner: false
+    db-config:
+      id-type: auto
+      logic-delete-field: deleted
+      logic-delete-value: 1
+      logic-not-delete-value: 0
+
+minio:
+  endpoint: ${MINIO_ENDPOINT:http://192.168.200.200:9000}
+  access-key: ${MINIO_ACCESS_KEY:minioadmin}
+  secret-key: ${MINIO_SECRET_KEY:minioadmin}
+  bucket: ${MINIO_BUCKET:blog}
+  public-endpoint: ${MINIO_PUBLIC_ENDPOINT:http://192.168.200.200:9000}
+  region: ${MINIO_REGION:us-east-1}
+
+jwt:
+  # HS256 密钥（生产环境务必通过环境变量覆盖为 >= 64 位随机串）
+  secret: ${JWT_SECRET:blog-dev-secret-please-change-me-0123456789abcdef0123456789}
+  # access token 有效期（秒）
+  access-expire: ${JWT_ACCESS_EXPIRE:7200}
+  # refresh token 有效期（秒）
+  refresh-expire: ${JWT_REFRESH_EXPIRE:604800}
+
+admin:
+  # 首次启动时若无 ADMIN 账号则自动创建
+  username: ${ADMIN_USERNAME:admin}
+  password: ${ADMIN_PASSWORD:admin123456}
+
+springdoc:
+  api-docs:
+    enabled: true
+  swagger-ui:
+    enabled: true
+
+knife4j:
+  enable: true
+  setting:
+    language: zh_cn
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info
+  endpoint:
+    health:
+      show-details: never
+
+logging:
+  level:
+    root: INFO
+    com.blog: INFO
+    org.springframework.security: WARN
