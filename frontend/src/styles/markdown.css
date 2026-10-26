@@ -1,0 +1,476 @@
+/* ==========================================================================
+   md-editor-v3 手绘化覆盖 + highlight.js 手绘代码配色
+   功能：
+   1) 用 CSS 变量把编辑器底色 / 文字 / 边框改成纸张色与铅笔灰，禁止纯白；
+   2) 工具栏、输入区、预览区统一虚线边框与手绘阴影；
+   3) 覆盖 highlight.js 的 .hljs-* 令牌配色，代码块底色使用加深纸色 #efe7d8。
+   ========================================================================== */
+
+/* ---------- 变量：md-editor-v3 ---------- */
+.md-editor,
+.md-editor-preview-wrapper,
+.md-editor-input-wrapper,
+.md-editor-content,
+.md-editor-toolbar-wrapper,
+.md-editor-toolbar,
+.md-editor-footer,
+.md-editor-modal,
+.md-editor-catalog {
+  --md-color: #2c2c2c;
+  --md-bk-color: #f5f0e8;
+  --md-bk-hover-color: #efe7d8;
+  --md-hover-color: #2c2c2c;
+  --md-border-color: #2c2c2c;
+  --md-border-hover-color: #2c2c2c;
+  --md-border-active-color: #2c2c2c;
+  --md-scrollbar-bg-color: #efe7d8;
+  --md-scrollbar-thumb-color: #c9bfa9;
+  --md-scrollbar-thumb-hover-color: #8c8578;
+  --md-scrollbar-thumb-active-color: #2c2c2c;
+  --md-modal-mask: rgba(44, 44, 44, 0.45);
+  --md-shadow-color: rgba(44, 44, 44, 0.2);
+  color: #2c2c2c;
+  background-color: #f5f0e8;
+}
+
+/* md-editor-v3 内部边框统一手绘虚线（覆盖库自带的实线边框） */
+.md-editor,
+.md-editor * {
+  border-style: dashed;
+}
+
+/* 库内部选择器优先级更高（.md-editor .md-editor-preview），这里用 !important 锁死纸色，
+   确保预览区/代码块/工具栏任何位置都不会回落到纯白背景 */
+.md-editor .md-editor-preview,
+.md-editor .md-editor-content,
+.md-editor .md-editor-input-wrapper,
+.md-editor .md-editor-preview-wrapper {
+  --md-bk-color: #f5f0e8 !important;
+  --md-bk-hover-color: #efe7d8 !important;
+  --md-theme-color-reverse: #f5f0e8 !important;
+  --md-theme-color-hover: #efe7d8 !important;
+}
+
+/* md-editor-v3 的 preview.css 默认含 #fff / #fafafa 等白色主题变量，
+   这里统一改成纸张色，保证预览区任何角落都不会出现纯白背景 */
+.md-editor .md-editor-preview {
+  --md-theme-bg-color: #f5f0e8 !important;
+  --md-theme-bg-color-inset: #efe7d8 !important;
+  --md-theme-table-stripe-color: #efe7d8 !important;
+  --md-theme-table-tr-bg-color: transparent !important;
+  --md-theme-code-copy-tips-bg-color: #efe7d8 !important;
+  --md-theme-code-copy-tips-color: #2c2c2c !important;
+  --md-theme-border-color: #8c8578 !important;
+  --md-theme-border-color-inset: #c9bfa9 !important;
+}
+
+.md-editor-preview table tr:nth-child(2n) {
+  background-color: #efe7d8 !important;
+}
+
+.md-editor-preview .md-editor-code-head {
+  background-color: #e4dac8 !important;
+  border-radius: 2px 2px 0 0 !important;
+}
+
+/* ---------- 编辑器外框与工具栏 ---------- */
+.md-editor {
+  border: 2px dashed #2c2c2c !important;
+  border-radius: 2px !important;
+  box-shadow: 3px 3px 0 rgba(44, 44, 44, 0.15);
+  background-color: #f5f0e8 !important;
+  overflow: hidden;
+}
+
+.md-editor-toolbar-wrapper,
+.md-editor-toolbar {
+  background-color: #efe7d8 !important;
+  border-bottom: 1px dashed rgba(44, 44, 44, 0.5) !important;
+}
+
+.md-editor-toolbar-item {
+  color: #2c2c2c !important;
+  border-radius: 2px !important;
+  transition: background-color 0.15s ease, color 0.15s ease;
+}
+
+.md-editor-toolbar-item:hover {
+  background-color: #2c2c2c !important;
+  color: #f5f0e8 !important;
+}
+
+.md-editor-toolbar-item-wrapper:hover .md-editor-toolbar-item {
+  background-color: #2c2c2c !important;
+  color: #f5f0e8 !important;
+}
+
+/* ---------- 输入 / 预览区域 ---------- */
+.md-editor-content,
+.md-editor-input-wrapper,
+.md-editor-preview-wrapper,
+.md-editor-previewOnly {
+  background-color: #f5f0e8 !important;
+}
+
+.md-editor-input {
+  background-color: transparent !important;
+  color: #2c2c2c !important;
+  font-family: 'Noto Serif SC', 'Source Han Serif SC', 'Songti SC', Georgia, serif;
+  font-size: 15px;
+  line-height: 1.9;
+}
+
+.md-editor-footer {
+  background-color: #efe7d8 !important;
+  border-top: 1px dashed rgba(44, 44, 44, 0.4) !important;
+  color: #5c564c !important;
+}
+
+.md-editor-footer-item:hover {
+  color: #2c2c2c !important;
+}
+
+.md-editor-modal,
+.md-editor-fullscreen {
+  background-color: #f5f0e8 !important;
+}
+
+/* ---------- 预览区 Markdown 排版 ---------- */
+.md-editor-preview {
+  background-color: #f5f0e8 !important;
+  color: #2c2c2c !important;
+  font-family: 'Noto Serif SC', 'Source Han Serif SC', 'Songti SC', Georgia, serif;
+  font-size: 16px;
+  line-height: 1.9;
+}
+
+.md-editor-preview h1,
+.md-editor-preview h2,
+.md-editor-preview h3,
+.md-editor-preview h4,
+.md-editor-preview h5,
+.md-editor-preview h6 {
+  font-family: 'Noto Serif SC', 'Source Han Serif SC', 'Songti SC', Georgia, serif;
+  font-style: italic;
+  color: #2c2c2c;
+  letter-spacing: 0.01em;
+}
+
+.md-editor-preview h1,
+.md-editor-preview h2 {
+  border-bottom: 1px dashed rgba(44, 44, 44, 0.35);
+  padding-bottom: 0.3em;
+}
+
+.md-editor-preview h1 {
+  font-size: 1.9em;
+}
+.md-editor-preview h2 {
+  font-size: 1.55em;
+}
+.md-editor-preview h3 {
+  font-size: 1.3em;
+}
+
+.md-editor-preview a {
+  color: #2c2c2c;
+  text-decoration: underline dashed;
+  text-underline-offset: 4px;
+}
+
+.md-editor-preview a:hover {
+  background-color: #2c2c2c;
+  color: #f5f0e8;
+}
+
+.md-editor-preview blockquote {
+  border-left: 3px dashed #8c8578;
+  margin: 1.2em 0;
+  padding: 0.4em 1em;
+  background-color: #efe7d8;
+  color: #3f3a33;
+}
+
+.md-editor-preview hr {
+  border: none;
+  border-top: 2px dashed rgba(44, 44, 44, 0.4);
+  margin: 2em 0;
+}
+
+.md-editor-preview table {
+  border-collapse: collapse;
+  width: 100%;
+}
+
+.md-editor-preview table th,
+.md-editor-preview table td {
+  border: 1px dashed #8c8578;
+  padding: 0.5em 0.75em;
+}
+
+.md-editor-preview table th {
+  background-color: #efe7d8;
+  font-style: italic;
+}
+
+.md-editor-preview img {
+  border: 2px dashed #8c8578;
+  box-shadow: 3px 3px 0 rgba(44, 44, 44, 0.15);
+  max-width: 100%;
+  height: auto;
+}
+
+/* ---------- 行内代码 ---------- */
+.md-editor-preview :not(pre) > code {
+  background-color: #efe7d8 !important;
+  color: #2c2c2c !important;
+  border: 1px dashed rgba(44, 44, 44, 0.45);
+  border-radius: 2px;
+  padding: 0.1em 0.35em;
+  font-size: 0.92em;
+}
+
+/* ---------- 代码块：加深纸色，禁止纯白 ---------- */
+.md-editor-preview pre,
+.md-editor-preview pre code,
+.md-editor-preview .hljs,
+.md-editor pre.hljs {
+  background-color: #efe7d8 !important;
+  color: #2c2c2c !important;
+  border: 1px dashed #8c8578;
+  border-radius: 2px;
+  box-shadow: 2px 2px 0 rgba(44, 44, 44, 0.12);
+}
+
+.md-editor-preview pre {
+  padding: 1rem 1.15rem;
+  overflow-x: auto;
+  line-height: 1.75;
+  font-size: 0.92em;
+}
+
+.md-editor-preview pre code {
+  padding: 0;
+  border: none;
+  box-shadow: none;
+}
+
+/* ---------- highlight.js 令牌配色（低饱和手绘四色）---------- */
+.md-editor-preview .hljs-comment,
+.md-editor-preview .hljs-quote {
+  color: #6a6255 !important;
+  font-style: italic;
+}
+
+.md-editor-preview .hljs-keyword,
+.md-editor-preview .hljs-selector-tag,
+.md-editor-preview .hljs-literal,
+.md-editor-preview .hljs-doctag {
+  color: #2b6e96 !important;
+  font-weight: 600;
+}
+
+.md-editor-preview .hljs-string,
+.md-editor-preview .hljs-regexp,
+.md-editor-preview .hljs-addition,
+.md-editor-preview .hljs-attribute,
+.md-editor-preview .hljs-meta .hljs-string {
+  color: #1f7a4d !important;
+}
+
+.md-editor-preview .hljs-number,
+.md-editor-preview .hljs-symbol,
+.md-editor-preview .hljs-bullet,
+.md-editor-preview .hljs-link {
+  color: #9a6a00 !important;
+}
+
+.md-editor-preview .hljs-title,
+.md-editor-preview .hljs-section,
+.md-editor-preview .hljs-title.class_,
+.md-editor-preview .hljs-title.function_ {
+  color: #2b6e96 !important;
+  text-decoration: underline dashed;
+  text-underline-offset: 3px;
+}
+
+.md-editor-preview .hljs-built_in,
+.md-editor-preview .hljs-type,
+.md-editor-preview .hljs-selector-id,
+.md-editor-preview .hljs-selector-class,
+.md-editor-preview .hljs-deletion {
+  color: #b23b2e !important;
+}
+
+.md-editor-preview .hljs-variable,
+.md-editor-preview .hljs-template-variable,
+.md-editor-preview .hljs-params {
+  color: #3f3a33 !important;
+}
+
+.md-editor-preview .hljs-emphasis {
+  font-style: italic;
+}
+.md-editor-preview .hljs-strong {
+  font-weight: 700;
+}
+
+/* 代码块复制按钮 / 语言标签：纸色 + 虚线 */
+.md-editor-preview .md-editor-copy-button,
+.md-editor-preview .copy-button,
+.md-editor-preview pre + .copy-button {
+  background-color: #f5f0e8 !important;
+  color: #2c2c2c !important;
+  border: 1px dashed #2c2c2c !important;
+}
+
+/* ==========================================================================
+   Vditor（正文即时渲染编辑器）手绘化覆盖
+   编辑器默认是浅灰白主题，这里统一改回纸张米色 + 铅笔灰 + 虚线边框。
+   ========================================================================== */
+
+.vditor {
+  border: 2px dashed #2c2c2c !important;
+  border-radius: 2px !important;
+  box-shadow: 3px 3px 0 rgba(44, 44, 44, 0.15);
+  background-color: #f5f0e8 !important;
+  overflow: hidden;
+}
+
+.vditor-toolbar {
+  background-color: #efe7d8 !important;
+  border-bottom: 1px dashed rgba(44, 44, 44, 0.5) !important;
+}
+
+.vditor-toolbar__item button {
+  color: #2c2c2c;
+  transition: background-color 0.15s ease, color 0.15s ease;
+}
+
+.vditor-toolbar__item button:hover,
+.vditor-toolbar__item button.vditor-menu--current {
+  background-color: #2c2c2c !important;
+  color: #f5f0e8 !important;
+  border-radius: 2px;
+}
+
+.vditor-toolbar__divider {
+  border-left: 1px dashed rgba(44, 44, 44, 0.35) !important;
+}
+
+.vditor-content,
+.vditor-ir,
+.vditor-sv,
+.vditor-wysiwyg {
+  background-color: #f5f0e8 !important;
+}
+
+.vditor-reset {
+  background-color: transparent !important;
+  color: #2c2c2c !important;
+  font-family: 'Noto Serif SC', 'Source Han Serif SC', 'Songti SC', Georgia, serif;
+  font-size: 15px;
+  line-height: 1.9;
+}
+
+.vditor-reset h1,
+.vditor-reset h2,
+.vditor-reset h3,
+.vditor-reset h4,
+.vditor-reset h5,
+.vditor-reset h6 {
+  font-family: 'Noto Serif SC', 'Source Han Serif SC', 'Songti SC', Georgia, serif;
+  font-style: italic;
+  color: #2c2c2c;
+}
+
+.vditor-reset a {
+  color: #2c2c2c;
+  text-decoration: underline dashed;
+  text-underline-offset: 4px;
+}
+
+.vditor-reset a:hover {
+  background-color: #2c2c2c;
+  color: #f5f0e8;
+}
+
+.vditor-reset blockquote {
+  border-left: 3px dashed #8c8578;
+  margin: 1.2em 0;
+  padding: 0.4em 1em;
+  background-color: #efe7d8;
+  color: #3f3a33;
+}
+
+.vditor-reset hr {
+  border: none;
+  border-top: 2px dashed rgba(44, 44, 44, 0.4);
+}
+
+.vditor-reset table th,
+.vditor-reset table td {
+  border: 1px dashed #8c8578;
+}
+
+.vditor-reset table th {
+  background-color: #efe7d8;
+  font-style: italic;
+}
+
+.vditor-reset img {
+  border: 2px dashed #8c8578;
+  box-shadow: 3px 3px 0 rgba(44, 44, 44, 0.15);
+}
+
+.vditor-reset pre > code,
+.vditor-reset .hljs {
+  background-color: #efe7d8 !important;
+  border: 1px dashed #8c8578;
+  box-shadow: 2px 2px 0 rgba(44, 44, 44, 0.12);
+}
+
+.vditor-reset :not(pre) > code {
+  background-color: #efe7d8 !important;
+  color: #2c2c2c !important;
+  border: 1px dashed rgba(44, 44, 44, 0.45);
+  border-radius: 2px;
+}
+
+.vditor-ir__marker {
+  color: #8c8578;
+}
+
+.vditor-panel,
+.vditor-hint {
+  background-color: #f5f0e8 !important;
+  border: 1px dashed #2c2c2c !important;
+  box-shadow: 3px 3px 0 rgba(44, 44, 44, 0.15);
+  color: #2c2c2c;
+}
+
+.vditor-hint button {
+  color: #2c2c2c;
+}
+
+.vditor-hint button:hover {
+  background-color: #2c2c2c !important;
+  color: #f5f0e8 !important;
+}
+
+.vditor-counter {
+  color: #6a6255;
+  font-family: 'Noto Serif SC', 'Source Han Serif SC', 'Songti SC', Georgia, serif;
+  font-style: italic;
+}
+
+.vditor--fullscreen {
+  background-color: #f5f0e8 !important;
+}
+
+/* 编辑器内的提示气泡 / 上传状态：纸色 + 虚线 */
+.vditor-tip {
+  background-color: #f5f0e8;
+  border: 1px dashed #2c2c2c;
+  color: #2c2c2c;
+}

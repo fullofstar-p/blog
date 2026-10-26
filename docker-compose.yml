@@ -1,0 +1,160 @@
+# =============================================================================
+# 技术分享博客 · 完整栈编排（MySQL / Redis / 对象存储 / 后端 / 前端）
+#
+# Docker： docker compose up -d --build
+# Podman（Rocky Linux）： podman-compose up -d --build
+#   注意：rootless Podman 默认不能绑定 80 端口，需先放行：
+#     sudo sysctl -w net.ipv4.ip_unprivileged_port_start=80   （持久化写 /etc/sysctl.d/）
+#   或把 .env 里 FRONTEND_PORT 改成 8080 等非特权端口。
+# SELinux：sql/ 挂载用长语法 bind.selinux: z 打标签（podman-compose 不认短语法 :z）；
+# 后端/前端用的是构建镜像，无需额外标签。
+# 本地只想起依赖服务时用 docker-compose.infra.yml，不要用本文件。
+# =============================================================================
+
+name: blog
+
+services:
+  mysql:
+    image: mysql:8.0
+    container_name: blog-mysql
+    restart: unless-stopped
+    environment:
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:?MYSQL_ROOT_PASSWORD is required}
+      MYSQL_DATABASE: ${MYSQL_DATABASE:-blog}
+      TZ: Asia/Shanghai
+    command:
+      - --character-set-server=utf8mb4
+      - --collation-server=utf8mb4_unicode_ci
+      - --default-time-zone=+08:00
+      - --ngram_token_size=2
+    ports:
+      - "${MYSQL_PORT:-3306}:3306"
+    volumes:
+      - mysql-data:/var/lib/mysql
+      # 长语法 + bind.selinux: z：Rocky/RHEL 的 SELinux 需要重打标签（Docker 下忽略此选项）
+      - type: bind
+        source: ./sql
+        target: /docker-entrypoint-initdb.d
+        read_only: true
+        bind:
+          selinux: z
+    healthcheck:
+      test: ["CMD-SHELL", "mysqladmin ping -h 127.0.0.1 -uroot -p$$MYSQL_ROOT_PASSWORD --silent"]
+      interval: 10s
+      timeout: 5s
+      retries: 15
+      start_period: 30s
+    networks:
+      - blog-net
+
+  redis:
+    image: redis:7-alpine
+    container_name: blog-redis
+    restart: unless-stopped
+    command: ["redis-server", "--appendonly", "yes"]
+    ports:
+      - "${REDIS_PORT:-6379}:6379"
+    volumes:
+      - redis-data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    networks:
+      - blog-net
+
+  minio:
+    # MinIO 社区版镜像已于 2026-09 从 Docker Hub 下架，这里做成可覆盖：
+    # 有自备镜像仓库就把 MINIO_IMAGE 指向自己的镜像（或在 .env 中覆盖）。
+    image: ${MINIO_IMAGE:-minio/minio:latest}
+    container_name: blog-minio
+    restart: unless-stopped
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER:?MINIO_ROOT_USER is required}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:?MINIO_ROOT_PASSWORD is required}
+    ports:
+      - "${MINIO_PORT:-9000}:9000"
+      - "${MINIO_CONSOLE_PORT:-9001}:9001"
+    volumes:
+      - minio-data:/data
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:9000/minio/health/live || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
+    networks:
+      - blog-net
+
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: blog-backend
+    restart: unless-stopped
+    environment:
+      TZ: Asia/Shanghai
+      MYSQL_HOST: mysql
+      MYSQL_PORT: 3306
+      MYSQL_DATABASE: ${MYSQL_DATABASE:-blog}
+      MYSQL_USERNAME: root
+      MYSQL_PASSWORD: ${MYSQL_ROOT_PASSWORD}
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      REDIS_PASSWORD: ""
+      REDIS_DATABASE: 0
+      MINIO_ENDPOINT: http://minio:9000
+      MINIO_ACCESS_KEY: ${MINIO_ROOT_USER}
+      MINIO_SECRET_KEY: ${MINIO_ROOT_PASSWORD}
+      MINIO_BUCKET: ${MINIO_BUCKET:-blog}
+      MINIO_PUBLIC_ENDPOINT: ${MINIO_PUBLIC_ENDPOINT:-http://localhost:9000}
+      MINIO_REGION: us-east-1
+      JWT_SECRET: ${JWT_SECRET:?JWT_SECRET is required}
+      JWT_ACCESS_EXPIRE: ${JWT_ACCESS_EXPIRE:-7200}
+      JWT_REFRESH_EXPIRE: ${JWT_REFRESH_EXPIRE:-604800}
+      ADMIN_USERNAME: ${ADMIN_USERNAME:-admin}
+      ADMIN_PASSWORD: ${ADMIN_PASSWORD:-admin123456}
+    ports:
+      - "${BACKEND_PORT:-8080}:8080"
+    depends_on:
+      mysql:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      # MinIO 的 healthcheck 依赖镜像自带 curl；不同镜像版本可能没有 curl，
+      # 因此这里只要求容器已启动，由后端 MinioInitializer 带重试地建桶，避免整栈卡在 minio 健康检查。
+      minio:
+        condition: service_started
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q -O - http://127.0.0.1:8080/actuator/health | grep -q UP || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 10
+      start_period: 60s
+    networks:
+      - blog-net
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: blog-frontend
+    restart: unless-stopped
+    ports:
+      - "${FRONTEND_PORT:-80}:80"
+    depends_on:
+      backend:
+        condition: service_started
+    networks:
+      - blog-net
+
+volumes:
+  mysql-data:
+  redis-data:
+  minio-data:
+
+networks:
+  blog-net:
+    driver: bridge

@@ -1,0 +1,175 @@
+# =============================================================================
+# 技术分享博客 · 本地开发基础设施（MySQL 8 + Redis 7 + 对象存储）
+#
+# 只起"依赖服务"：后端用 IDE / mvn 直接启动，前端用 npm run dev 直接启动，
+# 不重建镜像，改代码即时生效。
+#
+# 用法（在仓库根目录执行；本文件与 sql/ 目录同级）：
+#
+#   Rocky Linux 9 + Podman（推荐）：
+#     一次性安装：sudo dnf install -y epel-release && sudo dnf install -y podman podman-compose
+#     启动：podman-compose -f docker-compose.infra.yml up -d
+#     状态：podman-compose -f docker-compose.infra.yml ps
+#     日志：podman-compose -f docker-compose.infra.yml logs -f
+#     停止：podman-compose -f docker-compose.infra.yml down      # 保留数据
+#     重置：podman-compose -f docker-compose.infra.yml down -v   # 连数据卷一起删
+#     （Podman 4.7+ 也可用内置子命令 `podman compose -f docker-compose.infra.yml up -d`，
+#       它需要一个 provider：docker-compose 或 podman-compose，装后者即可。）
+#
+#   Docker（备选）：docker compose -f docker-compose.infra.yml up -d（要求 compose v2）
+#
+# Podman / Rocky 注意事项：
+#   1. 建议普通用户 rootless 直接跑（无需 systemd 里的 docker/podman 服务权限）；
+#      本文件端口全部 >1024，不需要特权端口。
+#   2. Rocky 默认 SELinux enforcing：sql/ 挂载用长语法设置了 bind.selinux: z（见 mysql.volumes）；
+#      以后若自己加宿主目录挂载，也要打 z/Z 标签——短语法写 ":z"，podman-compose 请用
+#      bind: {selinux: z} 长语法，否则会报 unknown mount option z，且容器读不到文件。
+#   3. podman-compose 依赖 DNS 后端：netavark + aardvark-dns（Rocky 的 podman 包默认带）。
+#      可用 `podman info --format '{{.Host.NetworkBackend}}'` 确认输出 netavark。
+#   4. 若从宿主机浏览器/客户端访问虚拟机里的服务，需放行 firewalld（按需，别在生产照搬）：
+#      sudo firewall-cmd --permanent --add-port={3306,6379,9000,9001,8080,5173}/tcp
+#      sudo firewall-cmd --reload
+#   5. rootless 容器默认不随开机启动；开发环境每次开机手动 up 即可（需要自启可做 systemd/quadlet）。
+#   6. 镜像加速：Rocky 的 /etc/containers/registries.conf 里给 docker.io 配 [[registry.mirror]]。
+#
+# 关于对象存储（重要）：
+#   MinIO 社区版从 2025-10 起改为 source-only，不再发预编译镜像；
+#   2026-09-11 Docker Hub 上的 minio/minio、minio/mc 全线下架，
+#   quay.io 上只剩冻结的旧 tag 且不再维护。本项目后端只用标准 S3 API
+#   （AWS SDK v2），完全不绑定 MinIO，所以这里默认改用 S3 兼容的 RustFS：
+#     镜像 rustfs/rustfs（Apache-2.0，带 Web 控制台），端口 9000 = S3 API、9001 = 控制台。
+#   如果你有可用的 MinIO 镜像仓库，把 objectstore 的 image 换成自己的镜像，
+#   并按 MinIO 的变量名（MINIO_ROOT_USER / MINIO_ROOT_PASSWORD）启动即可，
+#   后端侧环境变量（MINIO_*）不用改。
+#
+# 默认账号（仅本地开发，生产务必替换）：
+#   MySQL      root / blog_dev_123456       127.0.0.1:3306
+#   Redis      无密码                        127.0.0.1:6379
+#   对象存储   minioadmin / minioadmin       127.0.0.1:9000（控制台 :9001）
+#
+# 后端连接参数（宿主机/虚拟机内启动后端时）：
+#   MYSQL_HOST=127.0.0.1  MYSQL_PORT=3306  MYSQL_DATABASE=blog
+#   MYSQL_USERNAME=root   MYSQL_PASSWORD=blog_dev_123456
+#   REDIS_HOST=127.0.0.1  REDIS_PORT=6379
+#   MINIO_ENDPOINT=http://127.0.0.1:9000  MINIO_ACCESS_KEY=minioadmin
+#   MINIO_SECRET_KEY=minioadmin           MINIO_BUCKET=blog
+#
+# 说明：
+#   1. 所有变量都带默认值，不建 .env 也能直接跑；要改端口/密码就复制
+#      .env.example 为 .env 并覆盖同名变量（项目名 blog-infra，与完整栈不混）。
+#   2. 首次启动自动执行 ./sql/init.sql；bucket 由后端启动时自动创建并设公共读。
+#   3. 数据落在 named volume，down 不丢；只有 down -v 才清空。
+#   4. 完整栈 docker-compose.yml（项目名 blog）端口相同，切换前先 down 本文件。
+# =============================================================================
+
+
+name: blog-infra
+
+services:
+  # ---------------------------------------------------------------------------
+  # MySQL 8.0：首次启动自动执行 ./sql/init.sql（建表 + 初始化分类/标签）
+  # ---------------------------------------------------------------------------
+  mysql:
+    image: mysql:8.0
+    container_name: blog-infra-mysql
+    restart: unless-stopped
+    environment:
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:-blog_dev_123456}
+      MYSQL_DATABASE: ${MYSQL_DATABASE:-blog}
+      TZ: Asia/Shanghai
+    command:
+      - --character-set-server=utf8mb4
+      - --collation-server=utf8mb4_unicode_ci
+      - --default-time-zone=+08:00
+      # 全文检索使用 ngram 分词器，需与建表索引保持一致
+      - --ngram_token_size=2
+    ports:
+      - "${MYSQL_PORT:-3306}:3306"
+    volumes:
+      - mysql-data:/var/lib/mysql
+      # 仅在数据卷为空（首次启动）时执行；改完 init.sql 需 down -v 才会重跑。
+      # 用长语法带 bind.selinux: z —— Rocky/RHEL 的 SELinux 需要重打标签，
+      # 短语法里的 ":ro,z" 会被 podman-compose 判成未知选项，故写成长语法。
+      - type: bind
+        source: ./sql
+        target: /docker-entrypoint-initdb.d
+        read_only: true
+        bind:
+          selinux: z
+    healthcheck:
+      test: ["CMD-SHELL", "mysqladmin ping -h 127.0.0.1 -uroot -p$$MYSQL_ROOT_PASSWORD --silent"]
+      interval: 10s
+      timeout: 5s
+      retries: 15
+      start_period: 30s
+    networks:
+      - blog-infra-net
+
+  # ---------------------------------------------------------------------------
+  # Redis 7：JWT 白名单/黑名单 + 缓存 + 浏览量计数缓冲
+  # ---------------------------------------------------------------------------
+  redis:
+    image: redis:7-alpine
+    container_name: blog-infra-redis
+    restart: unless-stopped
+    command: ["redis-server", "--appendonly", "yes"]
+    ports:
+      - "${REDIS_PORT:-6379}:6379"
+    volumes:
+      - redis-data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    networks:
+      - blog-infra-net
+
+  # ---------------------------------------------------------------------------
+  # 对象存储：RustFS（S3 兼容，MinIO 社区镜像已下架，见文件头说明）
+  #   9000 = S3 API（后端 SDK、图片直链都走这里）
+  #   9001 = Web 控制台
+  #
+  # 若改用自备的 MinIO 镜像，把下面 image/command/environment 换成：
+  #   image: <你的仓库>/minio/minio:RELEASE.2025-10-15T17-29-55Z
+  #   command: server /data --console-address ":9001"
+  #   environment:
+  #     MINIO_ROOT_USER: ${MINIO_ROOT_USER:-minioadmin}
+  #     MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:-minioadmin}
+  # ---------------------------------------------------------------------------
+  objectstore:
+    image: ${OBJECTSTORE_IMAGE:-rustfs/rustfs:latest}
+    container_name: blog-infra-objectstore
+    restart: unless-stopped
+    environment:
+      RUSTFS_ADDRESS: 0.0.0.0:9000
+      RUSTFS_CONSOLE_ADDRESS: 0.0.0.0:9001
+      RUSTFS_CONSOLE_ENABLE: "true"
+      # 起一个兼容 MinIO/后端默认值的开发账号；生产请换成随机强口令
+      RUSTFS_ACCESS_KEY: ${MINIO_ROOT_USER:-minioadmin}
+      RUSTFS_SECRET_KEY: ${MINIO_ROOT_PASSWORD:-minioadmin}
+      RUSTFS_OBS_LOGGER_LEVEL: info
+      TZ: Asia/Shanghai
+    ports:
+      - "${MINIO_PORT:-9000}:9000"
+      - "${MINIO_CONSOLE_PORT:-9001}:9001"
+    volumes:
+      # 容器以 UID 10001 运行；用 named volume 可避免宿主机目录权限问题
+      - objectstore-data:/data
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://127.0.0.1:9000/health || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 20s
+    networks:
+      - blog-infra-net
+
+volumes:
+  mysql-data:
+  redis-data:
+  objectstore-data:
+
+networks:
+  blog-infra-net:
+    driver: bridge
