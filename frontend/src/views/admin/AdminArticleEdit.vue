@@ -10,6 +10,7 @@ import SketchTextarea from '@/components/SketchTextarea.vue'
 import { createArticle, getArticle, updateArticle } from '@/api/article'
 import { useMetaStore } from '@/store/meta'
 import { toastSuccess } from '@/utils/toast'
+import { countArticle } from '@/utils/wordCount'
 
 const props = defineProps({
   id: { type: String, default: '' }
@@ -36,6 +37,9 @@ const form = reactive({
 })
 
 const errors = reactive({ title: '', summary: '', content: '' })
+
+// 去掉 Markdown 标记后的真实字数（右侧展示）
+const wordStats = computed(() => countArticle(form.content))
 
 async function loadMeta() {
   try {
@@ -262,7 +266,12 @@ watch(
       <section class="sketch-card rotate-[0.2deg] p-5 md:p-6">
         <div class="flex flex-wrap items-center justify-between gap-2">
           <h3 class="font-serif text-xl italic text-pencil">正文</h3>
-          <span class="font-serif text-xs italic text-ink-300">{{ form.content.length }} 字符</span>
+          <span
+            class="font-serif text-xs italic text-ink-300"
+            :title="`汉字按字、英文/数字按词统计，不含 Markdown 标记与空白；去空白字符数 ${wordStats.chars}`"
+          >
+            {{ wordStats.words }} 字
+          </span>
         </div>
         <p v-if="errors.content" class="mt-2 font-serif text-sm italic text-[#b23b2e]" role="alert">
           {{ errors.content }}

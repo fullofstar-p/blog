@@ -91,7 +91,8 @@ onMounted(() => {
     // 内容以后端为准，不使用 Vditor 的 localStorage 缓存，避免多端编辑串内容
     cache: { enable: false },
     toolbar,
-    counter: { enable: true, type: 'markdown' },
+    // 工具栏自带字数是按输入事件估算的，不准确；字数统计统一由页面右侧显示
+    counter: { enable: false },
     upload: {
       accept: 'image/jpeg,image/png,image/webp,image/gif',
       max: 5 * 1024 * 1024,

@@ -195,24 +195,21 @@ function installTableTools(root, internal) {
       const contentRight = preRect.right - scrollbarWidth - padRight
       let left = contentRight - rootRect.left + 1
       left = Math.max(Math.min(left, preRect.right - rootRect.left - boxWidth - 1), 6)
-      let top = tableRect.top - rootRect.top
-      const maxTop = root.clientHeight - panel.offsetHeight - gap
+      let top = tableRect.bottom - rootRect.top + gap
+      const maxTop = root.clientHeight - panel.offsetHeight - 6
       top = Math.min(Math.max(top, toolbarHeight + 4), Math.max(maxTop, toolbarHeight + 4))
       panel.style.top = `${top}px`
       panel.style.left = `${left}px`
       return true
     }
 
-    // 窄屏兜底：贴表格右上角，尽量只压住右侧留白
+    // 窄屏兜底：贴表格右下角，尽量只压住右侧留白
     panel.style.width = ''
     const panelRect = panel.getBoundingClientRect()
     let left = tableRect.right - rootRect.left - panelRect.width
     left = Math.max(Math.min(left, root.clientWidth - panelRect.width - gap), gap)
-    let top = tableRect.top - rootRect.top - panelRect.height - gap
-    if (top < toolbarHeight + 4) {
-      top = tableRect.bottom - rootRect.top + gap
-    }
-    const maxTop = root.clientHeight - panelRect.height - gap
+    let top = tableRect.bottom - rootRect.top + gap
+    const maxTop = root.clientHeight - panelRect.height - 6
     top = Math.min(Math.max(top, toolbarHeight + 4), Math.max(maxTop, toolbarHeight + 4))
     panel.style.top = `${top}px`
     panel.style.left = `${left}px`
@@ -278,6 +275,12 @@ function installTableTools(root, internal) {
     const range = document.createRange()
     range.selectNodeContents(cell)
     range.collapse(true)
+    // 对齐用的 setTableAlign 依赖 startContainer.parentElement 找当前列，
+    // 起点必须落在单元格内部（文本节点或子元素），不能是 <td> 本身
+    if (!cell.firstChild) {
+      cell.appendChild(document.createTextNode(''))
+    }
+    range.setStart(cell.firstChild, 0)
     const selection = window.getSelection()
     selection.removeAllRanges()
     selection.addRange(range)
@@ -397,6 +400,136 @@ function fixFullscreen(root) {
 }
 
 /**
+ * 左侧行号。
+ *
+ * IR 模式没有真正的“源码行”，这里按渲染后的可视行编号：
+ * 遍历正文文本节点，用 Range.getClientRects() 拿到每一行的位置，
+ * 去重后把序号画在左侧留白里（不参与正文布局、不响应鼠标）。
+ * 为了不压住 Vditor 自己的 H1/H2 标记，给正文左侧额外留出 30px。
+ */
+function installLineNumbers(root, internal) {
+  const pre = internal.ir.element
+  const numbers = document.createElement('div')
+  numbers.className = 'vditor-line-numbers'
+  numbers.setAttribute('aria-hidden', 'true')
+  const track = document.createElement('div')
+  track.className = 'vditor-line-numbers__track'
+  numbers.appendChild(track)
+  root.appendChild(numbers)
+
+  const EXTRA_LEFT = 30
+  let frame = 0
+  let timer = 0
+
+  const ensurePadding = () => {
+    const right = parseFloat(pre.style.paddingRight) || 0
+    // 窄屏（移动端）本来就放不下行号，就别再挤占正文宽度
+    const want = right >= 40 ? right + EXTRA_LEFT : right
+    if (!want) return
+    const left = parseFloat(pre.style.paddingLeft) || 0
+    if (Math.abs(left - want) > 0.5) {
+      pre.style.paddingLeft = `${want}px`
+    }
+  }
+
+  const render = () => {
+    frame = 0
+    ensurePadding()
+    const preRect = pre.getBoundingClientRect()
+    const rootRect = root.getBoundingClientRect()
+    const padLeft = parseFloat(getComputedStyle(pre).paddingLeft) || 0
+    const width = padLeft - 34
+    if (width < 14 || preRect.height === 0) {
+      numbers.style.display = 'none'
+      return
+    }
+    numbers.style.display = 'block'
+    numbers.style.top = `${preRect.top - rootRect.top}px`
+    numbers.style.left = `${preRect.left - rootRect.left + 4}px`
+    numbers.style.width = `${width}px`
+    numbers.style.height = `${pre.clientHeight}px`
+
+    const range = document.createRange()
+    const walker = document.createTreeWalker(pre, NodeFilter.SHOW_TEXT, {
+      acceptNode: (node) =>
+        /[^\s\u200b\ufeff]/.test(node.nodeValue || '') ? NodeFilter.FILTER_ACCEPT : NodeFilter.FILTER_REJECT
+    })
+    const lineTops = []
+    let node = walker.nextNode()
+    while (node) {
+      // 折叠状态的 IR 标记（#、```、表格竖线等）高度为 0，但文本仍有 rect，需要排除
+      const marker = node.parentElement && node.parentElement.closest('[class*="vditor-ir__marker"]')
+      if (marker && marker.getBoundingClientRect().height < 2) {
+        node = walker.nextNode()
+        continue
+      }
+      range.selectNodeContents(node)
+      const rects = range.getClientRects()
+      for (let i = 0; i < rects.length; i += 1) {
+        const rect = rects[i]
+        if (rect.height < 2) continue
+        lineTops.push({ top: rect.top - preRect.top + pre.scrollTop, height: rect.height })
+      }
+      node = walker.nextNode()
+    }
+    lineTops.sort((a, b) => a.top - b.top)
+    const merged = []
+    lineTops.forEach((line) => {
+      if (!merged.length || line.top - merged[merged.length - 1].top > 6) {
+        merged.push(line)
+      }
+    })
+
+    let html = ''
+    merged.forEach((line, index) => {
+      const offset = Math.max((line.height - 15) / 2, 0)
+      html += `<span style="top:${Math.round(line.top + offset)}px">${index + 1}</span>`
+    })
+    track.innerHTML = html
+    track.style.transform = `translateY(${-pre.scrollTop}px)`
+  }
+
+  const schedule = () => {
+    if (timer) window.clearTimeout(timer)
+    timer = window.setTimeout(() => {
+      timer = 0
+      if (!frame) frame = window.requestAnimationFrame(render)
+    }, 120)
+  }
+
+  const syncScroll = () => {
+    track.style.transform = `translateY(${-pre.scrollTop}px)`
+  }
+
+  const offScroll = on(pre, 'scroll', syncScroll)
+  const offResize = on(window, 'resize', schedule)
+
+  // 正文重渲染（输入、插入表格/代码块、外部 setValue）后重新测量
+  const contentObserver = new MutationObserver(schedule)
+  contentObserver.observe(pre, { childList: true, subtree: true, characterData: true })
+
+  // Vditor 会重算 padding（resize、大纲切换、全屏），这里把左侧额外留白补回去
+  const styleObserver = new MutationObserver(() => {
+    ensurePadding()
+    schedule()
+  })
+  styleObserver.observe(pre, { attributes: true, attributeFilter: ['style'] })
+
+  schedule()
+  window.setTimeout(schedule, 400)
+
+  return () => {
+    offScroll()
+    offResize()
+    contentObserver.disconnect()
+    styleObserver.disconnect()
+    if (frame) window.cancelAnimationFrame(frame)
+    if (timer) window.clearTimeout(timer)
+    numbers.remove()
+  }
+}
+
+/**
  * 安装全部增强。返回 dispose 函数，组件卸载时调用。
  * @param {import('vditor').default} vditor Vditor 实例
  */
@@ -404,6 +537,12 @@ export function enhanceVditor(vditor) {
   const internal = vditor && vditor.vditor
   if (!internal || !internal.element) return () => {}
   const root = internal.element
-  const disposers = [decorateToolbar(root), fixOutlineJump(root, internal), installTableTools(root, internal), fixFullscreen(root)]
+  const disposers = [
+    decorateToolbar(root),
+    fixOutlineJump(root, internal),
+    installTableTools(root, internal),
+    installLineNumbers(root, internal),
+    fixFullscreen(root)
+  ]
   return () => disposers.forEach((dispose) => dispose())
 }

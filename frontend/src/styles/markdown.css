@@ -624,7 +624,7 @@
   z-index: 20;
   display: none;
   grid-template-columns: 1fr;
-  gap: 2px;
+  gap: 1px;
   padding: 2px;
   background-color: #f5f0e8;
   border: 1px dashed #2c2c2c;
@@ -637,7 +637,7 @@
 
 .vditor-table-tools button {
   width: 100%;
-  height: 21px;
+  height: 19px;
   margin: 0;
   padding: 0;
   border: 0;
@@ -676,7 +676,35 @@
   outline: none;
 }
 
-/* ---------- 5. 全屏兜底（祖先变换由 vditorEnhance.js 临时清除） ---------- */
+/* ---------- 5. 左侧行号 ---------- */
+.vditor-line-numbers {
+  position: absolute;
+  z-index: 4;
+  display: none;
+  overflow: hidden;
+  pointer-events: none;
+  user-select: none;
+  font-family: 'Noto Serif SC', 'Source Han Serif SC', 'Songti SC', Georgia, serif;
+  font-size: 10px;
+  line-height: 15px;
+  color: #a89e8a;
+  text-align: right;
+}
+
+.vditor-line-numbers__track {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+}
+
+.vditor-line-numbers span {
+  position: absolute;
+  right: 2px;
+  font-variant-numeric: tabular-nums;
+}
+
+/* ---------- 6. 全屏兜底（祖先变换由 vditorEnhance.js 临时清除） ---------- */
 .vditor--fullscreen {
   position: fixed !important;
   top: 0 !important;
