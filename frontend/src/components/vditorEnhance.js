@@ -42,10 +42,13 @@ const TABLE_OPS = {
   'col-left': { key: 'G', shift: true, code: 'KeyG' },
   'col-right': { key: '+', shift: true, code: 'Equal' },
   'row-del': { key: '-', shift: false, code: 'Minus' },
-  'col-del': { key: '_', shift: true, code: 'Minus' },
-  'align-left': { key: 'L', shift: true, code: 'KeyL' },
-  'align-center': { key: 'C', shift: true, code: 'KeyC' },
-  'align-right': { key: 'R', shift: true, code: 'KeyR' }
+  'col-del': { key: '_', shift: true, code: 'Minus' }
+}
+
+const ALIGN_OPS = {
+  'align-left': 'left',
+  'align-center': 'center',
+  'align-right': 'right'
 }
 
 const TABLE_BUTTONS = [
@@ -57,7 +60,8 @@ const TABLE_BUTTONS = [
   { op: 'col-del', label: '删除列', title: '删除当前列' },
   { op: 'align-left', label: '左对齐', title: '当前列左对齐' },
   { op: 'align-center', label: '居中', title: '当前列居中对齐' },
-  { op: 'align-right', label: '右对齐', title: '当前列右对齐' }
+  { op: 'align-right', label: '右对齐', title: '当前列右对齐' },
+  { op: 'table-del', label: '删除表格', title: '删除整个表格' }
 ]
 
 const on = (el, type, handler, options) => {
@@ -117,8 +121,28 @@ function fixOutlineJump(vditorEl, internal) {
   return on(content, 'click', handler, true)
 }
 
+/** 找出 Markdown 里的所有表格块（行号区间） */
+const findTableBlocks = (lines) => {
+  const blocks = []
+  let index = 0
+  while (index < lines.length - 1) {
+    const isRow = /^\s*\|.*\|\s*$/.test(lines[index])
+    const isDivider = /^\s*\|?[\s:|-]+\|?\s*$/.test(lines[index + 1]) && lines[index + 1].includes('-')
+    if (isRow && isDivider) {
+      const start = index
+      let end = index + 1
+      while (end + 1 < lines.length && /^\s*\|.*\|\s*$/.test(lines[end + 1])) end += 1
+      blocks.push({ start, end })
+      index = end + 1
+    } else {
+      index += 1
+    }
+  }
+  return blocks
+}
+
 /** 表格浮动工具条：鼠标移到表格上时出现，点击按钮复用 Vditor 的快捷键实现增删改。 */
-function installTableTools(root, internal) {
+function installTableTools(root, internal, vditor) {
   const panel = document.createElement('div')
   panel.className = 'vditor-table-tools'
   panel.setAttribute('role', 'toolbar')
@@ -243,7 +267,62 @@ function installTableTools(root, internal) {
     if (op === 'col-del') anchor.cellIndex = Math.max(anchor.cellIndex - 1, 0)
   }
 
+  /** 删除整张表格：按 Markdown 文本定位并移除对应表格块 */
+  const deleteWholeTable = () => {
+    if (!anchor) return
+    const markdown = vditor.getValue()
+    const blocks = findTableBlocks(markdown.split('\n'))
+    const block = blocks[anchor.tableIndex]
+    if (!block) return
+    const lines = markdown.split('\n')
+    const next = lines.slice(0, block.start).concat(lines.slice(block.end + 1))
+    const cleaned = next
+      .join('\n')
+      .replace(/\u200b/g, '')
+      .replace(/[ \t]+\n/g, '\n')
+      .replace(/\n{3,}/g, '\n\n')
+      .replace(/^\n+/, '')
+      .replace(/\n+$/, '\n')
+    const pre = internal.ir.element
+    const savedScroll = pre.scrollTop
+    hide()
+    vditor.setValue(cleaned, false)
+    // setValue 的 enableInput 为 false，这里手动通知外层（v-model）同步
+    if (internal.options && typeof internal.options.input === 'function') {
+      internal.options.input(cleaned)
+    }
+    pre.scrollTop = savedScroll
+  }
+
+  /** 列对齐：直接改单元格 align 属性，再从 DOM 重新生成 Markdown 同步给外层 */
+  const applyAlignment = (align) => {
+    const found = resolve()
+    if (!found) return
+    const { table } = found
+    const column = anchor.cellIndex
+    Array.from(table.rows).forEach((row) => {
+      const cell = row.cells[column]
+      if (!cell) return
+      cell.setAttribute('align', align)
+      cell.classList.add('vditor-align-flash')
+      window.setTimeout(() => cell.classList.remove('vditor-align-flash'), 800)
+    })
+    const markdown = vditor.getValue()
+    if (internal.options && typeof internal.options.input === 'function') {
+      internal.options.input(markdown)
+    }
+    window.setTimeout(place, 60)
+  }
+
   const dispatchOp = (op) => {
+    if (op === 'table-del') {
+      deleteWholeTable()
+      return
+    }
+    if (ALIGN_OPS[op]) {
+      applyAlignment(ALIGN_OPS[op])
+      return
+    }
     const config = TABLE_OPS[op]
     const found = resolve()
     if (!config || !found) return
@@ -518,7 +597,7 @@ export function enhanceVditor(vditor) {
   const disposers = [
     decorateToolbar(root),
     fixOutlineJump(root, internal),
-    installTableTools(root, internal),
+    installTableTools(root, internal, vditor),
     installLineNumbers(root, internal),
     fixFullscreen(root)
   ]

@@ -659,6 +659,13 @@
   outline: none;
 }
 
+/* 点击对齐后短暂高亮被操作的列，便于确认生效 */
+.vditor-reset td.vditor-align-flash,
+.vditor-reset th.vditor-align-flash {
+  background-color: #e8ddc6 !important;
+  box-shadow: inset 0 0 0 1px #8c8578;
+}
+
 /* ---------- 5. 左侧行号 ---------- */
 .vditor-line-numbers {
   position: absolute;
