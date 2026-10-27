@@ -56,7 +56,11 @@ src/
 ## Markdown / 代码高亮
 
 - 后台写文章用 **Vditor**「即时渲染（IR）」模式：在书写位置直接渲染标题、列表、代码块，
-  类似 Typora，不再左右分栏；工具栏「编辑模式」可切到所见即所得（wysiwyg）或分屏（sv）。
+  类似 Typora，不再左右分栏；只保留即时渲染，不再提供所见即所得 / 分屏切换。
+  工具栏按钮带中文名称（`vditorEnhance.js` 补挂），鼠标悬停显示功能名与快捷键。
+  表格支持悬停浮出操作条：插行、删行、插列、删列、整列左/中/右对齐。
+  大纲点击会滚动正文容器到对应标题（不再调用 `window.scrollTo` 导致整页跳顶）；
+  全屏时临时清除祖先卡片 `rotate` 变换，避免 `position: fixed` 被卡片限制。
   Vditor 的 lute / 中文语言包 / 图标 / 高亮样式在 `predev`、`prebuild` 时由
   `scripts/copy-vditor.mjs` 拷到 `public/vditor`（已 gitignore），不依赖外网 CDN。
 - 前台阅读用 `MarkdownViewer`（md-editor-v3 预览），与后台编辑器解耦。

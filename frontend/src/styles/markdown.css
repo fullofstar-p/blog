@@ -413,9 +413,21 @@
   border: 1px dashed #8c8578;
 }
 
+.vditor-reset table {
+  background-color: transparent;
+}
+
 .vditor-reset table th {
   background-color: #efe7d8;
   font-style: italic;
+}
+
+.vditor-reset table td {
+  background-color: #f5f0e8;
+}
+
+.vditor-reset table tr:nth-child(2n) td {
+  background-color: #efe7d8;
 }
 
 .vditor-reset img {
@@ -473,4 +485,185 @@
   background-color: #f5f0e8;
   border: 1px dashed #2c2c2c;
   color: #2c2c2c;
+}
+
+/* ==========================================================================
+   编辑器可用性修复
+   1) 工具栏：图标 + 中文名称，提示气泡移到按钮下方（原来在按钮上方，
+      被 .vditor 的 overflow: hidden 裁掉，等于没有提示）；
+   2) 有序列表：Tailwind 的 preflight 把 ol/ul 的 list-style 清成 none，
+      Vditor 只为 ul 补了 list-style-type，导致有序列表没有序号；
+   3) 代码块：展开编辑时源码块和渲染预览同时显示，看起来像两三个格子；
+   4) 表格：即时渲染模式没有增删行列入口，这里补一个悬浮工具条；
+   5) 全屏：祖先卡片的 rotate 变换会让 fixed 以卡片为包含块（见 vditorEnhance.js）。
+   ========================================================================== */
+
+/* ---------- 1. 工具栏中文名称 ---------- */
+.vditor-toolbar__item > .vditor-tooltipped {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  width: auto !important;
+  padding: 0 5px !important;
+  font-size: 12px;
+  line-height: 1;
+  white-space: nowrap;
+}
+
+.vditor-toolbar__item > .vditor-tooltipped svg {
+  flex-shrink: 0;
+}
+
+.vditor-toolbar__item .vditor-tb-label {
+  font-family: 'Noto Serif SC', 'Source Han Serif SC', 'Songti SC', Georgia, serif;
+  font-size: 12px;
+  line-height: 1;
+  color: inherit;
+  white-space: nowrap;
+}
+
+/* 提示气泡改到按钮下方，避免顶部被裁切 */
+.vditor-toolbar__item .vditor-tooltipped::after {
+  top: 100% !important;
+  bottom: auto !important;
+  right: auto !important;
+  left: 50% !important;
+  margin-top: 6px !important;
+  margin-bottom: 0 !important;
+  transform: translateX(-50%) !important;
+  background: #2c2c2c;
+  color: #f5f0e8;
+  border-radius: 2px;
+  font-family: 'Noto Serif SC', 'Source Han Serif SC', 'Songti SC', Georgia, serif;
+}
+
+.vditor-toolbar__item .vditor-tooltipped::before {
+  display: none !important;
+}
+
+/* 窄屏只留图标，靠提示气泡兜底 */
+@media (max-width: 720px) {
+  .vditor-toolbar__item .vditor-tb-label {
+    display: none;
+  }
+  .vditor-toolbar__item > .vditor-tooltipped {
+    width: 25px !important;
+    padding: 0 !important;
+    justify-content: center;
+  }
+}
+
+/* ---------- 2. 有序 / 无序列表（补 Tailwind preflight 清掉的序号） ---------- */
+.vditor-reset ol,
+.md-editor-preview ol {
+  list-style-type: decimal;
+}
+
+.vditor-reset ul,
+.md-editor-preview ul {
+  list-style-type: disc;
+}
+
+.vditor-reset ul ul,
+.md-editor-preview ul ul {
+  list-style-type: circle;
+}
+
+.vditor-reset ul ul ul,
+.md-editor-preview ul ul ul {
+  list-style-type: square;
+}
+
+.vditor-reset li,
+.md-editor-preview li {
+  display: list-item;
+}
+
+/* 列表项内的段落不再额外撑开（默认 li > p 有 16px 上边距，列表会非常松） */
+.vditor-reset li > p,
+.md-editor-preview li > p {
+  margin-top: 0;
+  margin-bottom: 0;
+}
+
+.vditor-reset li + li,
+.md-editor-preview li + li {
+  margin-top: 0.35em;
+}
+
+/* ---------- 3. 代码块：编辑时只保留一个源码框 ---------- */
+.vditor-ir__node--expand > .vditor-ir__preview {
+  display: none;
+}
+
+.vditor-ir__node--expand .vditor-ir__marker--pre {
+  display: block;
+  width: auto;
+  height: auto;
+  overflow: visible;
+}
+
+.vditor-ir__node--expand .vditor-ir__marker--pre > code {
+  display: block;
+  min-height: 44px;
+  padding: 12px 14px;
+  background-color: #efe7d8 !important;
+  color: #2c2c2c !important;
+  border: 1px dashed #8c8578;
+  border-radius: 2px;
+  box-shadow: 2px 2px 0 rgba(44, 44, 44, 0.12);
+  white-space: pre-wrap;
+  line-height: 1.75;
+  font-size: 0.92em;
+}
+
+/* ---------- 4. 表格悬浮操作条 ---------- */
+.vditor-table-tools {
+  position: absolute;
+  z-index: 20;
+  display: none;
+  align-items: center;
+  gap: 2px;
+  max-width: calc(100% - 16px);
+  padding: 4px 6px;
+  background-color: #f5f0e8;
+  border: 1px dashed #2c2c2c;
+  box-shadow: 3px 3px 0 rgba(44, 44, 44, 0.15);
+}
+
+.vditor-table-tools.is-open {
+  display: flex;
+  flex-wrap: wrap;
+}
+
+.vditor-table-tools button {
+  margin: 0;
+  padding: 5px 6px;
+  border: 1px dashed rgba(44, 44, 44, 0.5);
+  background-color: transparent;
+  color: #2c2c2c;
+  font-family: 'Noto Serif SC', 'Source Han Serif SC', 'Songti SC', Georgia, serif;
+  font-size: 12px;
+  line-height: 1;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: background-color 0.15s ease, color 0.15s ease;
+}
+
+.vditor-table-tools button:hover,
+.vditor-table-tools button:focus-visible {
+  background-color: #2c2c2c;
+  color: #f5f0e8;
+  outline: none;
+}
+
+/* ---------- 5. 全屏兜底（祖先变换由 vditorEnhance.js 临时清除） ---------- */
+.vditor--fullscreen {
+  position: fixed !important;
+  top: 0 !important;
+  left: 0 !important;
+  width: 100% !important;
+  height: 100vh !important;
+  border-radius: 0 !important;
+  z-index: 9999 !important;
 }

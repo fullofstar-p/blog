@@ -3,15 +3,17 @@ import { onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import Vditor from 'vditor'
 import 'vditor/dist/index.css'
 import { uploadFile } from '@/api/file'
+import { enhanceVditor } from '@/components/vditorEnhance'
 import { toastSuccess } from '@/utils/toast'
 
 /**
  * 正文编辑器：Vditor「即时渲染（IR）」模式。
  *
- * 与原先 md-editor-v3 的左右分栏不同：IR 模式在书写位置直接渲染标题/列表/
- * 代码块等，类似 Typora；工具栏的「编辑模式」按钮可随时切到所见即所得
- * （wysiwyg）或分屏（sv）。图片仍走项目自己的 /api/files/upload。
+ * 只保留即时渲染，不提供所见即所得 / 分屏切换——写和看是同一片区域，
+ * 光标所在位置直接渲染标题、列表、表格、代码块等。
+ * 图片仍走项目自己的 /api/files/upload。
  *
+ * 工具栏中文名称、表格浮动操作条、大纲跳转与全屏修复在 vditorEnhance.js 中。
  * 静态资源（lute / i18n / 图标 / 高亮样式）由 scripts/copy-vditor.mjs 在
  * predev、prebuild 时拷贝到 public/vditor，因此不用外网 CDN。
  */
@@ -25,6 +27,7 @@ const emit = defineEmits(['update:modelValue'])
 
 const host = ref(null)
 let vditor = null
+let disposeEnhance = null
 
 const toolbar = [
   'headings',
@@ -49,7 +52,6 @@ const toolbar = [
   'undo',
   'redo',
   '|',
-  'edit-mode',
   'outline',
   'fullscreen'
 ]
@@ -95,7 +97,10 @@ onMounted(() => {
       max: 5 * 1024 * 1024,
       handler: uploadImages
     },
-    input: onInput
+    input: onInput,
+    after: () => {
+      disposeEnhance = enhanceVditor(vditor)
+    }
   })
 })
 
@@ -112,6 +117,10 @@ watch(
 )
 
 onBeforeUnmount(() => {
+  if (disposeEnhance) {
+    disposeEnhance()
+    disposeEnhance = null
+  }
   if (vditor) {
     vditor.destroy()
     vditor = null
