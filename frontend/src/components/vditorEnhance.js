@@ -49,15 +49,15 @@ const TABLE_OPS = {
 }
 
 const TABLE_BUTTONS = [
-  { op: 'row-above', label: '上方插行', title: '在当前行上方插入一行' },
-  { op: 'row-below', label: '下方插行', title: '在当前行下方插入一行' },
-  { op: 'row-del', label: '删除行', title: '删除当前行' },
-  { op: 'col-left', label: '左侧插列', title: '在当前列左侧插入一列' },
-  { op: 'col-right', label: '右侧插列', title: '在当前列右侧插入一列' },
-  { op: 'col-del', label: '删除列', title: '删除当前列' },
-  { op: 'align-left', label: '左对齐', title: '当前列左对齐' },
-  { op: 'align-center', label: '居中', title: '当前列居中对齐' },
-  { op: 'align-right', label: '右对齐', title: '当前列右对齐' }
+  { op: 'row-above', label: '行↑', title: '在当前行上方插入一行' },
+  { op: 'row-below', label: '行↓', title: '在当前行下方插入一行' },
+  { op: 'row-del', label: '删行', title: '删除当前行' },
+  { op: 'col-left', label: '列←', title: '在当前列左侧插入一列' },
+  { op: 'col-right', label: '列→', title: '在当前列右侧插入一列' },
+  { op: 'col-del', label: '删列', title: '删除当前列' },
+  { op: 'align-left', label: '左', title: '当前列左对齐' },
+  { op: 'align-center', label: '中', title: '当前列居中对齐' },
+  { op: 'align-right', label: '右', title: '当前列右对齐' }
 ]
 
 const on = (el, type, handler, options) => {
@@ -173,10 +173,47 @@ function installTableTools(root, internal) {
     if (!found) return false
     const tableRect = found.table.getBoundingClientRect()
     const rootRect = root.getBoundingClientRect()
+    const toolbar = root.querySelector('.vditor-toolbar')
+    const toolbarHeight = toolbar ? toolbar.offsetHeight : 0
+    const gap = 8
+
+    // 正文容器左右各有一段 padding，右侧这条留白带可以塞下一条竖排操作条，
+    // 完全压不到正文与表格；padding 太窄（窄屏）时退化成表格右上角的小面板。
+    const pre = internal.ir.element
+    const preStyle = getComputedStyle(pre)
+    const padRight = parseFloat(preStyle.paddingRight) || 0
+    const rail = padRight >= 34 && root.clientWidth >= 520
+    panel.classList.toggle('is-rail', rail)
+    panel.classList.toggle('is-grid', !rail)
+
+    if (rail) {
+      const railWidth = Math.max(24, Math.min(40, padRight - 8))
+      panel.style.width = `${railWidth}px`
+      const boxWidth = panel.offsetWidth
+      const scrollbarWidth = pre.offsetWidth - pre.clientWidth
+      const preRect = pre.getBoundingClientRect()
+      const contentRight = preRect.right - scrollbarWidth - padRight
+      let left = contentRight - rootRect.left + 1
+      left = Math.max(Math.min(left, preRect.right - rootRect.left - boxWidth - 1), 6)
+      let top = tableRect.top - rootRect.top
+      const maxTop = root.clientHeight - panel.offsetHeight - gap
+      top = Math.min(Math.max(top, toolbarHeight + 4), Math.max(maxTop, toolbarHeight + 4))
+      panel.style.top = `${top}px`
+      panel.style.left = `${left}px`
+      return true
+    }
+
+    // 窄屏兜底：贴表格右上角，尽量只压住右侧留白
+    panel.style.width = ''
     const panelRect = panel.getBoundingClientRect()
-    const above = tableRect.top - rootRect.top - panelRect.height - 8
-    const top = above > 60 ? above : tableRect.bottom - rootRect.top + 8
-    const left = Math.max(tableRect.left - rootRect.left, 8)
+    let left = tableRect.right - rootRect.left - panelRect.width
+    left = Math.max(Math.min(left, root.clientWidth - panelRect.width - gap), gap)
+    let top = tableRect.top - rootRect.top - panelRect.height - gap
+    if (top < toolbarHeight + 4) {
+      top = tableRect.bottom - rootRect.top + gap
+    }
+    const maxTop = root.clientHeight - panelRect.height - gap
+    top = Math.min(Math.max(top, toolbarHeight + 4), Math.max(maxTop, toolbarHeight + 4))
     panel.style.top = `${top}px`
     panel.style.left = `${left}px`
     return true
@@ -188,6 +225,10 @@ function installTableTools(root, internal) {
     anchor = next
     panel.classList.add('is-open')
     place()
+    // 首次显示时字号/滚动条可能还没稳定，下一帧再校正一次
+    window.requestAnimationFrame(() => {
+      if (panel.classList.contains('is-open')) place()
+    })
   }
 
   const hide = () => {
@@ -197,7 +238,7 @@ function installTableTools(root, internal) {
 
   const scheduleHide = () => {
     window.clearTimeout(hideTimer)
-    hideTimer = window.setTimeout(hide, 220)
+    hideTimer = window.setTimeout(hide, 350)
   }
 
   const offOver = on(root, 'mouseover', (event) => {
@@ -276,12 +317,22 @@ function installTableTools(root, internal) {
     if (panel.classList.contains('is-open')) place()
   })
 
+  // Vditor 会根据容器宽度重算正文左右 padding（会改变留白带宽度），窗口尺寸变化也要重排
+  const reposition = () => {
+    if (panel.classList.contains('is-open')) place()
+  }
+  const paddingObserver = new MutationObserver(reposition)
+  paddingObserver.observe(internal.ir.element, { attributes: true, attributeFilter: ['style'] })
+  const offResize = on(window, 'resize', reposition)
+
   return () => {
     offOver()
     offLeave()
     offOut()
     offClick()
     offScroll()
+    offResize()
+    paddingObserver.disconnect()
     window.clearTimeout(hideTimer)
     panel.remove()
   }
