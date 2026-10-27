@@ -16,14 +16,14 @@
   --md-font: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Helvetica Neue', 'PingFang SC',
     'Hiragino Sans GB', 'Microsoft YaHei', Arial, sans-serif;
   --md-mono: 'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, 'Courier New', monospace;
-  --md-text: #24292e;
-  --md-heading: #1b1f23;
-  --md-muted: #6a737d;
-  --md-border: #e1e4e8;
-  --md-border-strong: #dfe2e5;
-  --md-bg: #ffffff;
-  --md-bg-code: #f6f8fa;
-  --md-bg-inline-code: #f0f1f3;
+  --md-text: #2f2f2f;
+  --md-heading: #222222;
+  --md-muted: #777777;
+  --md-border: #ddd6c8;
+  --md-border-strong: #cfc7b6;
+  --md-bg: #f5f0e8;
+  --md-bg-code: #efe9db;
+  --md-bg-inline-code: #ece5d6;
   --md-bg-quote: transparent;
   --md-link: #4183c4;
   font-family: var(--md-font);
@@ -239,12 +239,12 @@
   font-style: normal;
   font-weight: 600;
   text-align: left;
-  background-color: #f2f3f5;
+  background-color: #efe7d8;
 }
 
 .vditor-reset table tr:nth-child(2n) td,
 .md-editor-preview table tr:nth-child(2n) td {
-  background-color: #f8f9fa;
+  background-color: #f7f2e6;
 }
 
 /* ---------- 7. 图片 ---------- */
@@ -600,10 +600,11 @@
 }
 
 /* ==========================================================================
-   编辑器外壳：Typora 式（顶部菜单 + 大纲侧栏 + 状态栏，无图标工具栏）
+   编辑器外壳：Typora 式结构（顶部菜单 + 大纲侧栏 + 状态栏），纸张配色
    --------------------------------------------------------------------------
    Vditor 只负责编辑区内核；工具栏整条隐藏，交互改成 Typora 的菜单结构。
-   颜色走 GitHub / Typora 默认主题的中性灰，和正文排版一致。
+   外壳沿用站点纸张色（#f5f0e8 / #efe7d8 / 铅笔灰），只有结构、交互与 Typora 一致，
+   不再使用虚线边框和倾斜。
    ========================================================================== */
 
 .typora-editor {
@@ -611,10 +612,10 @@
   display: flex;
   flex-direction: column;
   overflow: hidden;
-  border: 1px solid #dcdfe3;
+  border: 1px solid #d8d0c0;
   border-radius: 6px;
-  background-color: #fff;
-  box-shadow: 0 1px 3px rgba(27, 31, 35, 0.06);
+  background-color: #f5f0e8;
+  box-shadow: 0 1px 3px rgba(44, 44, 44, 0.08);
   font-family: var(--md-font);
   color: var(--md-text);
 }
@@ -626,8 +627,8 @@
   gap: 2px;
   height: 36px;
   padding: 0 10px;
-  background-color: #fafbfc;
-  border-bottom: 1px solid #eaecef;
+  background-color: #efe7d8;
+  border-bottom: 1px solid #e0d5c0;
   user-select: none;
 }
 
@@ -641,7 +642,7 @@
   border: 0;
   border-radius: 4px;
   background-color: transparent;
-  color: #24292e;
+  color: #2c2c2c;
   font-family: inherit;
   font-size: 13px;
   line-height: 1;
@@ -651,7 +652,7 @@
 
 .typora-editor__menu-btn:hover,
 .typora-editor__menu-btn.is-open {
-  background-color: #eaecef;
+  background-color: #e4dac8;
 }
 
 .typora-editor__dropdown {
@@ -661,10 +662,10 @@
   z-index: 60;
   min-width: 208px;
   padding: 4px;
-  border: 1px solid #dfe2e5;
+  border: 1px solid #d8d0c0;
   border-radius: 6px;
-  background-color: #fff;
-  box-shadow: 0 8px 24px rgba(27, 31, 35, 0.14);
+  background-color: #faf6ee;
+  box-shadow: 0 8px 24px rgba(44, 44, 44, 0.16);
 }
 
 .typora-editor__item {
@@ -678,7 +679,7 @@
   border: 0;
   border-radius: 4px;
   background-color: transparent;
-  color: #24292e;
+  color: #2c2c2c;
   font-family: inherit;
   font-size: 13px;
   text-align: left;
@@ -686,11 +687,11 @@
 }
 
 .typora-editor__item:hover {
-  background-color: #f2f3f5;
+  background-color: #efe7d8;
 }
 
 .typora-editor__item-hint {
-  color: #b0b6bc;
+  color: #9a917f;
   font-size: 12px;
   font-variant-numeric: tabular-nums;
 }
@@ -698,7 +699,7 @@
 .typora-editor__divider {
   height: 1px;
   margin: 4px 6px;
-  background-color: #eaecef;
+  background-color: #e8dfcd;
 }
 
 .typora-editor__tools {
@@ -714,7 +715,7 @@
   border: 0;
   border-radius: 4px;
   background-color: transparent;
-  color: #586069;
+  color: #5c564c;
   font-family: inherit;
   font-size: 12px;
   line-height: 1;
@@ -723,13 +724,13 @@
 }
 
 .typora-editor__tool:hover {
-  background-color: #eaecef;
-  color: #24292e;
+  background-color: #e4dac8;
+  color: #2c2c2c;
 }
 
 .typora-editor__tool.is-active {
-  background-color: #e7f0fa;
-  color: #0969da;
+  background-color: #dcd0b8;
+  color: #2c2c2c;
 }
 
 /* ---------- 主体：大纲侧栏 + 编辑区 ---------- */
@@ -743,8 +744,8 @@
   flex: 0 0 220px;
   flex-direction: column;
   min-width: 0;
-  border-right: 1px solid #eaecef;
-  background-color: #fbfbfb;
+  border-right: 1px solid #e4dac8;
+  background-color: #f7f2e6;
 }
 
 .typora-editor__sidebar-head {
@@ -753,7 +754,7 @@
   justify-content: space-between;
   height: 32px;
   padding: 0 12px;
-  color: #8a9199;
+  color: #8c8578;
   font-size: 12px;
   letter-spacing: 0.08em;
 }
@@ -765,15 +766,15 @@
   border: 0;
   border-radius: 4px;
   background-color: transparent;
-  color: #8a9199;
+  color: #8c8578;
   font-size: 14px;
   line-height: 1;
   cursor: pointer;
 }
 
 .typora-editor__sidebar-close:hover {
-  background-color: #eaecef;
-  color: #24292e;
+  background-color: #efe7d8;
+  color: #2c2c2c;
 }
 
 .typora-editor__outline {
@@ -790,7 +791,7 @@
   border: 0;
   border-radius: 4px;
   background-color: transparent;
-  color: #444d56;
+  color: #4a463f;
   font-family: inherit;
   font-size: 13px;
   line-height: 1.45;
@@ -801,17 +802,18 @@
 }
 
 .typora-editor__outline-item:hover {
-  background-color: #f0f2f4;
+  background-color: #efe7d8;
 }
 
 .typora-editor__outline-item.is-active {
-  background-color: #edf4fc;
-  color: #0969da;
+  background-color: #e6dcc6;
+  color: #2c2c2c;
+  font-weight: 600;
 }
 
 .typora-editor__outline-empty {
   padding: 6px 8px;
-  color: #b0b6bc;
+  color: #a39a86;
   font-size: 12px;
 }
 
@@ -829,18 +831,18 @@
   left: 0;
 }
 
-/* ---------- Vditor 内层：去掉自带边框/工具栏，铺满白色页面 ---------- */
+/* ---------- Vditor 内层：去掉自带边框/工具栏，铺满纸张页面 ---------- */
 .typora-editor .vditor {
   height: 100% !important;
   border: 0 !important;
   border-radius: 0 !important;
-  background-color: #fff !important;
+  background-color: #f5f0e8 !important;
   box-shadow: none;
-  --ir-heading-color: #b6bcc4;
-  --ir-title-color: #b6bcc4;
-  --ir-bi-color: #b6bcc4;
-  --ir-bracket-color: #b6bcc4;
-  --ir-paren-color: #b6bcc4;
+  --ir-heading-color: #b3a992;
+  --ir-title-color: #b3a992;
+  --ir-bi-color: #b3a992;
+  --ir-bracket-color: #b3a992;
+  --ir-paren-color: #b3a992;
   --ir-link-color: #4183c4;
 }
 
@@ -851,14 +853,14 @@
 .typora-editor .vditor-content,
 .typora-editor .vditor-ir,
 .typora-editor .vditor-sv {
-  background-color: #fff !important;
+  background-color: #f5f0e8 !important;
 }
 
 .typora-editor .vditor-ir pre.vditor-reset {
-  padding: 18px 48px 40px 72px !important;
+  padding: 18px 48px 40px 48px !important;
   background-color: transparent !important;
   color: var(--md-text);
-  caret-color: #24292e;
+  caret-color: #2c2c2c;
 }
 
 .typora-editor .vditor-sv {
@@ -866,11 +868,16 @@
   font-family: var(--md-mono);
   font-size: 14px;
   line-height: 1.7;
-  color: #24292e;
+  color: #2f2f2f;
 }
 
 .typora-editor .vditor-ir__marker {
-  color: #b6bcc4;
+  color: #b3a992;
+}
+
+.typora-editor .vditor-reset ::selection {
+  background-color: #d9cdb4;
+  color: inherit;
 }
 
 /* Typora 不显示 H1/H2… 的级别角标，这里去掉 Vditor 默认的标题级别标签 */
@@ -884,11 +891,6 @@
   display: none;
 }
 
-.typora-editor .vditor-reset ::selection {
-  background-color: #b3d4fc;
-  color: inherit;
-}
-
 /* ---------- 状态栏（Typora 底部：模式 + 字数） ---------- */
 .typora-editor__statusbar {
   display: flex;
@@ -896,9 +898,9 @@
   height: 28px;
   padding: 0 12px;
   gap: 10px;
-  border-top: 1px solid #eaecef;
-  background-color: #fafbfc;
-  color: #8a9199;
+  border-top: 1px solid #e0d5c0;
+  background-color: #efe7d8;
+  color: #8c8578;
   font-size: 12px;
   line-height: 1;
   user-select: none;
@@ -922,15 +924,15 @@
   max-width: calc(100% - 32px);
   padding: 16px;
   transform: translateX(-50%);
-  border: 1px solid #dfe2e5;
+  border: 1px solid #d8d0c0;
   border-radius: 8px;
-  background-color: #fff;
-  box-shadow: 0 12px 32px rgba(27, 31, 35, 0.18);
+  background-color: #faf6ee;
+  box-shadow: 0 12px 32px rgba(44, 44, 44, 0.2);
 }
 
 .typora-editor__dialog-title {
   margin: 0 0 12px;
-  color: #24292e;
+  color: #2c2c2c;
   font-size: 14px;
   font-weight: 600;
 }
@@ -940,7 +942,7 @@
   align-items: center;
   gap: 8px;
   margin-bottom: 10px;
-  color: #586069;
+  color: #5c564c;
   font-size: 13px;
 }
 
@@ -952,18 +954,18 @@
   flex: 1;
   height: 32px;
   padding: 0 8px;
-  border: 1px solid #dfe2e5;
+  border: 1px solid #ddd6c8;
   border-radius: 4px;
-  background-color: #fff;
-  color: #24292e;
+  background-color: #fdfbf5;
+  color: #2c2c2c;
   font-family: inherit;
   font-size: 13px;
   outline: none;
 }
 
 .typora-editor__field input:focus {
-  border-color: #7fb3e8;
-  box-shadow: 0 0 0 3px rgba(9, 105, 218, 0.12);
+  border-color: #b3a992;
+  box-shadow: 0 0 0 3px rgba(179, 169, 146, 0.22);
 }
 
 .typora-editor__dialog-actions {
@@ -976,27 +978,27 @@
 .typora-editor__btn {
   height: 30px;
   padding: 0 14px;
-  border: 1px solid #dfe2e5;
+  border: 1px solid #ddd6c8;
   border-radius: 4px;
-  background-color: #fafbfc;
-  color: #24292e;
+  background-color: #fdfbf5;
+  color: #2c2c2c;
   font-family: inherit;
   font-size: 13px;
   cursor: pointer;
 }
 
 .typora-editor__btn:hover {
-  background-color: #f0f2f4;
+  background-color: #efe7d8;
 }
 
 .typora-editor__btn--primary {
-  border-color: #0969da;
-  background-color: #0969da;
-  color: #fff;
+  border-color: #2c2c2c;
+  background-color: #2c2c2c;
+  color: #f5f0e8;
 }
 
 .typora-editor__btn--primary:hover {
-  background-color: #0860ca;
+  background-color: #3a3a3a;
 }
 
 .typora-editor__file {
@@ -1009,7 +1011,7 @@
   height: 100vh;
   border: 0;
   border-radius: 0;
-  background-color: #fff;
+  background-color: #f5f0e8;
 }
 
 .typora-editor:fullscreen .typora-editor__body {
@@ -1027,7 +1029,7 @@
   z-index: 9999;
   border: 0;
   border-radius: 0;
-  background-color: #fff;
+  background-color: #f5f0e8;
 }
 
 .typora-editor--fullscreen .typora-editor__body {
@@ -1035,7 +1037,7 @@
   flex: 1;
 }
 
-/* ---------- 代码块：编辑时只保留一个源码框，右下角显示语言 ---------- */
+/* ---------- 代码块：编辑时只保留一个源码框 ---------- */
 .typora-editor .vditor-ir__node--expand > .vditor-ir__preview {
   display: none;
 }
@@ -1055,39 +1057,84 @@
   font-size: 14px;
   line-height: 1.6;
   white-space: pre-wrap;
-  color: #24292e !important;
+  color: #2f2f2f !important;
   background-color: var(--md-bg-code);
   border: 0;
   border-radius: 4px;
   box-shadow: none;
 }
 
-.typora-editor .vditor-ir__node[data-type='code-block'] .vditor-ir__preview {
-  position: relative;
-}
-
-.typora-editor .vditor-ir__node[data-type='code-block'] .vditor-ir__preview[data-lang]::after {
-  content: attr(data-lang);
-  position: absolute;
-  right: 10px;
-  bottom: 6px;
-  color: #adb5bd;
-  font-family: var(--md-font);
-  font-size: 12px;
-  line-height: 1;
-  pointer-events: none;
-}
-
 /* 代码块右上角的复制按钮（Vditor 原生，悬停出现） */
 .typora-editor .vditor-reset pre .vditor-copy span {
   top: 8px;
   right: 8px;
-  color: #8a9199;
+  color: #8c8578;
 }
 
 .typora-editor .vditor-reset pre .vditor-copy svg {
   width: 14px;
   height: 14px;
+}
+
+/* ---------- 代码块语言（右下角，可点击选择） ---------- */
+.vditor-code-lang {
+  position: absolute;
+  z-index: 32;
+  height: 22px;
+  padding: 0 7px;
+  border: 1px solid #ddd6c8;
+  border-radius: 3px;
+  background-color: rgba(250, 246, 238, 0.94);
+  color: #8c8578;
+  font-family: var(--md-font);
+  font-size: 12px;
+  line-height: 20px;
+  cursor: pointer;
+}
+
+.vditor-code-lang:hover {
+  border-color: #b3a992;
+  background-color: #efe7d8;
+  color: #2c2c2c;
+}
+
+.vditor-code-lang__menu {
+  position: absolute;
+  z-index: 40;
+  display: grid;
+  grid-template-columns: repeat(3, minmax(64px, 1fr));
+  gap: 2px;
+  width: 232px;
+  padding: 6px;
+  border: 1px solid #d8d0c0;
+  border-radius: 6px;
+  background-color: #faf6ee;
+  box-shadow: 0 8px 20px rgba(44, 44, 44, 0.18);
+}
+
+.vditor-code-lang__item {
+  height: 24px;
+  padding: 0 6px;
+  border: 0;
+  border-radius: 3px;
+  background-color: transparent;
+  color: #4a463f;
+  font-family: var(--md-font);
+  font-size: 12px;
+  line-height: 1;
+  text-align: left;
+  cursor: pointer;
+}
+
+.vditor-code-lang__item:hover {
+  background-color: #efe7d8;
+  color: #2c2c2c;
+}
+
+.vditor-code-lang__item.is-current {
+  background-color: #e6dcc6;
+  color: #2c2c2c;
+  font-weight: 600;
 }
 
 /* ---------- 表格工具条（Typora：表格左上角一排图标） ---------- */
@@ -1098,10 +1145,10 @@
   align-items: center;
   gap: 1px;
   padding: 2px;
-  background-color: #fff;
-  border: 1px solid #d0d7de;
+  background-color: #faf6ee;
+  border: 1px solid #d8d0c0;
   border-radius: 4px;
-  box-shadow: 0 1px 3px rgba(27, 31, 35, 0.14);
+  box-shadow: 0 1px 3px rgba(44, 44, 44, 0.14);
 }
 
 .vditor-table-tools.is-open {
@@ -1119,54 +1166,26 @@
   border: 0;
   border-radius: 3px;
   background-color: transparent;
-  color: #57606a;
+  color: #5c564c;
   cursor: pointer;
   transition: background-color 0.12s ease, color 0.12s ease;
 }
 
 .vditor-table-tools button:hover,
 .vditor-table-tools button:focus-visible {
-  background-color: #eaeef2;
-  color: #24292f;
+  background-color: #efe7d8;
+  color: #2c2c2c;
   outline: none;
 }
 
 .vditor-table-tools button[data-op='table-del']:hover {
-  background-color: #ffe3e0;
-  color: #cf222e;
-}
-
-/* ---------- 左侧行号（Typora 没有，但这里保留为低调的辅助信息） ---------- */
-.vditor-line-numbers {
-  position: absolute;
-  z-index: 4;
-  display: none;
-  overflow: hidden;
-  pointer-events: none;
-  user-select: none;
-  font-family: var(--md-mono);
-  font-size: 11px;
-  line-height: 16px;
-  color: #c6ccd3;
-  text-align: right;
-}
-
-.vditor-line-numbers__track {
-  position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
-}
-
-.vditor-line-numbers span {
-  position: absolute;
-  right: 4px;
-  font-variant-numeric: tabular-nums;
+  background-color: #f2ddd7;
+  color: #b23b2e;
 }
 
 @media (max-width: 720px) {
   .typora-editor .vditor-ir pre.vditor-reset {
-    padding: 14px 18px 32px 20px !important;
+    padding: 14px 18px 32px 18px !important;
   }
 
   .typora-editor .vditor-sv {

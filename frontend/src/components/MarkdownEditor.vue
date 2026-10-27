@@ -54,6 +54,8 @@ const headings = ref([])
 const activeHeading = ref(-1)
 const isSource = ref(false)
 const isFullscreen = ref(false)
+// CSS 兜底全屏（浏览器拒绝 Fullscreen API 时使用）
+const cssFullscreen = ref(false)
 const stats = ref({ words: 0, chars: 0 })
 const linkDialog = reactive({ open: false, text: '', url: '' })
 
@@ -210,9 +212,13 @@ function gotoHeading(index) {
   if (!vditor) return
   const heading = headings.value[index]
   if (!heading) return
-  scrollToHeading(vditor, index, heading.line)
-  activeHeading.value = index
+  // 先 focus 再滚动：focus 会把光标滚进可视区，顺序反了会被拉回原位
   if (!isSource.value) vditor.focus()
+  activeHeading.value = index
+  window.requestAnimationFrame(() => {
+    if (!vditor) return
+    scrollToHeading(vditor, index, heading.line)
+  })
 }
 
 function toggleSource() {
@@ -303,8 +309,10 @@ function restoreAncestors() {
 }
 
 function setCssFullscreen(element, on) {
+  cssFullscreen.value = on
   isFullscreen.value = on
-  element.classList.toggle('typora-editor--fullscreen', on)
+  if (on) element.classList.add('typora-editor--fullscreen')
+  else element.classList.remove('typora-editor--fullscreen')
   document.body.style.overflow = on ? 'hidden' : ''
   if (on) clearAncestors(element)
   else restoreAncestors()
@@ -325,12 +333,12 @@ function resizeEditor() {
 function toggleFullscreen() {
   const element = root.value
   if (!element) return
-  if (isFullscreen.value) {
-    if (document.fullscreenElement === element && document.exitFullscreen) {
-      document.exitFullscreen()
-    } else {
-      setCssFullscreen(element, false)
-    }
+  if (document.fullscreenElement === element) {
+    if (document.exitFullscreen) document.exitFullscreen()
+    return
+  }
+  if (cssFullscreen.value) {
+    setCssFullscreen(element, false)
     return
   }
   if (element.requestFullscreen) {
@@ -347,12 +355,19 @@ function onFullscreenChange() {
   const element = root.value
   const native = Boolean(element && document.fullscreenElement === element)
   if (native) {
+    // 原生全屏接管：清掉 CSS 兜底状态，避免退出后残留 fixed/flex 布局
     isFullscreen.value = true
-    element.classList.remove('typora-editor--fullscreen')
+    if (cssFullscreen.value) {
+      cssFullscreen.value = false
+      if (element) element.classList.remove('typora-editor--fullscreen')
+    }
     document.body.style.overflow = ''
     restoreAncestors()
+  } else if (cssFullscreen.value) {
+    // 正在用 CSS 兜底全屏，保持状态
+    isFullscreen.value = true
   } else {
-    isFullscreen.value = element ? element.classList.contains('typora-editor--fullscreen') : false
+    isFullscreen.value = false
   }
   resizeEditor()
 }
@@ -494,7 +509,7 @@ onBeforeUnmount(() => {
   window.clearTimeout(outlineTimer)
   if (headingFrame) window.cancelAnimationFrame(headingFrame)
   // 组件卸载时如果还处于 CSS 兜底全屏，恢复页面滚动与祖先样式
-  if (isFullscreen.value) setCssFullscreen(root.value, false)
+  if (cssFullscreen.value) setCssFullscreen(root.value, false)
   destroyVditor()
 })
 </script>
@@ -503,7 +518,7 @@ onBeforeUnmount(() => {
   <div
     ref="root"
     class="typora-editor"
-    :class="{ 'typora-editor--fullscreen': isFullscreen }"
+    :class="{ 'typora-editor--fullscreen': cssFullscreen }"
     @keydown="onKeydown"
   >
     <div class="typora-editor__menubar">

@@ -31,7 +31,7 @@ src/
 ├── components/  # Sketch 通用组件、上传、Markdown、评论、管理布局
 ├── router/      # 路由与登录/管理员守卫
 ├── store/       # auth（token 持久化）、meta（分类/标签缓存）
-├── styles/      # Tailwind 入口、纸张纹理、手绘组件类、编辑器覆盖、阅读页白纸
+├── styles/      # Tailwind 入口、纸张纹理、手绘组件类、编辑器覆盖、阅读页纸张
 ├── utils/       # 格式化、Toast
 └── views/       # 前台页面 + admin/ 管理后台
 ```
@@ -67,37 +67,42 @@ src/
   滚动时按可视区域高亮当前标题，不用 `window.scrollTo` 避免整页跳顶。
 - **源码模式**：「源码」按钮或 `Ctrl+/` 在 IR / SV 之间切换，源码模式只显示
   Markdown textarea（`preview.mode: 'editor'`），修改通过 `input` 回调实时同步回
-  v-model，切回即时渲染时行号恢复。
+  v-model，切回即时渲染后恢复即时渲染视图。
 - **表格工具条**：鼠标移到表格上时，表格左上角浮出一排图标按钮（插入/删除行列、
   删除整张表格），按钮带 `title` / `aria-label` tooltip；表格滚到编辑区顶部时
   工具条落到表格内部，保证始终可点。
 - **Typora 快捷键**：`Ctrl+1`~`6` / `Ctrl+0` 设置标题与正文、`Ctrl+B` 加粗、
   `Ctrl+I` 斜体、`Ctrl+K` 链接、`Ctrl+/` 源码模式。
-- 正文左侧显示行号（按渲染后的可视行编号，随滚动同步）；全屏优先用浏览器
-  Fullscreen API，被拒绝时退回 CSS 全屏（`setCssFullscreen`：此时才由 `clearAncestors`
-  临时清掉祖先卡片的 `transform` / `filter`，否则 `position: fixed` 会以带变换的卡片为包含块）。
+- **代码块**：右下角浮出当前语言按钮，点击可从常用语言下拉里选择，选择后直接改写
+  Markdown 围栏语言并重新渲染；代码块内 `Tab` 缩进 4 个空格、`Shift+Tab` 反缩进。
+- **Markdown 快捷输入**（与 Typora 一致）：`#` + 空格渲染标题、`-` + 空格渲染列表、
+  三个反引号 + 回车渲染代码块、表格源码（表头行 + `---` 分隔行）回车后转成真正的表格
+  （转换时拦截 Vditor「表头换行就抢跑」的行为，避免分隔行被塞进单元格），转完光标落在第一格。
+- **全屏**：优先用浏览器 Fullscreen API，被拒绝时退回 CSS 全屏（`setCssFullscreen`：此时才由
+  `clearAncestors` 临时清掉祖先卡片的 `transform` / `filter`，否则 `position: fixed` 会以带变换的卡片为包含块）；
+  退出全屏会清掉 CSS 兜底状态，正文窗口不会塌缩。
+- 不显示行号（Typora 即时渲染也没有行号），左侧留白只保留标题标记。
   Vditor 的 lute / 中文语言包 / 图标 / 高亮样式在 `predev`、`prebuild` 时由
   `scripts/copy-vditor.mjs` 拷到 `public/vditor`（已 gitignore），不依赖外网 CDN。
 
 **阅读页**用 `MarkdownViewer`（md-editor-v3 预览）与后台编辑器共用同一套 Typora 排版：
 
-- 正文是一张 **Typora 白色页面**（`.typora-page`，样式在 `src/styles/markdown-reading.css`）：
-  纯白底、1px `#e3e3e3` 实线边框、5px 圆角、最大宽度 860px 居中、
+- 正文是一张 **Typora 式纸张页面**（`.typora-page`，样式在 `src/styles/markdown-reading.css`）：
+  纸张底 `#faf6ee`、1px `#e4dac8` 实线边框、5px 圆角、最大宽度 860px 居中、
   上下 40px / 左右 48px 内边距；没有站点其它卡片的虚线边框和轻微倾斜。
 - 阅读态代码高亮改为**本地 highlight.js + GitHub 浅色主题**：`MarkdownViewer.vue` 里把
   `highlight.js/lib/common` 实例交给 md-editor-v3，不再从 unpkg 运行时拉
   `highlight.min.js` / `atom-one-dark`；`scripts/copy-vditor.mjs` 会把
   `node_modules/highlight.js/styles/github.css` 拷到 `public/highlight/github.css`
-  （predev / prebuild 自动执行，已 gitignore）。离线也有高亮，且配色与白纸 + `#f6f8fa`
-  代码块一致。
-- 阅读态代码块沿用 Typora 配色（`#f6f8fa` 浅灰底、无边框无阴影、字号 14px，由
+  （predev / prebuild 自动执行，已 gitignore）。离线也有高亮，且配色与纸张色代码块（`#efe9db`）一致。
+- 阅读态代码块沿用纸张配色（`#efe9db` 浅纸底、无边框无阴影、字号 14px，由
   `markdown.css` 的 `--md-bg-code` 等变量统一提供）；`markdown-reading.css` 只补代码块 chrome：
   语言名固定在代码块右下角，复制按钮默认隐藏、鼠标移入代码块才浮到右上角。
 - 正文排版本身（标题 / 表格 / 引用 / 列表 / 代码高亮）仍由 `src/styles/markdown.css`
   统一提供：系统无衬线字体、1.65 行距、粗体标题（h1/h2 带细实线下边框）、
   实线表格边框 + 斑马纹、Typora 蓝链接、灰字左边线引用、GitHub 色系代码高亮；
-  阅读页配色也用白纸基调（`--md-bg` #fff、`--md-bg-code` #f6f8fa、`--md-border` #e1e4e8）。
-- 页面外壳（导航、卡片、按钮）保持 Sketch 手绘风，只有正文区域是白纸。
+  阅读页配色也用纸张基调（`--md-bg` #f5f0e8、`--md-bg-code` #efe9db、`--md-border` #ddd6c8）。
+- 页面外壳（导航、卡片、按钮）保持 Sketch 手绘风，正文区域是纸张页面。
 
 ### 已修复：编辑页「正文模块不见」
 

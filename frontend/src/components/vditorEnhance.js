@@ -2,13 +2,13 @@
  * Vditor 编辑器增强（不依赖 Vue，便于在浏览器中单独验证）。
  *
  * 只保留 Typora 式外壳需要、Vditor 本身不提供的能力：
- * 1. 表格操作条：鼠标移到表格上时，在表格左上角浮出一排图标按钮
+ * 1. 表格工具条：鼠标移到表格上时，在表格左上角浮出一排图标按钮
  *    （上方/下方插行、删除行、左侧/右侧插列、删除列、删除表格），
  *    复用 Vditor 自己的表格快捷键实现，保证撤销栈与 Markdown 文本一致；
- * 2. 左侧行号：IR 模式没有真实源码行，按渲染后的可视行编号；
- * 3. 代码块语言角标：从围栏信息里取语言名，显示在代码块右下角。
- *
- * 工具栏本身由 MarkdownEditor.vue 隐藏并换成顶部菜单，这里不再处理工具栏。
+ * 2. 代码块语言：悬停代码块时在右下角出现语言按钮，点击可从常用语言里选择，
+ *    选择后直接改 Markdown 围栏语言并重新渲染（Typora 的「右下角选语言」）；
+ * 3. 代码块编辑：Tab / Shift+Tab 缩进与反缩进（Vditor 默认 Tab 会跳出编辑区）；
+ * 4. Markdown 快捷输入：表格源码（表头 + 分隔行）按回车后直接转成表格。
  */
 
 const isMac = () => /Mac|iPhone|iPad/.test(navigator.platform)
@@ -23,8 +23,9 @@ const TABLE_OPS = {
   'col-del': { key: '_', shift: true, code: 'Minus' }
 }
 
-const svg = (paths) =>
-  `<svg viewBox="0 0 16 16" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${paths}</svg>`
+const ICON_ATTRS =
+  'viewBox="0 0 16 16" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"'
+const svg = (paths) => `<svg ${ICON_ATTRS}>${paths}</svg>`
 
 const TABLE_BUTTONS = [
   {
@@ -64,6 +65,34 @@ const TABLE_BUTTONS = [
   }
 ]
 
+/** 代码块语言下拉里提供的常用语言（与 Vditor 内置 highlight.js 对齐） */
+const CODE_LANGS = [
+  'text',
+  'js',
+  'ts',
+  'html',
+  'css',
+  'json',
+  'java',
+  'python',
+  'go',
+  'rust',
+  'sql',
+  'bash',
+  'yaml',
+  'markdown',
+  'c',
+  'cpp',
+  'csharp',
+  'php',
+  'ruby',
+  'kotlin',
+  'swift',
+  'xml',
+  'dockerfile',
+  'diff'
+]
+
 const on = (el, type, handler, options) => {
   el.addEventListener(type, handler, options)
   return () => el.removeEventListener(type, handler, options)
@@ -87,6 +116,28 @@ const findTableBlocks = (lines) => {
     }
   }
   return blocks
+}
+
+/** 代码块序号 → 替换该围栏的语言标识 */
+const replaceFenceLang = (markdown, blockIndex, lang) => {
+  const lines = markdown.split('\n')
+  let count = -1
+  let fence = ''
+  for (let i = 0; i < lines.length; i += 1) {
+    const match = /^(\s*)(`{3,}|~{3,})(.*)$/.exec(lines[i])
+    if (!match) continue
+    if (!fence) {
+      count += 1
+      if (count === blockIndex) {
+        lines[i] = `${match[1]}${match[2]}${lang}`
+        return lines.join('\n')
+      }
+      fence = match[2]
+    } else if (match[2].startsWith(fence[0].repeat(3)) && !match[3].trim()) {
+      fence = ''
+    }
+  }
+  return markdown
 }
 
 /**
@@ -257,7 +308,16 @@ function installTableTools(root, internal, vditor) {
     const config = TABLE_OPS[op]
     const found = resolve()
     if (!config || !found) return
-    const { cell } = found
+    let cell = found.cell
+    // 表头行上做行操作时 Vditor 会忽略，这里改成作用在第一行数据行上
+    const isRowOp = op === 'row-above' || op === 'row-below' || op === 'row-del'
+    const inHead = found.table.tHead && found.table.tHead.contains(found.cell)
+    if (isRowOp && inHead) {
+      const bodyRow = found.table.tBodies[0] && found.table.tBodies[0].rows[0]
+      if (!bodyRow || !bodyRow.cells.length) return
+      cell = bodyRow.cells[Math.min(anchor.cellIndex, bodyRow.cells.length - 1)]
+      anchor.rowIndex = 1
+    }
     const editor = internal.ir.element
     editor.focus()
     const range = document.createRange()
@@ -306,15 +366,14 @@ function installTableTools(root, internal, vditor) {
     if (panel.classList.contains('is-open')) place()
   })
 
-  // 切到源码模式时立即收起（Vditor 重渲染后位置也会失效）
-  const offMode = on(root, 'vditor-mode-change', hide)
-
   const reposition = () => {
     if (panel.classList.contains('is-open')) place()
   }
   const paddingObserver = new MutationObserver(reposition)
   paddingObserver.observe(internal.ir.element, { attributes: true, attributeFilter: ['style'] })
   const offResize = on(window, 'resize', reposition)
+  // 切到源码模式时立即收起（Vditor 重渲染后位置也会失效）
+  const offMode = on(root, 'vditor-mode-change', hide)
 
   return () => {
     offOver()
@@ -332,181 +391,301 @@ function installTableTools(root, internal, vditor) {
 }
 
 /**
- * 左侧行号。
- *
- * IR 模式没有真正的“源码行”，这里按渲染后的可视行编号：
- * 遍历正文文本节点，用 Range.getClientRects() 拿到每一行的位置，
- * 去重后把序号画在左侧留白里（不参与正文布局、不响应鼠标）。
+ * 代码块语言选择：悬停代码块时在右下角浮出语言按钮（Typora 的位置），
+ * 点击弹出常用语言，选择后改写 Markdown 围栏并重新渲染。
  */
-function installLineNumbers(root, internal) {
-  const pre = internal.ir.element
-  const numbers = document.createElement('div')
-  numbers.className = 'vditor-line-numbers'
-  numbers.setAttribute('aria-hidden', 'true')
-  const track = document.createElement('div')
-  track.className = 'vditor-line-numbers__track'
-  numbers.appendChild(track)
-  root.appendChild(numbers)
+function installCodeLanguage(root, internal, vditor) {
+  const button = document.createElement('button')
+  button.type = 'button'
+  button.className = 'vditor-code-lang'
+  button.hidden = true
+  button.title = '选择代码语言'
+  const menu = document.createElement('div')
+  menu.className = 'vditor-code-lang__menu'
+  menu.hidden = true
+  root.appendChild(button)
+  root.appendChild(menu)
 
-  const EXTRA_LEFT = 30
-  let frame = 0
-  let timer = 0
+  let anchorNode = null
+  let hideTimer = 0
 
-  const ensurePadding = () => {
-    const right = parseFloat(pre.style.paddingRight) || 0
-    // 窄屏（移动端）本来就放不下行号，就别再挤占正文宽度
-    const want = right >= 40 ? right + EXTRA_LEFT : right
-    if (!want) return
-    const left = parseFloat(pre.style.paddingLeft) || 0
-    if (Math.abs(left - want) > 0.5) {
-      pre.style.paddingLeft = `${want}px`
-    }
+  const codeBlocks = () => Array.from(root.querySelectorAll('.vditor-ir__node[data-type="code-block"]'))
+
+  const langOf = (node) => {
+    const info = node.querySelector('.vditor-ir__marker--info')
+    if (!info) return ''
+    return info.textContent.replace(/[\u200b\ufeff]/g, '').trim()
   }
 
-  const render = () => {
-    frame = 0
-    if (internal.currentMode !== 'ir') {
-      numbers.style.display = 'none'
-      return
-    }
-    ensurePadding()
-    const preRect = pre.getBoundingClientRect()
+  const place = () => {
+    if (!anchorNode || !root.contains(anchorNode)) return
+    const rect = anchorNode.getBoundingClientRect()
     const rootRect = root.getBoundingClientRect()
-    const padLeft = parseFloat(getComputedStyle(pre).paddingLeft) || 0
-    const width = padLeft - 20
-    if (width < 14 || preRect.height === 0) {
-      numbers.style.display = 'none'
+    const buttonRect = button.getBoundingClientRect()
+    const left = Math.min(
+      rect.right - rootRect.left - buttonRect.width - 10,
+      root.clientWidth - buttonRect.width - 8
+    )
+    const top = rect.bottom - rootRect.top - buttonRect.height - 8
+    button.style.left = `${Math.max(left, 8)}px`
+    button.style.top = `${Math.max(top, 8)}px`
+  }
+
+  const hideMenu = () => {
+    menu.hidden = true
+    menu.innerHTML = ''
+  }
+
+  const hideButton = () => {
+    button.hidden = true
+    anchorNode = null
+    hideMenu()
+  }
+
+  const setLanguage = (lang) => {
+    if (!anchorNode) return
+    const index = codeBlocks().indexOf(anchorNode)
+    if (index < 0) return
+    const markdown = vditor.getValue()
+    const next = replaceFenceLang(markdown, index, lang)
+    hideMenu()
+    hideButton()
+    if (next === markdown) return
+    const pre = internal.ir.element
+    const savedScroll = pre.scrollTop
+    vditor.setValue(next, false)
+    if (internal.options && typeof internal.options.input === 'function') {
+      internal.options.input(next)
+    }
+    pre.scrollTop = savedScroll
+  }
+
+  const openMenu = () => {
+    if (!anchorNode) return
+    const current = langOf(anchorNode)
+    menu.innerHTML = ''
+    CODE_LANGS.forEach((lang) => {
+      const item = document.createElement('button')
+      item.type = 'button'
+      item.className = 'vditor-code-lang__item'
+      item.textContent = lang
+      if (lang === current) item.classList.add('is-current')
+      item.addEventListener('mousedown', (event) => {
+        event.preventDefault()
+        event.stopPropagation()
+        setLanguage(lang)
+      })
+      menu.appendChild(item)
+    })
+    menu.hidden = false
+    const rect = button.getBoundingClientRect()
+    const rootRect = root.getBoundingClientRect()
+    const menuWidth = menu.offsetWidth || 220
+    const left = Math.min(
+      rect.left - rootRect.left + rect.width - menuWidth,
+      root.clientWidth - menuWidth - 8
+    )
+    menu.style.left = `${Math.max(left, 8)}px`
+    menu.style.top = `${Math.min(rect.bottom - rootRect.top + 4, root.clientHeight - menu.offsetHeight - 8)}px`
+  }
+
+  const showFor = (target) => {
+    if (internal.currentMode !== 'ir') return
+    if (!target || !target.closest) return
+    if (target.closest('.vditor-code-lang') || target.closest('.vditor-code-lang__menu')) {
+      window.clearTimeout(hideTimer)
       return
     }
-    numbers.style.display = 'block'
-    numbers.style.top = `${preRect.top - rootRect.top}px`
-    numbers.style.left = `${preRect.left - rootRect.left + 4}px`
-    numbers.style.width = `${width}px`
-    numbers.style.height = `${pre.clientHeight}px`
-
-    const range = document.createRange()
-    const walker = document.createTreeWalker(pre, NodeFilter.SHOW_TEXT, {
-      acceptNode: (node) =>
-        /[^\s\u200b\ufeff]/.test(node.nodeValue || '') ? NodeFilter.FILTER_ACCEPT : NodeFilter.FILTER_REJECT
-    })
-    const lineTops = []
-    let node = walker.nextNode()
-    while (node) {
-      // 折叠状态的 IR 标记（#、```、表格竖线等）高度为 0，但文本仍有 rect，需要排除
-      const marker = node.parentElement && node.parentElement.closest('[class*="vditor-ir__marker"]')
-      if (marker && marker.getBoundingClientRect().height < 2) {
-        node = walker.nextNode()
-        continue
+    const node = target.closest('.vditor-ir__node[data-type="code-block"]')
+    if (!node || !root.contains(node)) {
+      if (anchorNode) {
+        window.clearTimeout(hideTimer)
+        hideTimer = window.setTimeout(() => {
+          if (!menu.hidden) return
+          hideButton()
+        }, 400)
       }
-      range.selectNodeContents(node)
-      const rects = range.getClientRects()
-      for (let i = 0; i < rects.length; i += 1) {
-        const rect = rects[i]
-        if (rect.height < 2) continue
-        lineTops.push({ top: rect.top - preRect.top + pre.scrollTop, height: rect.height })
-      }
-      node = walker.nextNode()
+      return
     }
-    lineTops.sort((a, b) => a.top - b.top)
-    const merged = []
-    lineTops.forEach((line) => {
-      if (!merged.length || line.top - merged[merged.length - 1].top > 6) {
-        merged.push(line)
-      }
-    })
-
-    let html = ''
-    merged.forEach((line, index) => {
-      const offset = Math.max((line.height - 16) / 2, 0)
-      html += `<span style="top:${Math.round(line.top + offset)}px">${index + 1}</span>`
-    })
-    track.innerHTML = html
-    track.style.transform = `translateY(${-pre.scrollTop}px)`
+    window.clearTimeout(hideTimer)
+    anchorNode = node
+    button.textContent = langOf(node) || '语言'
+    button.hidden = false
+    place()
   }
 
-  const schedule = () => {
-    if (timer) window.clearTimeout(timer)
-    timer = window.setTimeout(() => {
-      timer = 0
-      if (!frame) frame = window.requestAnimationFrame(render)
-    }, 120)
-  }
-
-  const syncScroll = () => {
-    track.style.transform = `translateY(${-pre.scrollTop}px)`
-  }
-
-  const offScroll = on(pre, 'scroll', syncScroll)
-  const offResize = on(window, 'resize', schedule)
-
-  // 正文重渲染（输入、插入表格/代码块、外部 setValue）后重新测量
-  const contentObserver = new MutationObserver(schedule)
-  contentObserver.observe(pre, { childList: true, subtree: true, characterData: true })
-
-  // Vditor 会重算 padding（resize、全屏），这里把左侧额外留白补回去
-  const styleObserver = new MutationObserver(() => {
-    ensurePadding()
-    schedule()
+  const offOver = on(root, 'mouseover', (event) => showFor(event.target))
+  const offLeave = on(button, 'mouseenter', () => window.clearTimeout(hideTimer))
+  const offButtonLeave = on(button, 'mouseleave', () => {
+    window.clearTimeout(hideTimer)
+    hideTimer = window.setTimeout(() => {
+      if (!menu.hidden) return
+      hideButton()
+    }, 350)
   })
-  styleObserver.observe(pre, { attributes: true, attributeFilter: ['style'] })
-
-  schedule()
-  window.setTimeout(schedule, 400)
-
-  // 源码模式 / 即时渲染切换后立刻隐藏或重新测量
-  const offMode = on(root, 'vditor-mode-change', () => {
-    if (internal.currentMode !== 'ir') numbers.style.display = 'none'
-    schedule()
+  const offMenuLeave = on(menu, 'mouseleave', () => {
+    window.clearTimeout(hideTimer)
+    hideTimer = window.setTimeout(hideMenu, 250)
   })
+  const offClick = on(button, 'mousedown', (event) => {
+    event.preventDefault()
+    if (menu.hidden) openMenu()
+    else hideMenu()
+  })
+  const offOutside = on(document, 'mousedown', (event) => {
+    if (!menu.hidden && !menu.contains(event.target) && event.target !== button) hideMenu()
+  })
+  const offScroll = on(internal.ir.element, 'scroll', () => {
+    if (!button.hidden) {
+      hideMenu()
+      hideButton()
+    }
+  })
+  const offResize = on(window, 'resize', () => {
+    if (!button.hidden) place()
+  })
+  const offMode = on(root, 'vditor-mode-change', hideButton)
 
   return () => {
+    offOver()
+    offLeave()
+    offButtonLeave()
+    offMenuLeave()
+    offClick()
+    offOutside()
     offScroll()
     offResize()
     offMode()
-    contentObserver.disconnect()
-    styleObserver.disconnect()
-    if (frame) window.cancelAnimationFrame(frame)
-    if (timer) window.clearTimeout(timer)
-    numbers.remove()
+    window.clearTimeout(hideTimer)
+    button.remove()
+    menu.remove()
   }
 }
 
+/** 是否在代码块里（返回代码块节点） */
+const codeBlockOf = (node) => {
+  const element = node && (node.nodeType === 1 ? node : node.parentElement)
+  return element && element.closest ? element.closest('.vditor-ir__node[data-type="code-block"]') : null
+}
+
 /**
- * 代码块语言角标（Typora 在代码块右下角显示语言名）。
- * 只写 data-lang 属性，由 CSS ::after 渲染，不往 DOM 里塞节点，避免影响 Markdown 序列化。
+ * 代码块里 Tab / Shift+Tab 缩进；Markdown 里「表格源码 + 回车」转成真正的表格。
  */
-function installCodeLanguage(root) {
-  let frame = 0
+function installEditingShortcuts(root, internal, vditor) {
+  const isSeparatorRow = (text) =>
+    /^\|?\s*:?-{3,}:?\s*(\|\s*:?-{3,}:?\s*)*\|?$/.test(text) && text.includes('-')
+  const isHeaderRow = (text) => /^\|.*\|$/.test(text) && text.includes('|')
 
-  const apply = () => {
-    frame = 0
-    if (root.querySelectorAll('.vditor-ir__node[data-type="code-block"]').length === 0) return
-    root.querySelectorAll('.vditor-ir__node[data-type="code-block"]').forEach((node) => {
-      const preview = node.querySelector('.vditor-ir__preview')
-      if (!preview) return
-      const info = node.querySelector('.vditor-ir__marker--info')
-      const lang = info ? info.textContent.replace(/[\u200b\ufeff]/g, '').trim() : ''
-      if (lang) {
-        if (preview.getAttribute('data-lang') !== lang) preview.setAttribute('data-lang', lang)
-      } else if (preview.hasAttribute('data-lang')) {
-        preview.removeAttribute('data-lang')
+  const convertTable = (block) => {
+    const header = block.previousElementSibling
+    if (!header || header.tagName !== 'P') return false
+    const headerText = (header.textContent || '').trim()
+    const separatorText = (block.textContent || '').trim()
+    if (!isHeaderRow(headerText) || !isSeparatorRow(separatorText)) return false
+    const columns = headerText
+      .replace(/^\|/, '')
+      .replace(/\|$/, '')
+      .split('|')
+      .length
+    if (columns < 1) return false
+    const markdown = vditor.getValue()
+    const needle = `${headerText}\n\n${separatorText}`
+    if (!markdown.includes(needle)) return false
+    const emptyRow = `|${Array.from({ length: columns }, () => '  ').join('|')}|`
+    const next = markdown.replace(needle, `${headerText}\n${separatorText}\n${emptyRow}`)
+    const pre = internal.ir.element
+    const savedScroll = pre.scrollTop
+    vditor.setValue(next, false)
+    if (internal.options && typeof internal.options.input === 'function') {
+      internal.options.input(next)
+    }
+    window.setTimeout(() => {
+      pre.scrollTop = savedScroll
+      // 定位到刚生成的那张表（按 Markdown 里的表格顺序取 DOM 表格），把光标放进第一格
+      const blocks = findTableBlocks(next.split('\n'))
+      const index = blocks.findIndex((block) => {
+        const lines = next.split('\n')
+        return lines[block.start].trim() === headerText && lines[block.start + 1].trim() === separatorText
+      })
+      const tables = pre.querySelectorAll('table')
+      const targetTable = tables[index >= 0 ? index : tables.length - 1]
+      const cell = targetTable && targetTable.querySelector('tbody tr td')
+      if (!cell) return
+      pre.focus()
+      const range = document.createRange()
+      range.selectNodeContents(cell)
+      range.collapse(true)
+      const selection = window.getSelection()
+      selection.removeAllRanges()
+      selection.addRange(range)
+    }, 40)
+    return true
+  }
+
+  const insertIndent = (spaces) => {
+    document.execCommand('insertText', false, ' '.repeat(spaces))
+  }
+
+  const outdent = () => {
+    const selection = window.getSelection()
+    if (!selection || !selection.rangeCount) return
+    const range = selection.getRangeAt(0)
+    const node = range.startContainer
+    if (node.nodeType !== 3) return
+    const text = node.nodeValue || ''
+    const lineStart = text.lastIndexOf('\n', Math.max(range.startOffset - 1, 0)) + 1
+    const indent = /^ */.exec(text.slice(lineStart))[0].length
+    if (!indent) return
+    const remove = Math.min(indent, 4)
+    const target = document.createRange()
+    target.setStart(node, lineStart)
+    target.setEnd(node, lineStart + remove)
+    selection.removeAllRanges()
+    selection.addRange(target)
+    document.execCommand('delete')
+  }
+
+  const onKeydown = (event) => {
+    if (internal.currentMode !== 'ir') return
+    if (event.ctrlKey || event.metaKey || event.altKey) return
+
+    if (event.key === 'Tab') {
+      const selection = window.getSelection()
+      if (!selection || !selection.rangeCount) return
+      const block = codeBlockOf(selection.anchorNode)
+      if (!block) return
+      event.preventDefault()
+      event.stopPropagation()
+      if (event.shiftKey) outdent()
+      else insertIndent(4)
+      return
+    }
+
+    if (event.key === 'Enter' && !event.shiftKey) {
+      const selection = window.getSelection()
+      if (!selection || !selection.rangeCount) return
+      const anchor = selection.anchorNode
+      const element = anchor && (anchor.nodeType === 1 ? anchor : anchor.parentElement)
+      const block = element && element.closest ? element.closest('p') : null
+      if (!block || !internal.ir.element.contains(block)) return
+      const blockText = (block.textContent || '').trim()
+      // 表格源码：上一行是表头、当前行是分隔行时才转换（Vditor 会在表头换行时就抢跑成表格）
+      if (convertTable(block)) {
+        event.preventDefault()
+        event.stopPropagation()
+        return
       }
-    })
+      // 表头行先按普通换行处理，等分隔行输入完再一起转成表格
+      if (isHeaderRow(blockText) && !isSeparatorRow(blockText)) {
+        event.preventDefault()
+        event.stopPropagation()
+        document.execCommand('insertParagraph')
+      }
+    }
   }
 
-  const schedule = () => {
-    if (frame) return
-    frame = window.requestAnimationFrame(apply)
-  }
-
-  const observer = new MutationObserver(schedule)
-  observer.observe(root, { childList: true, subtree: true, characterData: true })
-  schedule()
-
-  return () => {
-    observer.disconnect()
-    if (frame) window.cancelAnimationFrame(frame)
-  }
+  // 捕获阶段挂在 .vditor 上，先于 Vditor 自己的 keydown 处理（默认行为与插入都被我们接管）
+  return on(root, 'keydown', onKeydown, true)
 }
 
 /**
@@ -519,8 +698,8 @@ export function enhanceVditor(vditor) {
   const root = internal.element
   const disposers = [
     installTableTools(root, internal, vditor),
-    installLineNumbers(root, internal),
-    installCodeLanguage(root)
+    installCodeLanguage(root, internal, vditor),
+    installEditingShortcuts(root, internal, vditor)
   ]
   return () => disposers.forEach((dispose) => dispose())
 }
