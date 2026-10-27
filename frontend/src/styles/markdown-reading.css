@@ -1,0 +1,140 @@
+/* ==========================================================================
+   Markdown 阅读页：Typora 式纸张页面
+   --------------------------------------------------------------------------
+   前台文章正文改成一张纸张质感的页面，结构对齐 Typora（沿用站点纸色，不用纯白）：
+   - .typora-page 只负责外壳：纸张底、1px 浅灰实线边框、小圆角、居中、最大 860px；
+   - 正文排版与配色（标题 / 表格 / 引用 / 列表 / 高亮 / 代码块底色与字号）由
+     styles/markdown.css 统一提供，这里不覆盖任何正文变量与颜色；
+   - 只补阅读预览（md-editor-v3）代码块的 chrome：
+     语言名固定在右下角、复制按钮悬停才浮到右上角。
+   编辑器外壳（Vditor 菜单栏 / 状态栏 / 大纲）不在这里处理。
+   ========================================================================== */
+
+/* ---------- 1. 纸张外壳 ---------- */
+.typora-page {
+  /* 覆盖站点全局的虚线边框与轻微倾斜，留一张干净的纸 */
+  max-width: 860px;
+  margin: 0 auto;
+  padding: 40px 48px;
+  background-color: #faf6ee;
+  border: 1px solid #e4dac8;
+  border-radius: 5px;
+  box-shadow: none;
+  transform: none;
+}
+
+/* 内层预览容器自带 10px/20px 内边距，纸张的留白统一由卡片自己控制 */
+.typora-page .md-editor-preview-wrapper {
+  padding: 0;
+}
+
+@media (max-width: 720px) {
+  .typora-page {
+    padding: 24px 18px;
+    border-radius: 4px;
+  }
+}
+
+/* ---------- 2. 代码块 chrome ---------- */
+.typora-page .md-editor-preview .md-editor-code,
+.typora-page .md-editor-preview.default-theme .md-editor-code {
+  position: relative;
+}
+
+/* 标题栏退化成透明容器，语言名与复制按钮各自相对 .md-editor-code 定位 */
+.typora-page .md-editor-preview .md-editor-code .md-editor-code-head,
+.typora-page .md-editor-preview.default-theme .md-editor-code .md-editor-code-head {
+  display: contents !important;
+  /* markdown.css 里标题栏默认 opacity: 0、悬停才出现；阅读页要让语言名一直可见 */
+  opacity: 1 !important;
+  visibility: visible !important;
+  background-color: transparent !important;
+  border: 0 !important;
+}
+
+.typora-page .md-editor-preview .md-editor-code .md-editor-code-flag,
+.typora-page .md-editor-preview.default-theme .md-editor-code .md-editor-code-flag {
+  display: none !important;
+}
+
+/* 代码块默认不折叠，但 md-editor-v3 仍会渲染折叠图标；display: contents 拆开标题栏后
+   它会露在代码块左上角，阅读页直接隐藏 */
+.md-editor-preview .md-editor-collapse-tips {
+  display: none !important;
+}
+
+.typora-page .md-editor-preview .md-editor-code .md-editor-code-action,
+.typora-page .md-editor-preview.default-theme .md-editor-code .md-editor-code-action {
+  display: contents !important;
+}
+
+/* 语言名：代码块右下角，低调的灰色小字 */
+.typora-page .md-editor-preview .md-editor-code .md-editor-code-lang,
+.typora-page .md-editor-preview.default-theme .md-editor-code .md-editor-code-lang {
+  position: absolute !important;
+  right: 12px !important;
+  bottom: 7px !important;
+  z-index: 2;
+  display: block !important;
+  max-width: 50%;
+  margin: 0 !important;
+  padding: 0 !important;
+  overflow: hidden;
+  font-family: var(
+    --md-mono,
+    'SFMono-Regular',
+    Consolas,
+    'Liberation Mono',
+    Menlo,
+    'Courier New',
+    monospace
+  );
+  font-size: 12px !important;
+  line-height: 1 !important;
+  color: #8b949e !important;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  pointer-events: none;
+}
+
+.typora-page .md-editor-preview .md-editor-code .md-editor-code-lang:empty {
+  display: none !important;
+}
+
+/* 复制按钮：默认隐藏，鼠标移入代码块才浮到右上角 */
+.typora-page .md-editor-preview .md-editor-code .md-editor-copy-button,
+.typora-page .md-editor-preview.default-theme .md-editor-code .md-editor-copy-button {
+  position: absolute !important;
+  top: 6px !important;
+  right: 6px !important;
+  z-index: 2;
+  display: inline-flex !important;
+  align-items: center;
+  justify-content: center;
+  box-sizing: border-box;
+  width: auto !important;
+  min-width: 28px;
+  height: 28px;
+  padding: 0 8px !important;
+  border-radius: 4px;
+  font-size: 12px !important;
+  line-height: 1 !important;
+  background-color: rgba(255, 255, 255, 0.9) !important;
+  box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.06);
+  cursor: pointer;
+  opacity: 0;
+  transition: opacity 0.15s ease, background-color 0.15s ease;
+  pointer-events: none;
+}
+
+.typora-page .md-editor-preview .md-editor-code:hover .md-editor-copy-button,
+.typora-page .md-editor-preview.default-theme .md-editor-code:hover .md-editor-copy-button,
+.typora-page .md-editor-preview .md-editor-code:focus-within .md-editor-copy-button {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.typora-page .md-editor-preview .md-editor-code .md-editor-copy-button:hover,
+.typora-page .md-editor-preview.default-theme .md-editor-code .md-editor-copy-button:hover {
+  background-color: rgba(0, 0, 0, 0.06) !important;
+}

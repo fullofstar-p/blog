@@ -5,6 +5,8 @@ import 'md-editor-v3/lib/style.css'
 import 'md-editor-v3/lib/preview.css'
 import './styles/main.css'
 import './styles/markdown.css'
+// 阅读页白纸外壳与阅读态代码块 chrome，需在 markdown.css 之后引入以覆盖
+import './styles/markdown-reading.css'
 import App from './App.vue'
 import router from './router'
 

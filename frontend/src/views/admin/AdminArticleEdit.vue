@@ -19,7 +19,9 @@ const router = useRouter()
 const meta = useMetaStore()
 
 const isEdit = computed(() => Boolean(props.id))
-const loading = ref(false)
+// 编辑已有文章时初始就是加载态：数据回来之前不挂载表单，避免 MarkdownEditor
+// 先挂载、再被 loading 置 true 卸载，Vditor 初始化未完成就 destroy 会抛错导致正文空白
+const loading = ref(isEdit.value)
 const loadError = ref('')
 const saving = ref(false)
 const saveError = ref('')
@@ -142,7 +144,7 @@ watch(
           {{ isEdit ? '编辑文章' : '写新文章' }}
         </h2>
         <p class="mt-1 font-serif text-sm italic text-ink-500">
-          正文使用 Markdown，边写边渲染；工具栏「编辑模式」可切换即时渲染 / 所见即所得 / 分屏。保存草稿后可以随时回来继续写。
+          正文使用 Markdown 即时渲染；顶部菜单栏可插入标题/列表/表格/代码块，右侧「大纲」「源码」切换侧栏与 Markdown 源码模式，表格旁会浮出操作按钮，底部状态栏显示字数。
         </p>
       </div>
       <span
@@ -260,10 +262,7 @@ watch(
       </section>
 
       <section class="sketch-card rotate-[0.2deg] p-5 md:p-6">
-        <div class="flex flex-wrap items-center justify-between gap-2">
-          <h3 class="font-serif text-xl italic text-pencil">正文</h3>
-          <span class="font-serif text-xs italic text-ink-300">{{ form.content.length }} 字符</span>
-        </div>
+        <h3 class="font-serif text-xl italic text-pencil">正文</h3>
         <p v-if="errors.content" class="mt-2 font-serif text-sm italic text-[#b23b2e]" role="alert">
           {{ errors.content }}
         </p>
