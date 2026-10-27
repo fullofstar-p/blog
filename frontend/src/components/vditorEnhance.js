@@ -45,12 +45,6 @@ const TABLE_OPS = {
   'col-del': { key: '_', shift: true, code: 'Minus' }
 }
 
-const ALIGN_OPS = {
-  'align-left': 'left',
-  'align-center': 'center',
-  'align-right': 'right'
-}
-
 const TABLE_BUTTONS = [
   { op: 'row-above', label: '上方插行', title: '在当前行上方插入一行' },
   { op: 'row-below', label: '下方插行', title: '在当前行下方插入一行' },
@@ -58,9 +52,6 @@ const TABLE_BUTTONS = [
   { op: 'col-left', label: '左侧插列', title: '在当前列左侧插入一列' },
   { op: 'col-right', label: '右侧插列', title: '在当前列右侧插入一列' },
   { op: 'col-del', label: '删除列', title: '删除当前列' },
-  { op: 'align-left', label: '左对齐', title: '当前列左对齐' },
-  { op: 'align-center', label: '居中', title: '当前列居中对齐' },
-  { op: 'align-right', label: '右对齐', title: '当前列右对齐' },
   { op: 'table-del', label: '删除表格', title: '删除整个表格' }
 ]
 
@@ -99,6 +90,8 @@ function fixOutlineJump(vditorEl, internal) {
   if (!content) return () => {}
 
   const handler = (event) => {
+    // 源码模式下没有渲染后的标题锚点，交回 Vditor 自己处理
+    if (internal.currentMode !== 'ir') return
     const target = event.target
     if (!target || !target.closest) return
     // 折叠/展开箭头交给 Vditor 自己处理
@@ -241,6 +234,7 @@ function installTableTools(root, internal, vditor) {
   }
 
   const offOver = on(root, 'mouseover', (event) => {
+    if (internal.currentMode !== 'ir') return
     const target = event.target
     if (!target || !target.closest) return
     if (target.closest('.vditor-table-tools')) {
@@ -294,33 +288,9 @@ function installTableTools(root, internal, vditor) {
     pre.scrollTop = savedScroll
   }
 
-  /** 列对齐：直接改单元格 align 属性，再从 DOM 重新生成 Markdown 同步给外层 */
-  const applyAlignment = (align) => {
-    const found = resolve()
-    if (!found) return
-    const { table } = found
-    const column = anchor.cellIndex
-    Array.from(table.rows).forEach((row) => {
-      const cell = row.cells[column]
-      if (!cell) return
-      cell.setAttribute('align', align)
-      cell.classList.add('vditor-align-flash')
-      window.setTimeout(() => cell.classList.remove('vditor-align-flash'), 800)
-    })
-    const markdown = vditor.getValue()
-    if (internal.options && typeof internal.options.input === 'function') {
-      internal.options.input(markdown)
-    }
-    window.setTimeout(place, 60)
-  }
-
   const dispatchOp = (op) => {
     if (op === 'table-del') {
       deleteWholeTable()
-      return
-    }
-    if (ALIGN_OPS[op]) {
-      applyAlignment(ALIGN_OPS[op])
       return
     }
     const config = TABLE_OPS[op]
@@ -332,8 +302,7 @@ function installTableTools(root, internal, vditor) {
     const range = document.createRange()
     range.selectNodeContents(cell)
     range.collapse(true)
-    // 对齐用的 setTableAlign 依赖 startContainer.parentElement 找当前列，
-    // 起点必须落在单元格内部（文本节点或子元素），不能是 <td> 本身
+    // 选区起点落在单元格内部（文本节点或子元素），Vditor 才能识别当前单元格/列
     if (!cell.firstChild) {
       cell.appendChild(document.createTextNode(''))
     }
@@ -384,6 +353,8 @@ function installTableTools(root, internal, vditor) {
   const paddingObserver = new MutationObserver(reposition)
   paddingObserver.observe(internal.ir.element, { attributes: true, attributeFilter: ['style'] })
   const offResize = on(window, 'resize', reposition)
+  // 切到源码模式时收起表格操作条
+  const offMode = on(root, 'vditor-mode-change', hide)
 
   return () => {
     offOver()
@@ -392,6 +363,7 @@ function installTableTools(root, internal, vditor) {
     offClick()
     offScroll()
     offResize()
+    offMode()
     paddingObserver.disconnect()
     window.clearTimeout(hideTimer)
     panel.remove()
@@ -491,6 +463,10 @@ function installLineNumbers(root, internal) {
 
   const render = () => {
     frame = 0
+    if (internal.currentMode !== 'ir') {
+      numbers.style.display = 'none'
+      return
+    }
     ensurePadding()
     const preRect = pre.getBoundingClientRect()
     const rootRect = root.getBoundingClientRect()
@@ -560,6 +536,8 @@ function installLineNumbers(root, internal) {
 
   const offScroll = on(pre, 'scroll', syncScroll)
   const offResize = on(window, 'resize', schedule)
+  // 源码模式 / 即时渲染切换后重新测量（源码模式下隐藏行号）
+  const offMode = on(root, 'vditor-mode-change', schedule)
 
   // 正文重渲染（输入、插入表格/代码块、外部 setValue）后重新测量
   const contentObserver = new MutationObserver(schedule)
@@ -578,11 +556,61 @@ function installLineNumbers(root, internal) {
   return () => {
     offScroll()
     offResize()
+    offMode()
     contentObserver.disconnect()
     styleObserver.disconnect()
     if (frame) window.cancelAnimationFrame(frame)
     if (timer) window.clearTimeout(timer)
     numbers.remove()
+  }
+}
+
+/**
+ * 源码模式开关。
+ *
+ * 复用 Vditor 内置的 edit-mode 面板（隐藏起来），点我们的「源码」按钮时
+ * 程序化点击面板里对应的 ir / sv 项，这样布局、texture、撤销栈都由 Vditor 处理。
+ */
+function installSourceMode(root, internal) {
+  const toolbar = root.querySelector('.vditor-toolbar')
+  const editModeItem = internal.toolbar && internal.toolbar.elements['edit-mode']
+  if (!toolbar || !editModeItem) return () => {}
+  editModeItem.style.display = 'none'
+
+  const wrapper = document.createElement('div')
+  wrapper.className = 'vditor-toolbar__item'
+  const button = document.createElement('button')
+  button.type = 'button'
+  button.className = 'vditor-tooltipped vditor-tooltipped__n'
+  button.dataset.type = 'source-mode'
+  button.setAttribute('aria-label', '源码模式')
+  button.setAttribute('aria-pressed', 'false')
+  button.innerHTML = '<span class="vditor-tb-glyph">&lt;/&gt;</span><span class="vditor-tb-label">源码</span>'
+  wrapper.appendChild(button)
+  toolbar.insertBefore(wrapper, editModeItem)
+
+  const sync = () => {
+    const isSource = internal.currentMode === 'sv'
+    button.classList.toggle('vditor-menu--current', isSource)
+    button.setAttribute('aria-pressed', isSource ? 'true' : 'false')
+    root.dispatchEvent(new CustomEvent('vditor-mode-change', { detail: internal.currentMode }))
+  }
+
+  const onClick = (event) => {
+    event.preventDefault()
+    const target = internal.currentMode === 'sv' ? 'ir' : 'sv'
+    const modeButton = editModeItem.querySelector(`button[data-mode="${target}"]`)
+    if (modeButton) modeButton.click()
+    sync()
+  }
+
+  button.addEventListener('click', onClick)
+  sync()
+
+  return () => {
+    button.removeEventListener('click', onClick)
+    wrapper.remove()
+    editModeItem.style.display = ''
   }
 }
 
@@ -599,6 +627,7 @@ export function enhanceVditor(vditor) {
     fixOutlineJump(root, internal),
     installTableTools(root, internal, vditor),
     installLineNumbers(root, internal),
+    installSourceMode(root, internal),
     fixFullscreen(root)
   ]
   return () => disposers.forEach((dispose) => dispose())

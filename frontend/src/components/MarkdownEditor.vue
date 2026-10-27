@@ -9,11 +9,11 @@ import { toastSuccess } from '@/utils/toast'
 /**
  * 正文编辑器：Vditor「即时渲染（IR）」模式。
  *
- * 只保留即时渲染，不提供所见即所得 / 分屏切换——写和看是同一片区域，
- * 光标所在位置直接渲染标题、列表、表格、代码块等。
+ * 默认在书写位置直接渲染标题、列表、表格、代码块等；工具栏最右侧的
+ * 「源码」按钮可切到 Markdown 源码模式（Vditor 的 SV textarea），再点一次回到即时渲染。
  * 图片仍走项目自己的 /api/files/upload。
  *
- * 工具栏中文名称、表格浮动操作条、大纲跳转与全屏修复在 vditorEnhance.js 中。
+ * 工具栏中文名称、表格浮动操作条、行号、源码模式开关、大纲跳转与全屏修复在 vditorEnhance.js 中。
  * 静态资源（lute / i18n / 图标 / 高亮样式）由 scripts/copy-vditor.mjs 在
  * predev、prebuild 时拷贝到 public/vditor，因此不用外网 CDN。
  */
@@ -53,7 +53,9 @@ const toolbar = [
   'redo',
   '|',
   'outline',
-  'fullscreen'
+  'fullscreen',
+  // 隐藏的原生模式切换项：供「源码」按钮程序化切换 IR / SV
+  'edit-mode'
 ]
 
 function onInput(value) {
@@ -86,6 +88,8 @@ onMounted(() => {
     lang: 'zh_CN',
     icon: 'ant',
     theme: 'classic',
+    // 源码模式只显示 textarea，不要右侧的预览/设备模拟面板
+    preview: { mode: 'editor' },
     // 本地资源目录（由 scripts/copy-vditor.mjs 生成）
     cdn: '/vditor',
     // 内容以后端为准，不使用 Vditor 的 localStorage 缓存，避免多端编辑串内容
