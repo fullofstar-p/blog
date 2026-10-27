@@ -49,15 +49,15 @@ const TABLE_OPS = {
 }
 
 const TABLE_BUTTONS = [
-  { op: 'row-above', label: '行↑', title: '在当前行上方插入一行' },
-  { op: 'row-below', label: '行↓', title: '在当前行下方插入一行' },
-  { op: 'row-del', label: '删行', title: '删除当前行' },
-  { op: 'col-left', label: '列←', title: '在当前列左侧插入一列' },
-  { op: 'col-right', label: '列→', title: '在当前列右侧插入一列' },
-  { op: 'col-del', label: '删列', title: '删除当前列' },
-  { op: 'align-left', label: '左', title: '当前列左对齐' },
-  { op: 'align-center', label: '中', title: '当前列居中对齐' },
-  { op: 'align-right', label: '右', title: '当前列右对齐' }
+  { op: 'row-above', label: '上方插行', title: '在当前行上方插入一行' },
+  { op: 'row-below', label: '下方插行', title: '在当前行下方插入一行' },
+  { op: 'row-del', label: '删除行', title: '删除当前行' },
+  { op: 'col-left', label: '左侧插列', title: '在当前列左侧插入一列' },
+  { op: 'col-right', label: '右侧插列', title: '在当前列右侧插入一列' },
+  { op: 'col-del', label: '删除列', title: '删除当前列' },
+  { op: 'align-left', label: '左对齐', title: '当前列左对齐' },
+  { op: 'align-center', label: '居中', title: '当前列居中对齐' },
+  { op: 'align-right', label: '右对齐', title: '当前列右对齐' }
 ]
 
 const on = (el, type, handler, options) => {
@@ -177,40 +177,18 @@ function installTableTools(root, internal) {
     const toolbarHeight = toolbar ? toolbar.offsetHeight : 0
     const gap = 8
 
-    // 正文容器左右各有一段 padding，右侧这条留白带可以塞下一条竖排操作条，
-    // 完全压不到正文与表格；padding 太窄（窄屏）时退化成表格右上角的小面板。
-    const pre = internal.ir.element
-    const preStyle = getComputedStyle(pre)
-    const padRight = parseFloat(preStyle.paddingRight) || 0
-    const rail = padRight >= 34 && root.clientWidth >= 520
-    panel.classList.toggle('is-rail', rail)
-    panel.classList.toggle('is-grid', !rail)
-
-    if (rail) {
-      const railWidth = Math.max(24, Math.min(40, padRight - 8))
-      panel.style.width = `${railWidth}px`
-      const boxWidth = panel.offsetWidth
-      const scrollbarWidth = pre.offsetWidth - pre.clientWidth
-      const preRect = pre.getBoundingClientRect()
-      const contentRight = preRect.right - scrollbarWidth - padRight
-      let left = contentRight - rootRect.left + 1
-      left = Math.max(Math.min(left, preRect.right - rootRect.left - boxWidth - 1), 6)
-      let top = tableRect.bottom - rootRect.top + gap
-      const maxTop = root.clientHeight - panel.offsetHeight - 6
-      top = Math.min(Math.max(top, toolbarHeight + 4), Math.max(maxTop, toolbarHeight + 4))
-      panel.style.top = `${top}px`
-      panel.style.left = `${left}px`
-      return true
-    }
-
-    // 窄屏兜底：贴表格右下角，尽量只压住右侧留白
-    panel.style.width = ''
+    // 横向操作条：正下方，与表格左对齐；宽度超出编辑区时自动换行
     const panelRect = panel.getBoundingClientRect()
-    let left = tableRect.right - rootRect.left - panelRect.width
+    let left = tableRect.left - rootRect.left
     left = Math.max(Math.min(left, root.clientWidth - panelRect.width - gap), gap)
+
     let top = tableRect.bottom - rootRect.top + gap
-    const maxTop = root.clientHeight - panelRect.height - 6
-    top = Math.min(Math.max(top, toolbarHeight + 4), Math.max(maxTop, toolbarHeight + 4))
+    const minTop = toolbarHeight + 4
+    const maxTop = root.clientHeight - panelRect.height - gap
+    if (top > maxTop) {
+      // 下方空间不够时贴到编辑区底部，尽量贴近表格
+      top = Math.max(maxTop, minTop)
+    }
     panel.style.top = `${top}px`
     panel.style.left = `${left}px`
     return true
@@ -320,7 +298,7 @@ function installTableTools(root, internal) {
     if (panel.classList.contains('is-open')) place()
   })
 
-  // Vditor 会根据容器宽度重算正文左右 padding（会改变留白带宽度），窗口尺寸变化也要重排
+  // Vditor 会重算正文 padding 与尺寸，窗口变化后操作条也要重新定位
   const reposition = () => {
     if (panel.classList.contains('is-open')) place()
   }
