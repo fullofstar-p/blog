@@ -212,13 +212,9 @@ function gotoHeading(index) {
   if (!vditor) return
   const heading = headings.value[index]
   if (!heading) return
-  // 先 focus 再滚动：focus 会把光标滚进可视区，顺序反了会被拉回原位
-  if (!isSource.value) vditor.focus()
+  // 只滚动，不 focus：focus 会先把光标（常在文末）滚进可视区，看起来像先跳到底部
   activeHeading.value = index
-  window.requestAnimationFrame(() => {
-    if (!vditor) return
-    scrollToHeading(vditor, index, heading.line)
-  })
+  scrollToHeading(vditor, index, heading.line)
 }
 
 function toggleSource() {

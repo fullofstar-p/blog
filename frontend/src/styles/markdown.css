@@ -1077,6 +1077,12 @@
 }
 
 /* ---------- 代码块语言（右下角，可点击选择） ---------- */
+/* hidden 属性必须真正隐藏：本文件里给菜单写了 display:grid，会压过浏览器默认的 [hidden] */
+.vditor-code-lang[hidden],
+.vditor-code-lang__menu[hidden] {
+  display: none !important;
+}
+
 .vditor-code-lang {
   position: absolute;
   z-index: 32;

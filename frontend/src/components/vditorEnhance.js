@@ -626,6 +626,20 @@ function installEditingShortcuts(root, internal, vditor) {
     document.execCommand('insertText', false, ' '.repeat(spaces))
   }
 
+  /** 把只有列表标记的段落转成真正的列表（Vditor 只有回车才转，这里补上空格触发） */
+  const convertList = (block, ordered) => {
+    const selection = window.getSelection()
+    if (!selection) return
+    const range = document.createRange()
+    range.selectNodeContents(block)
+    selection.removeAllRanges()
+    selection.addRange(range)
+    document.execCommand('delete')
+    const item = internal.toolbar && internal.toolbar.elements[ordered ? 'ordered-list' : 'list']
+    const action = item && item.children[0]
+    if (action) action.click()
+  }
+
   const outdent = () => {
     const selection = window.getSelection()
     if (!selection || !selection.rangeCount) return
@@ -658,6 +672,25 @@ function installEditingShortcuts(root, internal, vditor) {
       event.stopPropagation()
       if (event.shiftKey) outdent()
       else insertIndent(4)
+      return
+    }
+
+    if (event.key === ' ' || event.key === 'Spacebar') {
+      const selection = window.getSelection()
+      if (!selection || !selection.rangeCount) return
+      const anchor = selection.anchorNode
+      const element = anchor && (anchor.nodeType === 1 ? anchor : anchor.parentElement)
+      const block = element && element.closest ? element.closest('p') : null
+      if (!block || !internal.ir.element.contains(block)) return
+      const text = (block.textContent || '').trim()
+      const ordered = /^\d+[.)]$/.test(text)
+      const unordered = /^[-*+]$/.test(text)
+      if (!ordered && !unordered) return
+      // 只在标记位于行尾时转换，避免正文里的短横线被误转
+      if (selection.focusOffset < (anchor.nodeValue || '').length) return
+      event.preventDefault()
+      event.stopPropagation()
+      convertList(block, ordered)
       return
     }
 
