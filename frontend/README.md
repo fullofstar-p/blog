@@ -31,7 +31,7 @@ src/
 ├── components/  # Sketch 通用组件、上传、Markdown、评论、管理布局
 ├── router/      # 路由与登录/管理员守卫
 ├── store/       # auth（token 持久化）、meta（分类/标签缓存）
-├── styles/      # Tailwind 入口、纸张纹理、手绘组件类、编辑器覆盖
+├── styles/      # Tailwind 入口、纸张纹理、手绘组件类、编辑器覆盖、阅读页白纸
 ├── utils/       # 格式化、Toast
 └── views/       # 前台页面 + admin/ 管理后台
 ```
@@ -55,28 +55,63 @@ src/
 
 ## Markdown / 代码高亮
 
-- 后台写文章用 **Vditor**「即时渲染（IR）」模式：在书写位置直接渲染标题、列表、代码块，
-  类似 Typora，不再左右分栏；只保留即时渲染，不再提供所见即所得 / 分屏切换。
-  工具栏按钮带中文名称（`vditorEnhance.js` 补挂），鼠标悬停显示功能名与快捷键。
-  表格支持悬停浮出操作条：插行、删行、插列、删列、删除整张表格；操作条横向贴在
-  表格正下方，鼠标移入即可点（窄屏自动换行）。
-  工具栏最右侧「源码」按钮：复用 Vditor 内置 edit-mode（隐藏起来）在 IR / SV 之间
-  切换，源码模式只显示 Markdown textarea（`preview.mode: 'editor'`），源码里的修改
-  会通过 `input` 回调实时同步回 v-model，切回即时渲染时行号恢复。
-  正文左侧显示行号（按渲染后的可视行编号，随滚动同步；Vditor 的 H1/H2 标记左侧额外留白 30px），
-  工具栏不再显示字数，字数由 `utils/wordCount.js` 去掉 Markdown 标记后在正文右上角统计。
-  大纲点击会滚动正文容器到对应标题（不再调用 `window.scrollTo` 导致整页跳顶）；
-  全屏时临时清除祖先卡片 `rotate` 变换，避免 `position: fixed` 被卡片限制。
+后台编辑器的「内核」仍是 **Vditor 即时渲染（IR）**，交互与 UI 外壳按 **Typora** 重做：
+
+- **顶部菜单栏**：`段落` / `格式` / `编辑` / `视图` 四个下拉菜单，替代原来一排图标工具栏
+  （Vditor 自带工具栏仍在 DOM 里，只是由 CSS 隐藏，菜单命令直接点它的隐藏按钮，
+  因此撤销栈、选区、Markdown 语法仍是 Vditor 原生实现）。
+  菜单右侧固定「大纲」「源码」「全屏」三个开关。
+- **底部状态栏**：显示 `Markdown`、当前模式（即时渲染 / 源码模式）与实时字数；
+  字数由 `utils/wordCount.js` 去掉 Markdown 标记后统计，页面右侧不再重复显示。
+- **大纲侧栏**：在左侧展开渲染后的标题树，点击精确滚动正文容器到对应标题；
+  滚动时按可视区域高亮当前标题，不用 `window.scrollTo` 避免整页跳顶。
+- **源码模式**：「源码」按钮或 `Ctrl+/` 在 IR / SV 之间切换，源码模式只显示
+  Markdown textarea（`preview.mode: 'editor'`），修改通过 `input` 回调实时同步回
+  v-model，切回即时渲染时行号恢复。
+- **表格工具条**：鼠标移到表格上时，表格左上角浮出一排图标按钮（插入/删除行列、
+  删除整张表格），按钮带 `title` / `aria-label` tooltip；表格滚到编辑区顶部时
+  工具条落到表格内部，保证始终可点。
+- **Typora 快捷键**：`Ctrl+1`~`6` / `Ctrl+0` 设置标题与正文、`Ctrl+B` 加粗、
+  `Ctrl+I` 斜体、`Ctrl+K` 链接、`Ctrl+/` 源码模式。
+- 正文左侧显示行号（按渲染后的可视行编号，随滚动同步）；全屏优先用浏览器
+  Fullscreen API，被拒绝时退回 CSS 全屏（`setCssFullscreen`：此时才由 `clearAncestors`
+  临时清掉祖先卡片的 `transform` / `filter`，否则 `position: fixed` 会以带变换的卡片为包含块）。
   Vditor 的 lute / 中文语言包 / 图标 / 高亮样式在 `predev`、`prebuild` 时由
   `scripts/copy-vditor.mjs` 拷到 `public/vditor`（已 gitignore），不依赖外网 CDN。
-- 正文排版参考 **Typora 默认主题**（`src/styles/markdown.css`）：
-  系统无衬线字体、1.65 行距、粗体标题（h1/h2 带细实线下边框）、实线表格边框 + 斑马纹、
-  浅灰圆角代码块、行内代码浅底、Typora 蓝链接、灰字左边线引用；代码高亮用 GitHub 色系。
-  页面外壳（工具栏、卡片虚线边框、按钮）保持 Sketch 手绘风，正文背景仍是纸张色而非纯白。
-- 前台阅读用 `MarkdownViewer`（md-editor-v3 预览），与后台编辑器共用同一套 Typora 风格内容样式，
-  并额外覆盖 md-editor-v3 `default-theme` 的默认间距/背景/代码块标题栏。
-- `src/styles/markdown.css` 通过 CSS 变量与类覆盖把编辑器/预览的底色、工具栏、边框改为纸色，
-  并把 highlight.js 的 `.hljs-*` 令牌映射到低饱和手绘四色；代码块底色为 `#efe7d8`，不使用纯白。
+
+**阅读页**用 `MarkdownViewer`（md-editor-v3 预览）与后台编辑器共用同一套 Typora 排版：
+
+- 正文是一张 **Typora 白色页面**（`.typora-page`，样式在 `src/styles/markdown-reading.css`）：
+  纯白底、1px `#e3e3e3` 实线边框、5px 圆角、最大宽度 860px 居中、
+  上下 40px / 左右 48px 内边距；没有站点其它卡片的虚线边框和轻微倾斜。
+- 阅读态代码高亮改为**本地 highlight.js + GitHub 浅色主题**：`MarkdownViewer.vue` 里把
+  `highlight.js/lib/common` 实例交给 md-editor-v3，不再从 unpkg 运行时拉
+  `highlight.min.js` / `atom-one-dark`；`scripts/copy-vditor.mjs` 会把
+  `node_modules/highlight.js/styles/github.css` 拷到 `public/highlight/github.css`
+  （predev / prebuild 自动执行，已 gitignore）。离线也有高亮，且配色与白纸 + `#f6f8fa`
+  代码块一致。
+- 阅读态代码块沿用 Typora 配色（`#f6f8fa` 浅灰底、无边框无阴影、字号 14px，由
+  `markdown.css` 的 `--md-bg-code` 等变量统一提供）；`markdown-reading.css` 只补代码块 chrome：
+  语言名固定在代码块右下角，复制按钮默认隐藏、鼠标移入代码块才浮到右上角。
+- 正文排版本身（标题 / 表格 / 引用 / 列表 / 代码高亮）仍由 `src/styles/markdown.css`
+  统一提供：系统无衬线字体、1.65 行距、粗体标题（h1/h2 带细实线下边框）、
+  实线表格边框 + 斑马纹、Typora 蓝链接、灰字左边线引用、GitHub 色系代码高亮；
+  阅读页配色也用白纸基调（`--md-bg` #fff、`--md-bg-code` #f6f8fa、`--md-border` #e1e4e8）。
+- 页面外壳（导航、卡片、按钮）保持 Sketch 手绘风，只有正文区域是白纸。
+
+### 已修复：编辑页「正文模块不见」
+
+`AdminArticleEdit.vue` 之前的 `loading` 初始值是 `false`：编辑已有文章时表单（含
+`MarkdownEditor`）先挂载，随后 `loadArticle()` 把 `loading` 置 `true`，表单被 `v-if`
+卸载；此时 Vditor 还没初始化完，`destroy()` 抛
+`Cannot read properties of undefined (reading 'element')`，组件更新链中断，
+文章数据不填充、正文区域只剩空壳。
+
+修复方式：编辑态下 `loading` 初始值直接取 `isEdit`（新建文章仍是 `false`），
+数据回来之前不挂载表单，`MarkdownEditor` 因此只会在有内容时创建一次，
+不会再出现「初始化中被卸载」。`MarkdownEditor` 内部也补了初始化完成标记与
+安全的 `destroyVditor()` 兜底。
+
 
 ## Docker
 

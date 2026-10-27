@@ -1,37 +1,15 @@
 /**
  * Vditor 编辑器增强（不依赖 Vue，便于在浏览器中单独验证）。
  *
- * 解决四类问题：
- * 1. 工具栏只有图标，鼠标悬停也没提示（提示框被 .vditor 的 overflow: hidden 裁掉）；
- * 2. 表格在即时渲染模式下没有任何操作入口（Vditor 只给所见即所得模式做了浮层）；
- * 3. 大纲点击标题时 Vditor 会调用 window.scrollTo(vditor.element.offsetTop)，
- *    而 offsetTop 是相对 .sketch-card（position: relative）的，导致整页跳到顶部；
- * 4. 编辑区所在的 .sketch-card 带 rotate 变换，形成 fixed 定位的包含块，
- *    全屏时 .vditor--fullscreen 只铺满卡片而不是视口。
+ * 只保留 Typora 式外壳需要、Vditor 本身不提供的能力：
+ * 1. 表格操作条：鼠标移到表格上时，在表格左上角浮出一排图标按钮
+ *    （上方/下方插行、删除行、左侧/右侧插列、删除列、删除表格），
+ *    复用 Vditor 自己的表格快捷键实现，保证撤销栈与 Markdown 文本一致；
+ * 2. 左侧行号：IR 模式没有真实源码行，按渲染后的可视行编号；
+ * 3. 代码块语言角标：从围栏信息里取语言名，显示在代码块右下角。
+ *
+ * 工具栏本身由 MarkdownEditor.vue 隐藏并换成顶部菜单，这里不再处理工具栏。
  */
-
-const LABELS = {
-  headings: '标题',
-  bold: '加粗',
-  italic: '斜体',
-  strike: '删除',
-  list: '无序',
-  'ordered-list': '有序',
-  check: '任务',
-  outdent: '减缩',
-  indent: '增效',
-  quote: '引用',
-  line: '分割',
-  code: '代码',
-  'inline-code': '行内',
-  link: '链接',
-  table: '表格',
-  upload: '图片',
-  undo: '撤销',
-  redo: '重做',
-  outline: '大纲',
-  fullscreen: '全屏'
-}
 
 const isMac = () => /Mac|iPhone|iPad/.test(navigator.platform)
 
@@ -45,73 +23,50 @@ const TABLE_OPS = {
   'col-del': { key: '_', shift: true, code: 'Minus' }
 }
 
+const svg = (paths) =>
+  `<svg viewBox="0 0 16 16" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${paths}</svg>`
+
 const TABLE_BUTTONS = [
-  { op: 'row-above', label: '上方插行', title: '在当前行上方插入一行' },
-  { op: 'row-below', label: '下方插行', title: '在当前行下方插入一行' },
-  { op: 'row-del', label: '删除行', title: '删除当前行' },
-  { op: 'col-left', label: '左侧插列', title: '在当前列左侧插入一列' },
-  { op: 'col-right', label: '右侧插列', title: '在当前列右侧插入一列' },
-  { op: 'col-del', label: '删除列', title: '删除当前列' },
-  { op: 'table-del', label: '删除表格', title: '删除整个表格' }
+  {
+    op: 'row-above',
+    label: '上方插入行',
+    icon: svg('<rect x="1.8" y="7.6" width="12.4" height="6.6" rx="1"/><path d="M8 1.6v4M5.6 3.6 8 1.2l2.4 2.4"/>')
+  },
+  {
+    op: 'row-below',
+    label: '下方插入行',
+    icon: svg('<rect x="1.8" y="1.8" width="12.4" height="6.6" rx="1"/><path d="M8 14.4v-4M5.6 12.4 8 14.8l2.4-2.4"/>')
+  },
+  {
+    op: 'row-del',
+    label: '删除行',
+    icon: svg('<rect x="1.8" y="1.8" width="12.4" height="12.4" rx="1"/><path d="M4 8h8"/>')
+  },
+  {
+    op: 'col-left',
+    label: '左侧插入列',
+    icon: svg('<rect x="7.6" y="1.8" width="6.6" height="12.4" rx="1"/><path d="M1.6 8h4M3.6 5.6 1.2 8l2.4 2.4"/>')
+  },
+  {
+    op: 'col-right',
+    label: '右侧插入列',
+    icon: svg('<rect x="1.8" y="1.8" width="6.6" height="12.4" rx="1"/><path d="M14.4 8h-4M12.4 5.6 14.8 8l-2.4 2.4"/>')
+  },
+  {
+    op: 'col-del',
+    label: '删除列',
+    icon: svg('<rect x="1.8" y="1.8" width="12.4" height="12.4" rx="1"/><path d="M8 4v8"/>')
+  },
+  {
+    op: 'table-del',
+    label: '删除表格',
+    icon: svg('<path d="M2.6 4.4h10.8M6.2 2.4h3.6M4.2 4.4l.7 9.2h6.2l.7-9.2M6.6 6.8v4.2M9.4 6.8v4.2"/>')
+  }
 ]
 
 const on = (el, type, handler, options) => {
   el.addEventListener(type, handler, options)
   return () => el.removeEventListener(type, handler, options)
-}
-
-/**
- * 给工具栏按钮补上中文名称。
- * Vditor 的按钮内容会被它自己重写（例如全屏图标切换），所以用 MutationObserver 补挂。
- */
-function decorateToolbar(root) {
-  const apply = () => {
-    root.querySelectorAll('.vditor-toolbar__item > [data-type]').forEach((btn) => {
-      const name = LABELS[btn.getAttribute('data-type')]
-      if (!name || btn.querySelector('.vditor-tb-label')) return
-      const label = document.createElement('span')
-      label.className = 'vditor-tb-label'
-      label.textContent = name
-      btn.appendChild(label)
-    })
-  }
-  apply()
-  const observer = new MutationObserver(apply)
-  observer.observe(root.querySelector('.vditor-toolbar'), { childList: true, subtree: true })
-  return () => observer.disconnect()
-}
-
-/**
- * 大纲点击：自己滚动正文容器，并阻止 Vditor 原生的 window.scrollTo。
- * 原生逻辑用的是相对卡片定位的 offsetTop，会把整页卷到顶部。
- */
-function fixOutlineJump(vditorEl, internal) {
-  const content = vditorEl.querySelector('.vditor-outline__content')
-  if (!content) return () => {}
-
-  const handler = (event) => {
-    // 源码模式下没有渲染后的标题锚点，交回 Vditor 自己处理
-    if (internal.currentMode !== 'ir') return
-    const target = event.target
-    if (!target || !target.closest) return
-    // 折叠/展开箭头交给 Vditor 自己处理
-    if (target.closest('.vditor-outline__action')) return
-    const link = target.closest('[data-target-id]')
-    if (!link) return
-
-    event.preventDefault()
-    event.stopPropagation()
-
-    const heading = document.getElementById(link.getAttribute('data-target-id'))
-    if (!heading) return
-
-    const scroller = internal.ir.element
-    const offset = heading.getBoundingClientRect().top - scroller.getBoundingClientRect().top
-    scroller.scrollTo({ top: Math.max(scroller.scrollTop + offset - 8, 0), behavior: 'smooth' })
-  }
-
-  // 捕获阶段拦截，避免 Vditor 绑定在列表上的 click 再触发一次滚动
-  return on(content, 'click', handler, true)
 }
 
 /** 找出 Markdown 里的所有表格块（行号区间） */
@@ -134,23 +89,27 @@ const findTableBlocks = (lines) => {
   return blocks
 }
 
-/** 表格浮动工具条：鼠标移到表格上时出现，点击按钮复用 Vditor 的快捷键实现增删改。 */
+/**
+ * 表格工具条（Typora 风格）：表格左上角的一排小图标，悬停表格时出现。
+ * 点击不是直接改 DOM，而是模拟 Vditor 的表格快捷键，保证 Markdown 文本同步。
+ */
 function installTableTools(root, internal, vditor) {
   const panel = document.createElement('div')
   panel.className = 'vditor-table-tools'
   panel.setAttribute('role', 'toolbar')
   panel.setAttribute('aria-label', '表格操作')
-  TABLE_BUTTONS.forEach(({ op, label, title }) => {
+  TABLE_BUTTONS.forEach(({ op, label, icon }) => {
     const button = document.createElement('button')
     button.type = 'button'
     button.dataset.op = op
-    button.textContent = label
-    button.title = title
+    button.title = label
+    button.setAttribute('aria-label', label)
+    button.innerHTML = icon
     panel.appendChild(button)
   })
   root.appendChild(panel)
 
-  // 记录“第几张表、第几行、第几列”，因为每次操作后 Vditor 会重建表格 DOM
+  // 记录「第几张表、第几行、第几列」，因为每次操作后 Vditor 会重建表格 DOM
   let anchor = null
   let hideTimer = 0
 
@@ -190,22 +149,18 @@ function installTableTools(root, internal, vditor) {
     if (!found) return false
     const tableRect = found.table.getBoundingClientRect()
     const rootRect = root.getBoundingClientRect()
-    const toolbar = root.querySelector('.vditor-toolbar')
-    const toolbarHeight = toolbar ? toolbar.offsetHeight : 0
-    const gap = 8
-
-    // 横向操作条：正下方，与表格左对齐；宽度超出编辑区时自动换行
     const panelRect = panel.getBoundingClientRect()
-    let left = tableRect.left - rootRect.left
-    left = Math.max(Math.min(left, root.clientWidth - panelRect.width - gap), gap)
+    const gap = 4
+    const margin = 6
 
-    let top = tableRect.bottom - rootRect.top + gap
-    const minTop = toolbarHeight + 4
-    const maxTop = root.clientHeight - panelRect.height - gap
-    if (top > maxTop) {
-      // 下方空间不够时贴到编辑区底部，尽量贴近表格
-      top = Math.max(maxTop, minTop)
-    }
+    let left = tableRect.left - rootRect.left
+    left = Math.max(Math.min(left, root.clientWidth - panelRect.width - margin), margin)
+
+    // Typora：工具条贴在表格左上角外侧；表格滚到编辑区顶部时落到表格内部
+    let top = tableRect.top - rootRect.top - panelRect.height - gap
+    if (top < margin) top = tableRect.top - rootRect.top + margin
+    top = Math.min(top, root.clientHeight - panelRect.height - margin)
+
     panel.style.top = `${top}px`
     panel.style.left = `${left}px`
     return true
@@ -233,23 +188,29 @@ function installTableTools(root, internal, vditor) {
     hideTimer = window.setTimeout(hide, 350)
   }
 
-  const offOver = on(root, 'mouseover', (event) => {
+  const revealFor = (target) => {
     if (internal.currentMode !== 'ir') return
-    const target = event.target
     if (!target || !target.closest) return
     if (target.closest('.vditor-table-tools')) {
       window.clearTimeout(hideTimer)
       return
     }
-    const nextCell = target.closest('td, th')
-    if (nextCell && root.contains(nextCell)) {
+    const cell = target.closest('td, th')
+    if (cell && root.contains(cell)) {
       window.clearTimeout(hideTimer)
-      show(nextCell)
+      show(cell)
       return
     }
     if (anchor) scheduleHide()
-  })
+  }
 
+  const offOver = on(root, 'mouseover', (event) => revealFor(event.target))
+  const offFocus = on(root, 'keyup', () => {
+    const selection = window.getSelection()
+    if (!selection || !selection.anchorNode) return
+    const node = selection.anchorNode.nodeType === 1 ? selection.anchorNode : selection.anchorNode.parentElement
+    revealFor(node)
+  })
   const offLeave = on(panel, 'mouseenter', () => window.clearTimeout(hideTimer))
   const offOut = on(panel, 'mouseleave', scheduleHide)
 
@@ -326,8 +287,7 @@ function installTableTools(root, internal, vditor) {
     adjustAnchor(op)
     // 表格结构变化后重新定位；单元格/表格被删掉时收起面板
     window.setTimeout(() => {
-      const next = resolve()
-      if (!next) {
+      if (!resolve()) {
         hide()
         return
       }
@@ -346,85 +306,28 @@ function installTableTools(root, internal, vditor) {
     if (panel.classList.contains('is-open')) place()
   })
 
-  // Vditor 会重算正文 padding 与尺寸，窗口变化后操作条也要重新定位
+  // 切到源码模式时立即收起（Vditor 重渲染后位置也会失效）
+  const offMode = on(root, 'vditor-mode-change', hide)
+
   const reposition = () => {
     if (panel.classList.contains('is-open')) place()
   }
   const paddingObserver = new MutationObserver(reposition)
   paddingObserver.observe(internal.ir.element, { attributes: true, attributeFilter: ['style'] })
   const offResize = on(window, 'resize', reposition)
-  // 切到源码模式时收起表格操作条
-  const offMode = on(root, 'vditor-mode-change', hide)
 
   return () => {
     offOver()
+    offFocus()
     offLeave()
     offOut()
     offClick()
     offScroll()
-    offResize()
     offMode()
+    offResize()
     paddingObserver.disconnect()
     window.clearTimeout(hideTimer)
     panel.remove()
-  }
-}
-
-/** 全屏：临时去掉祖先上的 transform / filter，否则 fixed 会以卡片为包含块。 */
-function fixFullscreen(root) {
-  let cleared = []
-
-  const clearAncestors = () => {
-    cleared = []
-    let el = root.parentElement
-    while (el && el !== document.body) {
-      const style = getComputedStyle(el)
-      const dirty =
-        style.transform !== 'none' ||
-        style.filter !== 'none' ||
-        style.perspective !== 'none' ||
-        style.willChange.includes('transform')
-      if (dirty) {
-        cleared.push({
-          el,
-          transform: el.style.transform,
-          filter: el.style.filter,
-          perspective: el.style.perspective,
-          willChange: el.style.willChange
-        })
-        el.style.transform = 'none'
-        el.style.filter = 'none'
-        el.style.perspective = 'none'
-        el.style.willChange = 'auto'
-      }
-      el = el.parentElement
-    }
-  }
-
-  const restore = () => {
-    cleared.forEach(({ el, transform, filter, perspective, willChange }) => {
-      el.style.transform = transform
-      el.style.filter = filter
-      el.style.perspective = perspective
-      el.style.willChange = willChange
-    })
-    cleared = []
-  }
-
-  const sync = () => {
-    if (root.classList.contains('vditor--fullscreen')) {
-      if (!cleared.length) clearAncestors()
-    } else if (cleared.length) {
-      restore()
-    }
-  }
-
-  const observer = new MutationObserver(sync)
-  observer.observe(root, { attributes: true, attributeFilter: ['class'] })
-
-  return () => {
-    observer.disconnect()
-    restore()
   }
 }
 
@@ -434,7 +337,6 @@ function fixFullscreen(root) {
  * IR 模式没有真正的“源码行”，这里按渲染后的可视行编号：
  * 遍历正文文本节点，用 Range.getClientRects() 拿到每一行的位置，
  * 去重后把序号画在左侧留白里（不参与正文布局、不响应鼠标）。
- * 为了不压住 Vditor 自己的 H1/H2 标记，给正文左侧额外留出 30px。
  */
 function installLineNumbers(root, internal) {
   const pre = internal.ir.element
@@ -471,7 +373,7 @@ function installLineNumbers(root, internal) {
     const preRect = pre.getBoundingClientRect()
     const rootRect = root.getBoundingClientRect()
     const padLeft = parseFloat(getComputedStyle(pre).paddingLeft) || 0
-    const width = padLeft - 34
+    const width = padLeft - 20
     if (width < 14 || preRect.height === 0) {
       numbers.style.display = 'none'
       return
@@ -515,7 +417,7 @@ function installLineNumbers(root, internal) {
 
     let html = ''
     merged.forEach((line, index) => {
-      const offset = Math.max((line.height - 15) / 2, 0)
+      const offset = Math.max((line.height - 16) / 2, 0)
       html += `<span style="top:${Math.round(line.top + offset)}px">${index + 1}</span>`
     })
     track.innerHTML = html
@@ -536,14 +438,12 @@ function installLineNumbers(root, internal) {
 
   const offScroll = on(pre, 'scroll', syncScroll)
   const offResize = on(window, 'resize', schedule)
-  // 源码模式 / 即时渲染切换后重新测量（源码模式下隐藏行号）
-  const offMode = on(root, 'vditor-mode-change', schedule)
 
   // 正文重渲染（输入、插入表格/代码块、外部 setValue）后重新测量
   const contentObserver = new MutationObserver(schedule)
   contentObserver.observe(pre, { childList: true, subtree: true, characterData: true })
 
-  // Vditor 会重算 padding（resize、大纲切换、全屏），这里把左侧额外留白补回去
+  // Vditor 会重算 padding（resize、全屏），这里把左侧额外留白补回去
   const styleObserver = new MutationObserver(() => {
     ensurePadding()
     schedule()
@@ -552,6 +452,12 @@ function installLineNumbers(root, internal) {
 
   schedule()
   window.setTimeout(schedule, 400)
+
+  // 源码模式 / 即时渲染切换后立刻隐藏或重新测量
+  const offMode = on(root, 'vditor-mode-change', () => {
+    if (internal.currentMode !== 'ir') numbers.style.display = 'none'
+    schedule()
+  })
 
   return () => {
     offScroll()
@@ -566,51 +472,40 @@ function installLineNumbers(root, internal) {
 }
 
 /**
- * 源码模式开关。
- *
- * 复用 Vditor 内置的 edit-mode 面板（隐藏起来），点我们的「源码」按钮时
- * 程序化点击面板里对应的 ir / sv 项，这样布局、texture、撤销栈都由 Vditor 处理。
+ * 代码块语言角标（Typora 在代码块右下角显示语言名）。
+ * 只写 data-lang 属性，由 CSS ::after 渲染，不往 DOM 里塞节点，避免影响 Markdown 序列化。
  */
-function installSourceMode(root, internal) {
-  const toolbar = root.querySelector('.vditor-toolbar')
-  const editModeItem = internal.toolbar && internal.toolbar.elements['edit-mode']
-  if (!toolbar || !editModeItem) return () => {}
-  editModeItem.style.display = 'none'
+function installCodeLanguage(root) {
+  let frame = 0
 
-  const wrapper = document.createElement('div')
-  wrapper.className = 'vditor-toolbar__item'
-  const button = document.createElement('button')
-  button.type = 'button'
-  button.className = 'vditor-tooltipped vditor-tooltipped__n'
-  button.dataset.type = 'source-mode'
-  button.setAttribute('aria-label', '源码模式')
-  button.setAttribute('aria-pressed', 'false')
-  button.innerHTML = '<span class="vditor-tb-glyph">&lt;/&gt;</span><span class="vditor-tb-label">源码</span>'
-  wrapper.appendChild(button)
-  toolbar.insertBefore(wrapper, editModeItem)
-
-  const sync = () => {
-    const isSource = internal.currentMode === 'sv'
-    button.classList.toggle('vditor-menu--current', isSource)
-    button.setAttribute('aria-pressed', isSource ? 'true' : 'false')
-    root.dispatchEvent(new CustomEvent('vditor-mode-change', { detail: internal.currentMode }))
+  const apply = () => {
+    frame = 0
+    if (root.querySelectorAll('.vditor-ir__node[data-type="code-block"]').length === 0) return
+    root.querySelectorAll('.vditor-ir__node[data-type="code-block"]').forEach((node) => {
+      const preview = node.querySelector('.vditor-ir__preview')
+      if (!preview) return
+      const info = node.querySelector('.vditor-ir__marker--info')
+      const lang = info ? info.textContent.replace(/[\u200b\ufeff]/g, '').trim() : ''
+      if (lang) {
+        if (preview.getAttribute('data-lang') !== lang) preview.setAttribute('data-lang', lang)
+      } else if (preview.hasAttribute('data-lang')) {
+        preview.removeAttribute('data-lang')
+      }
+    })
   }
 
-  const onClick = (event) => {
-    event.preventDefault()
-    const target = internal.currentMode === 'sv' ? 'ir' : 'sv'
-    const modeButton = editModeItem.querySelector(`button[data-mode="${target}"]`)
-    if (modeButton) modeButton.click()
-    sync()
+  const schedule = () => {
+    if (frame) return
+    frame = window.requestAnimationFrame(apply)
   }
 
-  button.addEventListener('click', onClick)
-  sync()
+  const observer = new MutationObserver(schedule)
+  observer.observe(root, { childList: true, subtree: true, characterData: true })
+  schedule()
 
   return () => {
-    button.removeEventListener('click', onClick)
-    wrapper.remove()
-    editModeItem.style.display = ''
+    observer.disconnect()
+    if (frame) window.cancelAnimationFrame(frame)
   }
 }
 
@@ -623,12 +518,9 @@ export function enhanceVditor(vditor) {
   if (!internal || !internal.element) return () => {}
   const root = internal.element
   const disposers = [
-    decorateToolbar(root),
-    fixOutlineJump(root, internal),
     installTableTools(root, internal, vditor),
     installLineNumbers(root, internal),
-    installSourceMode(root, internal),
-    fixFullscreen(root)
+    installCodeLanguage(root)
   ]
   return () => disposers.forEach((dispose) => dispose())
 }

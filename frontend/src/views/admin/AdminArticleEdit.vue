@@ -10,7 +10,6 @@ import SketchTextarea from '@/components/SketchTextarea.vue'
 import { createArticle, getArticle, updateArticle } from '@/api/article'
 import { useMetaStore } from '@/store/meta'
 import { toastSuccess } from '@/utils/toast'
-import { countArticle } from '@/utils/wordCount'
 
 const props = defineProps({
   id: { type: String, default: '' }
@@ -20,7 +19,9 @@ const router = useRouter()
 const meta = useMetaStore()
 
 const isEdit = computed(() => Boolean(props.id))
-const loading = ref(false)
+// 编辑已有文章时初始就是加载态：数据回来之前不挂载表单，避免 MarkdownEditor
+// 先挂载、再被 loading 置 true 卸载，Vditor 初始化未完成就 destroy 会抛错导致正文空白
+const loading = ref(isEdit.value)
 const loadError = ref('')
 const saving = ref(false)
 const saveError = ref('')
@@ -37,9 +38,6 @@ const form = reactive({
 })
 
 const errors = reactive({ title: '', summary: '', content: '' })
-
-// 去掉 Markdown 标记后的真实字数（右侧展示）
-const wordStats = computed(() => countArticle(form.content))
 
 async function loadMeta() {
   try {
@@ -146,7 +144,7 @@ watch(
           {{ isEdit ? '编辑文章' : '写新文章' }}
         </h2>
         <p class="mt-1 font-serif text-sm italic text-ink-500">
-          正文使用 Markdown，边写边渲染；工具栏最右侧「源码」可切换到 Markdown 源码模式（再点一次回到即时渲染），鼠标移到表格上会浮出增删行列、删除表格的操作条。保存草稿后可以随时回来继续写。
+          正文使用 Markdown 即时渲染；顶部菜单栏可插入标题/列表/表格/代码块，右侧「大纲」「源码」切换侧栏与 Markdown 源码模式，表格旁会浮出操作按钮，底部状态栏显示字数。
         </p>
       </div>
       <span
@@ -264,15 +262,7 @@ watch(
       </section>
 
       <section class="sketch-card rotate-[0.2deg] p-5 md:p-6">
-        <div class="flex flex-wrap items-center justify-between gap-2">
-          <h3 class="font-serif text-xl italic text-pencil">正文</h3>
-          <span
-            class="font-serif text-xs italic text-ink-300"
-            :title="`汉字按字、英文/数字按词统计，不含 Markdown 标记与空白；去空白字符数 ${wordStats.chars}`"
-          >
-            {{ wordStats.words }} 字
-          </span>
-        </div>
+        <h3 class="font-serif text-xl italic text-pencil">正文</h3>
         <p v-if="errors.content" class="mt-2 font-serif text-sm italic text-[#b23b2e]" role="alert">
           {{ errors.content }}
         </p>

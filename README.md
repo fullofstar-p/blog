@@ -198,7 +198,7 @@ node scripts/smoke-api.mjs   # 认证/文章/搜索/评论/上传/管理端 40 �
 - 设计令牌集中在 `tailwind.config.js`：纸张米色 `#f5f0e8`、铅笔灰 `#2c2c2c`、低饱和强调色（红 `#e74c3c` / 蓝 `#3498db` / 绿 `#27ae60` / 黄 `#f39c12`）。
 - 全局 SVG 纸张纹理背景；卡片与控件统一使用虚线边框、衬线斜体标题、轻微倾斜、手绘硬阴影 `3px 3px 0 rgba(44,44,44,.15)`。
 - 交互：hover 铅笔涂黑反白（Pencil Shading）、active 减少阴影并加大倾斜（Paper Press）、强调文本用波浪/虚线标注；所有动效在 `prefers-reduced-motion: reduce` 下关闭。
-- Markdown：后台写文章用 Vditor 的**即时渲染（IR）**模式，边写边在当前位置渲染；工具栏最右侧「源码」按钮可切到 Markdown 源码模式（再点回到即时渲染）。工具栏按钮带中文名称，正文左侧显示渲染行号（随滚动同步、自动重排），表格悬停时在表格正下方横向浮出操作条（插行/删行/插列/删列/删除表格），大纲点击精确滚动正文而不是整页跳顶，全屏铺满视口；工具栏不再显示字数，正文右上角按「去 Markdown 标记后的字数」统计。正文排版参考 **Typora**：系统无衬线字体、粗体标题、实线细边框、灰底代码块与 GitHub 高亮配色；外壳（工具栏、卡片边框）仍是手绘纸张风，不使用纯白背景，并补齐了 Tailwind preflight 清掉的列表序号。
+- Markdown：后台写文章用 Vditor 的**即时渲染（IR）**内核 + **Typora 式外壳**——顶部「段落 / 格式 / 编辑 / 视图」菜单栏代替图标工具栏，右侧「大纲」展开标题侧栏（点击跳转、随滚动高亮）、「源码」在 IR / SV 之间切换（`Ctrl+/`）、「全屏」铺满视口；表格悬停时在表格左上角浮出一排图标按钮（插入/删除行列、删除整张表格，带 tooltip）；底部状态栏显示当前模式与实时字数（按去 Markdown 标记后的字数统计）；快捷键沿用 Typora（`Ctrl+1~6`/`Ctrl+0` 标题、`Ctrl+B` 粗体、`Ctrl+I` 斜体、`Ctrl+K` 链接）。正文排版参考 **Typora**：系统无衬线字体、粗体标题、实线细边框、灰底代码块与 GitHub 高亮配色。前台阅读页把正文放进一张**白色页面卡片**（`src/styles/markdown-reading.css`：纯白底、1px 浅灰实线、小圆角、860px 居中），代码块沿用 `markdown.css` 的白纸配色（`#f6f8fa` 浅灰底、14px、无边框），`markdown-reading.css` 只补代码块 chrome（语言名在右下角、复制按钮悬停出现在右上角）；代码高亮走**本地 highlight.js + GitHub 浅色主题**（`public/highlight/github.css` 由 `scripts/copy-vditor.mjs` 生成），不再从 unpkg 拉 CDN，离线也有高亮。页面其它外壳仍是手绘纸张风。另外修复了编辑页「正文模块不见了」：编辑已有文章时 `loading` 初始为 `true`，数据回来前不挂载表单，避免 `MarkdownEditor` 在 Vditor 初始化完成前被卸载销毁而抛错。
 
 ## 接口文档
 

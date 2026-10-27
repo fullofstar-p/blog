@@ -148,7 +148,10 @@ async function confirmDelete() {
         />
 
         <section class="mt-8" aria-label="文章正文">
-          <MarkdownViewer :content="article.content" />
+          <!-- Typora 式白色页面：正文单独成一张纸，外壳样式在 styles/markdown-reading.css -->
+          <div class="typora-page">
+            <MarkdownViewer :content="article.content" />
+          </div>
         </section>
 
         <div v-if="tags.length" class="mt-8 flex flex-wrap items-center gap-2 border-t-2 border-dashed border-pencil/40 pt-5">

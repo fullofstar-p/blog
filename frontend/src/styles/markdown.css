@@ -16,14 +16,14 @@
   --md-font: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Helvetica Neue', 'PingFang SC',
     'Hiragino Sans GB', 'Microsoft YaHei', Arial, sans-serif;
   --md-mono: 'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, 'Courier New', monospace;
-  --md-text: #2f2f2f;
-  --md-heading: #222;
-  --md-muted: #777;
-  --md-border: #ddd6c8;
-  --md-border-strong: #cfc7b6;
-  --md-bg: #f5f0e8;
-  --md-bg-code: #efe9db;
-  --md-bg-inline-code: #ece5d6;
+  --md-text: #24292e;
+  --md-heading: #1b1f23;
+  --md-muted: #6a737d;
+  --md-border: #e1e4e8;
+  --md-border-strong: #dfe2e5;
+  --md-bg: #ffffff;
+  --md-bg-code: #f6f8fa;
+  --md-bg-inline-code: #f0f1f3;
   --md-bg-quote: transparent;
   --md-link: #4183c4;
   font-family: var(--md-font);
@@ -239,12 +239,12 @@
   font-style: normal;
   font-weight: 600;
   text-align: left;
-  background-color: #f4f0e6;
+  background-color: #f2f3f5;
 }
 
 .vditor-reset table tr:nth-child(2n) td,
 .md-editor-preview table tr:nth-child(2n) td {
-  background-color: #f8f4ea;
+  background-color: #f8f9fa;
 }
 
 /* ---------- 7. 图片 ---------- */
@@ -600,179 +600,460 @@
 }
 
 /* ==========================================================================
-   编辑器外壳（Vditor）：边框/工具栏仍用 Sketch 风格
+   编辑器外壳：Typora 式（顶部菜单 + 大纲侧栏 + 状态栏，无图标工具栏）
+   --------------------------------------------------------------------------
+   Vditor 只负责编辑区内核；工具栏整条隐藏，交互改成 Typora 的菜单结构。
+   颜色走 GitHub / Typora 默认主题的中性灰，和正文排版一致。
    ========================================================================== */
 
-.vditor {
+.typora-editor {
   position: relative;
-  border: 2px dashed #2c2c2c !important;
-  border-radius: 2px !important;
-  box-shadow: 3px 3px 0 rgba(44, 44, 44, 0.15);
-  background-color: #f5f0e8 !important;
+  display: flex;
+  flex-direction: column;
   overflow: hidden;
+  border: 1px solid #dcdfe3;
+  border-radius: 6px;
+  background-color: #fff;
+  box-shadow: 0 1px 3px rgba(27, 31, 35, 0.06);
+  font-family: var(--md-font);
+  color: var(--md-text);
 }
 
-.vditor-toolbar {
-  background-color: #efe7d8 !important;
-  border-bottom: 1px dashed rgba(44, 44, 44, 0.5) !important;
+/* 菜单栏与视图按钮为“无编辑焦点区”，禁止其抢走正文选区（mousedown.prevent 之外再加一层） */
+.typora-editor__menubar {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  height: 36px;
+  padding: 0 10px;
+  background-color: #fafbfc;
+  border-bottom: 1px solid #eaecef;
+  user-select: none;
 }
 
-.vditor-toolbar__item button {
-  color: #2c2c2c;
-  transition: background-color 0.15s ease, color 0.15s ease;
+.typora-editor__menu {
+  position: relative;
 }
 
-.vditor-toolbar__item button:hover,
-.vditor-toolbar__item button.vditor-menu--current {
-  background-color: #2c2c2c !important;
-  color: #f5f0e8 !important;
-  border-radius: 2px;
+.typora-editor__menu-btn {
+  height: 26px;
+  padding: 0 10px;
+  border: 0;
+  border-radius: 4px;
+  background-color: transparent;
+  color: #24292e;
+  font-family: inherit;
+  font-size: 13px;
+  line-height: 1;
+  cursor: pointer;
+  transition: background-color 0.12s ease;
 }
 
-.vditor-toolbar__divider {
-  border-left: 1px dashed rgba(44, 44, 44, 0.35) !important;
+.typora-editor__menu-btn:hover,
+.typora-editor__menu-btn.is-open {
+  background-color: #eaecef;
 }
 
-.vditor-content,
-.vditor-ir,
-.vditor-sv,
-.vditor-wysiwyg {
-  background-color: #f5f0e8 !important;
+.typora-editor__dropdown {
+  position: absolute;
+  top: calc(100% + 4px);
+  left: 0;
+  z-index: 60;
+  min-width: 208px;
+  padding: 4px;
+  border: 1px solid #dfe2e5;
+  border-radius: 6px;
+  background-color: #fff;
+  box-shadow: 0 8px 24px rgba(27, 31, 35, 0.14);
 }
 
-/* Vditor 会给编辑区 pre 设置白底，这里让它透出纸张色 */
-.vditor-ir pre.vditor-reset,
-.vditor-ir pre.vditor-reset[contenteditable='true'] {
+.typora-editor__item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 24px;
+  width: 100%;
+  height: 30px;
+  padding: 0 10px;
+  border: 0;
+  border-radius: 4px;
+  background-color: transparent;
+  color: #24292e;
+  font-family: inherit;
+  font-size: 13px;
+  text-align: left;
+  cursor: pointer;
+}
+
+.typora-editor__item:hover {
+  background-color: #f2f3f5;
+}
+
+.typora-editor__item-hint {
+  color: #b0b6bc;
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+}
+
+.typora-editor__divider {
+  height: 1px;
+  margin: 4px 6px;
+  background-color: #eaecef;
+}
+
+.typora-editor__tools {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  margin-left: auto;
+}
+
+.typora-editor__tool {
+  height: 26px;
+  padding: 0 10px;
+  border: 0;
+  border-radius: 4px;
+  background-color: transparent;
+  color: #586069;
+  font-family: inherit;
+  font-size: 12px;
+  line-height: 1;
+  cursor: pointer;
+  transition: background-color 0.12s ease, color 0.12s ease;
+}
+
+.typora-editor__tool:hover {
+  background-color: #eaecef;
+  color: #24292e;
+}
+
+.typora-editor__tool.is-active {
+  background-color: #e7f0fa;
+  color: #0969da;
+}
+
+/* ---------- 主体：大纲侧栏 + 编辑区 ---------- */
+.typora-editor__body {
+  display: flex;
+  min-height: 0;
+}
+
+.typora-editor__sidebar {
+  display: flex;
+  flex: 0 0 220px;
+  flex-direction: column;
+  min-width: 0;
+  border-right: 1px solid #eaecef;
+  background-color: #fbfbfb;
+}
+
+.typora-editor__sidebar-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  height: 32px;
+  padding: 0 12px;
+  color: #8a9199;
+  font-size: 12px;
+  letter-spacing: 0.08em;
+}
+
+.typora-editor__sidebar-close {
+  width: 20px;
+  height: 20px;
+  padding: 0;
+  border: 0;
+  border-radius: 4px;
+  background-color: transparent;
+  color: #8a9199;
+  font-size: 14px;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.typora-editor__sidebar-close:hover {
+  background-color: #eaecef;
+  color: #24292e;
+}
+
+.typora-editor__outline {
+  flex: 1;
+  overflow: auto;
+  padding: 2px 6px 12px;
+}
+
+.typora-editor__outline-item {
+  display: block;
+  width: 100%;
+  padding: 4px 8px;
+  overflow: hidden;
+  border: 0;
+  border-radius: 4px;
+  background-color: transparent;
+  color: #444d56;
+  font-family: inherit;
+  font-size: 13px;
+  line-height: 1.45;
+  text-align: left;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.typora-editor__outline-item:hover {
+  background-color: #f0f2f4;
+}
+
+.typora-editor__outline-item.is-active {
+  background-color: #edf4fc;
+  color: #0969da;
+}
+
+.typora-editor__outline-empty {
+  padding: 6px 8px;
+  color: #b0b6bc;
+  font-size: 12px;
+}
+
+.typora-editor__surface {
+  position: relative;
+  flex: 1;
+  min-width: 0;
+}
+
+.typora-editor .vditor-host {
+  position: absolute;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  left: 0;
+}
+
+/* ---------- Vditor 内层：去掉自带边框/工具栏，铺满白色页面 ---------- */
+.typora-editor .vditor {
+  height: 100% !important;
+  border: 0 !important;
+  border-radius: 0 !important;
+  background-color: #fff !important;
+  box-shadow: none;
+  --ir-heading-color: #b6bcc4;
+  --ir-title-color: #b6bcc4;
+  --ir-bi-color: #b6bcc4;
+  --ir-bracket-color: #b6bcc4;
+  --ir-paren-color: #b6bcc4;
+  --ir-link-color: #4183c4;
+}
+
+.typora-editor .vditor-toolbar {
+  display: none !important;
+}
+
+.typora-editor .vditor-content,
+.typora-editor .vditor-ir,
+.typora-editor .vditor-sv {
+  background-color: #fff !important;
+}
+
+.typora-editor .vditor-ir pre.vditor-reset {
+  padding: 18px 48px 40px 72px !important;
   background-color: transparent !important;
+  color: var(--md-text);
+  caret-color: #24292e;
 }
 
-/* IR 模式左侧的标题标记（H1/H2/``` 等）保持低调 */
-.vditor-ir__marker {
-  color: #b3a992;
-}
-
-.vditor-panel,
-.vditor-hint {
-  background-color: #f5f0e8 !important;
-  border: 1px dashed #2c2c2c !important;
-  box-shadow: 3px 3px 0 rgba(44, 44, 44, 0.15);
-  color: #2c2c2c;
-}
-
-.vditor-hint button {
-  color: #2c2c2c;
-}
-
-.vditor-hint button:hover {
-  background-color: #2c2c2c !important;
-  color: #f5f0e8 !important;
-}
-
-.vditor-tip {
-  background-color: #f5f0e8;
-  border: 1px dashed #2c2c2c;
-  color: #2c2c2c;
-}
-
-/* 源码模式（SV textarea） */
-.vditor-sv {
-  font-family: var(--md-mono, 'SFMono-Regular', Consolas, monospace);
+.typora-editor .vditor-sv {
+  padding: 18px 48px 40px 48px !important;
+  font-family: var(--md-mono);
   font-size: 14px;
   line-height: 1.7;
-  color: #2f2f2f;
-  background-color: #f5f0e8;
+  color: #24292e;
 }
 
-/* ==========================================================================
-   编辑器可用性修复
-   ========================================================================== */
-
-/* ---------- 工具栏中文名称 ---------- */
-.vditor-toolbar__item > .vditor-tooltipped {
-  display: inline-flex;
-  align-items: center;
-  gap: 3px;
-  width: auto !important;
-  padding: 0 5px !important;
-  font-size: 12px;
-  line-height: 1;
-  white-space: nowrap;
+.typora-editor .vditor-ir__marker {
+  color: #b6bcc4;
 }
 
-.vditor-toolbar__item > .vditor-tooltipped svg {
-  flex-shrink: 0;
-}
-
-.vditor-toolbar__item .vditor-tb-label {
-  font-family: 'Noto Serif SC', 'Source Han Serif SC', 'Songti SC', Georgia, serif;
-  font-size: 12px;
-  line-height: 1;
-  color: inherit;
-  white-space: nowrap;
-}
-
-/* 提示气泡移到按钮下方，避免被 .vditor 的 overflow: hidden 裁掉 */
-.vditor-toolbar__item .vditor-tooltipped::after {
-  top: 100% !important;
-  bottom: auto !important;
-  right: auto !important;
-  left: 50% !important;
-  margin-top: 6px !important;
-  margin-bottom: 0 !important;
-  transform: translateX(-50%) !important;
-  background: #2c2c2c;
-  color: #f5f0e8;
-  border-radius: 2px;
-  font-family: 'Noto Serif SC', 'Source Han Serif SC', 'Songti SC', Georgia, serif;
-}
-
-.vditor-toolbar__item .vditor-tooltipped::before {
-  display: none !important;
-}
-
-@media (max-width: 720px) {
-  .vditor-toolbar__item .vditor-tb-label {
-    display: none;
-  }
-  .vditor-toolbar__item > .vditor-tooltipped {
-    width: 25px !important;
-    padding: 0 !important;
-    justify-content: center;
-  }
-}
-
-/* 隐藏的原生模式切换项（由「源码」按钮接管 IR / SV 切换） */
-.vditor-toolbar__item > [data-type="edit-mode"] {
-  display: none !important;
-}
-
-/* 「源码」按钮的 </> 图标 */
-.vditor-tb-glyph {
-  font-family: Consolas, Menlo, 'Courier New', monospace;
-  font-size: 11px;
-  line-height: 1;
-  letter-spacing: -0.5px;
-}
-
-/* ---------- 代码块：编辑时只保留一个源码框 ---------- */
-.vditor-ir__node--expand > .vditor-ir__preview {
+/* Typora 不显示 H1/H2… 的级别角标，这里去掉 Vditor 默认的标题级别标签 */
+.typora-editor .vditor-ir .vditor-reset > h1::before,
+.typora-editor .vditor-ir .vditor-reset > h2::before,
+.typora-editor .vditor-ir .vditor-reset > h3::before,
+.typora-editor .vditor-ir .vditor-reset > h4::before,
+.typora-editor .vditor-ir .vditor-reset > h5::before,
+.typora-editor .vditor-ir .vditor-reset > h6::before {
+  content: none;
   display: none;
 }
 
-.vditor-ir__node--expand .vditor-ir__marker--pre {
+.typora-editor .vditor-reset ::selection {
+  background-color: #b3d4fc;
+  color: inherit;
+}
+
+/* ---------- 状态栏（Typora 底部：模式 + 字数） ---------- */
+.typora-editor__statusbar {
+  display: flex;
+  align-items: center;
+  height: 28px;
+  padding: 0 12px;
+  gap: 10px;
+  border-top: 1px solid #eaecef;
+  background-color: #fafbfc;
+  color: #8a9199;
+  font-size: 12px;
+  line-height: 1;
+  user-select: none;
+}
+
+.typora-editor__status-item {
+  white-space: nowrap;
+}
+
+.typora-editor__status-spacer {
+  flex: 1;
+}
+
+/* ---------- 插入链接对话框 ---------- */
+.typora-editor__dialog {
+  position: absolute;
+  top: 56px;
+  left: 50%;
+  z-index: 70;
+  width: 360px;
+  max-width: calc(100% - 32px);
+  padding: 16px;
+  transform: translateX(-50%);
+  border: 1px solid #dfe2e5;
+  border-radius: 8px;
+  background-color: #fff;
+  box-shadow: 0 12px 32px rgba(27, 31, 35, 0.18);
+}
+
+.typora-editor__dialog-title {
+  margin: 0 0 12px;
+  color: #24292e;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.typora-editor__field {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 10px;
+  color: #586069;
+  font-size: 13px;
+}
+
+.typora-editor__field > span {
+  flex: 0 0 32px;
+}
+
+.typora-editor__field input {
+  flex: 1;
+  height: 32px;
+  padding: 0 8px;
+  border: 1px solid #dfe2e5;
+  border-radius: 4px;
+  background-color: #fff;
+  color: #24292e;
+  font-family: inherit;
+  font-size: 13px;
+  outline: none;
+}
+
+.typora-editor__field input:focus {
+  border-color: #7fb3e8;
+  box-shadow: 0 0 0 3px rgba(9, 105, 218, 0.12);
+}
+
+.typora-editor__dialog-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 14px;
+}
+
+.typora-editor__btn {
+  height: 30px;
+  padding: 0 14px;
+  border: 1px solid #dfe2e5;
+  border-radius: 4px;
+  background-color: #fafbfc;
+  color: #24292e;
+  font-family: inherit;
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.typora-editor__btn:hover {
+  background-color: #f0f2f4;
+}
+
+.typora-editor__btn--primary {
+  border-color: #0969da;
+  background-color: #0969da;
+  color: #fff;
+}
+
+.typora-editor__btn--primary:hover {
+  background-color: #0860ca;
+}
+
+.typora-editor__file {
+  display: none;
+}
+
+/* ---------- 全屏（浏览器 Fullscreen API，避免祖先 transform 影响 fixed 定位） ---------- */
+.typora-editor:fullscreen {
+  width: 100vw;
+  height: 100vh;
+  border: 0;
+  border-radius: 0;
+  background-color: #fff;
+}
+
+.typora-editor:fullscreen .typora-editor__body {
+  height: auto !important;
+  flex: 1;
+}
+
+/* 浏览器拒绝 Fullscreen API 时的 CSS 兜底（祖先 transform 由组件临时清除） */
+.typora-editor--fullscreen {
+  position: fixed;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  z-index: 9999;
+  border: 0;
+  border-radius: 0;
+  background-color: #fff;
+}
+
+.typora-editor--fullscreen .typora-editor__body {
+  height: auto !important;
+  flex: 1;
+}
+
+/* ---------- 代码块：编辑时只保留一个源码框，右下角显示语言 ---------- */
+.typora-editor .vditor-ir__node--expand > .vditor-ir__preview {
+  display: none;
+}
+
+.typora-editor .vditor-ir__node--expand .vditor-ir__marker--pre {
   display: block;
   width: auto;
   height: auto;
   overflow: visible;
 }
 
-.vditor-ir__node--expand .vditor-ir__marker--pre > code {
+.typora-editor .vditor-ir__node--expand .vditor-ir__marker--pre > code {
   display: block;
   min-height: 44px;
-  padding: 12px 14px;
+  padding: 14px 16px;
   font-family: var(--md-mono);
-  font-size: 85%;
-  line-height: 1.55;
+  font-size: 14px;
+  line-height: 1.6;
   white-space: pre-wrap;
   color: #24292e !important;
   background-color: var(--md-bg-code);
@@ -781,18 +1062,46 @@
   box-shadow: none;
 }
 
-/* ---------- 表格操作条（表格正下方，横向） ---------- */
+.typora-editor .vditor-ir__node[data-type='code-block'] .vditor-ir__preview {
+  position: relative;
+}
+
+.typora-editor .vditor-ir__node[data-type='code-block'] .vditor-ir__preview[data-lang]::after {
+  content: attr(data-lang);
+  position: absolute;
+  right: 10px;
+  bottom: 6px;
+  color: #adb5bd;
+  font-family: var(--md-font);
+  font-size: 12px;
+  line-height: 1;
+  pointer-events: none;
+}
+
+/* 代码块右上角的复制按钮（Vditor 原生，悬停出现） */
+.typora-editor .vditor-reset pre .vditor-copy span {
+  top: 8px;
+  right: 8px;
+  color: #8a9199;
+}
+
+.typora-editor .vditor-reset pre .vditor-copy svg {
+  width: 14px;
+  height: 14px;
+}
+
+/* ---------- 表格工具条（Typora：表格左上角一排图标） ---------- */
 .vditor-table-tools {
   position: absolute;
-  z-index: 20;
+  z-index: 30;
   display: none;
-  flex-wrap: wrap;
-  gap: 2px;
-  max-width: calc(100% - 16px);
-  padding: 4px 6px;
-  background-color: #f5f0e8;
-  border: 1px dashed #2c2c2c;
-  box-shadow: 3px 3px 0 rgba(44, 44, 44, 0.15);
+  align-items: center;
+  gap: 1px;
+  padding: 2px;
+  background-color: #fff;
+  border: 1px solid #d0d7de;
+  border-radius: 4px;
+  box-shadow: 0 1px 3px rgba(27, 31, 35, 0.14);
 }
 
 .vditor-table-tools.is-open {
@@ -800,29 +1109,34 @@
 }
 
 .vditor-table-tools button {
-  width: auto;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
   height: 24px;
   margin: 0;
-  padding: 0 8px;
-  border: 1px dashed rgba(44, 44, 44, 0.5);
+  padding: 0;
+  border: 0;
+  border-radius: 3px;
   background-color: transparent;
-  color: #2c2c2c;
-  font-family: 'Noto Serif SC', 'Source Han Serif SC', 'Songti SC', Georgia, serif;
-  font-size: 12px;
-  line-height: 1;
-  white-space: nowrap;
+  color: #57606a;
   cursor: pointer;
-  transition: background-color 0.15s ease, color 0.15s ease;
+  transition: background-color 0.12s ease, color 0.12s ease;
 }
 
 .vditor-table-tools button:hover,
 .vditor-table-tools button:focus-visible {
-  background-color: #2c2c2c;
-  color: #f5f0e8;
+  background-color: #eaeef2;
+  color: #24292f;
   outline: none;
 }
 
-/* ---------- 左侧行号 ---------- */
+.vditor-table-tools button[data-op='table-del']:hover {
+  background-color: #ffe3e0;
+  color: #cf222e;
+}
+
+/* ---------- 左侧行号（Typora 没有，但这里保留为低调的辅助信息） ---------- */
 .vditor-line-numbers {
   position: absolute;
   z-index: 4;
@@ -830,10 +1144,10 @@
   overflow: hidden;
   pointer-events: none;
   user-select: none;
-  font-family: var(--md-mono, 'SFMono-Regular', Consolas, monospace);
-  font-size: 10px;
-  line-height: 15px;
-  color: #b3a992;
+  font-family: var(--md-mono);
+  font-size: 11px;
+  line-height: 16px;
+  color: #c6ccd3;
   text-align: right;
 }
 
@@ -846,17 +1160,25 @@
 
 .vditor-line-numbers span {
   position: absolute;
-  right: 2px;
+  right: 4px;
   font-variant-numeric: tabular-nums;
 }
 
-/* ---------- 全屏兜底（祖先变换由 vditorEnhance.js 临时清除） ---------- */
-.vditor--fullscreen {
-  position: fixed !important;
-  top: 0 !important;
-  left: 0 !important;
-  width: 100% !important;
-  height: 100vh !important;
-  border-radius: 0 !important;
-  z-index: 9999 !important;
+@media (max-width: 720px) {
+  .typora-editor .vditor-ir pre.vditor-reset {
+    padding: 14px 18px 32px 20px !important;
+  }
+
+  .typora-editor .vditor-sv {
+    padding: 14px 18px 32px 18px !important;
+  }
+
+  .typora-editor__sidebar {
+    display: none;
+  }
+
+  .typora-editor__menu-btn,
+  .typora-editor__tool {
+    padding: 0 6px;
+  }
 }

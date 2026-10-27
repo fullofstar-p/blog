@@ -2,6 +2,7 @@ node_modules
 dist
 .npm-cache
 public/vditor
+public/highlight
 *.local
 *.log
 .DS_Store
