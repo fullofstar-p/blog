@@ -1,332 +1,606 @@
 /* ==========================================================================
-   md-editor-v3 手绘化覆盖 + highlight.js 手绘代码配色
-   功能：
-   1) 用 CSS 变量把编辑器底色 / 文字 / 边框改成纸张色与铅笔灰，禁止纯白；
-   2) 工具栏、输入区、预览区统一虚线边框与手绘阴影；
-   3) 覆盖 highlight.js 的 .hljs-* 令牌配色，代码块底色使用加深纸色 #efe7d8。
+   Markdown 内容排版：参考 Typora 默认主题
+   --------------------------------------------------------------------------
+   页面外壳（卡片虚线边框、纸张底色、手绘按钮）保持 Sketch 风格不变，
+   但正文内容（后台编辑器的即时渲染 + 前台阅读预览）统一成 Typora 的排版语言：
+   - 系统无衬线字体、粗体标题、1.6 左右行距；
+   - 标题/表格/代码块用细实线而非手绘虚线，代码块浅灰底、圆角；
+   - 链接 Typora 蓝、引用灰字左边线、行内代码浅底；
+   - 代码高亮采用 GitHub 配色（Typora 默认主题同款色系）。
+   背景仍用纸张色，避免整站变成纯白；需要纯白可在下面 --md-bg 处改。
    ========================================================================== */
 
-/* ---------- 变量：md-editor-v3 ---------- */
-.md-editor,
-.md-editor-preview-wrapper,
-.md-editor-input-wrapper,
-.md-editor-content,
-.md-editor-toolbar-wrapper,
-.md-editor-toolbar,
-.md-editor-footer,
-.md-editor-modal,
-.md-editor-catalog {
-  --md-color: #2c2c2c;
-  --md-bk-color: #f5f0e8;
-  --md-bk-hover-color: #efe7d8;
-  --md-hover-color: #2c2c2c;
-  --md-border-color: #2c2c2c;
-  --md-border-hover-color: #2c2c2c;
-  --md-border-active-color: #2c2c2c;
-  --md-scrollbar-bg-color: #efe7d8;
-  --md-scrollbar-thumb-color: #c9bfa9;
-  --md-scrollbar-thumb-hover-color: #8c8578;
-  --md-scrollbar-thumb-active-color: #2c2c2c;
-  --md-modal-mask: rgba(44, 44, 44, 0.45);
-  --md-shadow-color: rgba(44, 44, 44, 0.2);
-  color: #2c2c2c;
-  background-color: #f5f0e8;
-}
-
-/* md-editor-v3 内部边框统一手绘虚线（覆盖库自带的实线边框） */
-.md-editor,
-.md-editor * {
-  border-style: dashed;
-}
-
-/* 库内部选择器优先级更高（.md-editor .md-editor-preview），这里用 !important 锁死纸色，
-   确保预览区/代码块/工具栏任何位置都不会回落到纯白背景 */
-.md-editor .md-editor-preview,
-.md-editor .md-editor-content,
-.md-editor .md-editor-input-wrapper,
-.md-editor .md-editor-preview-wrapper {
-  --md-bk-color: #f5f0e8 !important;
-  --md-bk-hover-color: #efe7d8 !important;
-  --md-theme-color-reverse: #f5f0e8 !important;
-  --md-theme-color-hover: #efe7d8 !important;
-}
-
-/* md-editor-v3 的 preview.css 默认含 #fff / #fafafa 等白色主题变量，
-   这里统一改成纸张色，保证预览区任何角落都不会出现纯白背景 */
-.md-editor .md-editor-preview {
-  --md-theme-bg-color: #f5f0e8 !important;
-  --md-theme-bg-color-inset: #efe7d8 !important;
-  --md-theme-table-stripe-color: #efe7d8 !important;
-  --md-theme-table-tr-bg-color: transparent !important;
-  --md-theme-code-copy-tips-bg-color: #efe7d8 !important;
-  --md-theme-code-copy-tips-color: #2c2c2c !important;
-  --md-theme-border-color: #8c8578 !important;
-  --md-theme-border-color-inset: #c9bfa9 !important;
-}
-
-.md-editor-preview table tr:nth-child(2n) {
-  background-color: #efe7d8 !important;
-}
-
-.md-editor-preview .md-editor-code-head {
-  background-color: #e4dac8 !important;
-  border-radius: 2px 2px 0 0 !important;
-}
-
-/* ---------- 编辑器外框与工具栏 ---------- */
-.md-editor {
-  border: 2px dashed #2c2c2c !important;
-  border-radius: 2px !important;
-  box-shadow: 3px 3px 0 rgba(44, 44, 44, 0.15);
-  background-color: #f5f0e8 !important;
-  overflow: hidden;
-}
-
-.md-editor-toolbar-wrapper,
-.md-editor-toolbar {
-  background-color: #efe7d8 !important;
-  border-bottom: 1px dashed rgba(44, 44, 44, 0.5) !important;
-}
-
-.md-editor-toolbar-item {
-  color: #2c2c2c !important;
-  border-radius: 2px !important;
-  transition: background-color 0.15s ease, color 0.15s ease;
-}
-
-.md-editor-toolbar-item:hover {
-  background-color: #2c2c2c !important;
-  color: #f5f0e8 !important;
-}
-
-.md-editor-toolbar-item-wrapper:hover .md-editor-toolbar-item {
-  background-color: #2c2c2c !important;
-  color: #f5f0e8 !important;
-}
-
-/* ---------- 输入 / 预览区域 ---------- */
-.md-editor-content,
-.md-editor-input-wrapper,
-.md-editor-preview-wrapper,
-.md-editor-previewOnly {
-  background-color: #f5f0e8 !important;
-}
-
-.md-editor-input {
-  background-color: transparent !important;
-  color: #2c2c2c !important;
-  font-family: 'Noto Serif SC', 'Source Han Serif SC', 'Songti SC', Georgia, serif;
-  font-size: 15px;
-  line-height: 1.9;
-}
-
-.md-editor-footer {
-  background-color: #efe7d8 !important;
-  border-top: 1px dashed rgba(44, 44, 44, 0.4) !important;
-  color: #5c564c !important;
-}
-
-.md-editor-footer-item:hover {
-  color: #2c2c2c !important;
-}
-
-.md-editor-modal,
-.md-editor-fullscreen {
-  background-color: #f5f0e8 !important;
-}
-
-/* ---------- 预览区 Markdown 排版 ---------- */
+/* ---------- 1. 内容排版变量（编辑器与阅读器共用） ---------- */
+.vditor-reset,
 .md-editor-preview {
-  background-color: #f5f0e8 !important;
-  color: #2c2c2c !important;
-  font-family: 'Noto Serif SC', 'Source Han Serif SC', 'Songti SC', Georgia, serif;
+  --md-font: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Helvetica Neue', 'PingFang SC',
+    'Hiragino Sans GB', 'Microsoft YaHei', Arial, sans-serif;
+  --md-mono: 'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, 'Courier New', monospace;
+  --md-text: #2f2f2f;
+  --md-heading: #222;
+  --md-muted: #777;
+  --md-border: #ddd6c8;
+  --md-border-strong: #cfc7b6;
+  --md-bg: #f5f0e8;
+  --md-bg-code: #efe9db;
+  --md-bg-inline-code: #ece5d6;
+  --md-bg-quote: transparent;
+  --md-link: #4183c4;
+  font-family: var(--md-font);
   font-size: 16px;
-  line-height: 1.9;
+  line-height: 1.65;
+  color: var(--md-text);
+  letter-spacing: 0;
+  -webkit-font-smoothing: antialiased;
 }
 
+/* ---------- 2. 标题 ---------- */
+.vditor-reset h1,
+.vditor-reset h2,
+.vditor-reset h3,
+.vditor-reset h4,
+.vditor-reset h5,
+.vditor-reset h6,
 .md-editor-preview h1,
 .md-editor-preview h2,
 .md-editor-preview h3,
 .md-editor-preview h4,
 .md-editor-preview h5,
 .md-editor-preview h6 {
-  font-family: 'Noto Serif SC', 'Source Han Serif SC', 'Songti SC', Georgia, serif;
-  font-style: italic;
-  color: #2c2c2c;
-  letter-spacing: 0.01em;
+  font-family: var(--md-font);
+  font-style: normal;
+  font-weight: 600;
+  line-height: 1.35;
+  color: var(--md-heading);
+  margin: 1.4em 0 0.7em;
 }
 
-.md-editor-preview h1,
-.md-editor-preview h2 {
-  border-bottom: 1px dashed rgba(44, 44, 44, 0.35);
-  padding-bottom: 0.3em;
-}
-
+.vditor-reset h1,
 .md-editor-preview h1 {
-  font-size: 1.9em;
+  font-size: 2em;
+  padding-bottom: 0.25em;
+  border-bottom: 1px solid var(--md-border);
 }
+
+.vditor-reset h2,
 .md-editor-preview h2 {
-  font-size: 1.55em;
+  font-size: 1.5em;
+  padding-bottom: 0.2em;
+  border-bottom: 1px solid var(--md-border);
 }
+
+.vditor-reset h3,
 .md-editor-preview h3 {
-  font-size: 1.3em;
+  font-size: 1.25em;
 }
 
+.vditor-reset h4,
+.md-editor-preview h4 {
+  font-size: 1em;
+}
+
+.vditor-reset h5,
+.md-editor-preview h5 {
+  font-size: 0.875em;
+}
+
+.vditor-reset h6,
+.md-editor-preview h6 {
+  font-size: 0.85em;
+  color: var(--md-muted);
+}
+
+.vditor-reset > :first-child,
+.md-editor-preview > :first-child {
+  margin-top: 0;
+}
+
+/* ---------- 3. 正文、强调、链接 ---------- */
+.vditor-reset p,
+.md-editor-preview p {
+  margin: 0.8em 0;
+}
+
+.vditor-reset strong,
+.md-editor-preview strong {
+  font-weight: 600;
+  color: #1f1f1f;
+}
+
+.vditor-reset em,
+.md-editor-preview em {
+  font-style: italic;
+}
+
+.vditor-reset del,
+.md-editor-preview del {
+  color: var(--md-muted);
+}
+
+.vditor-reset a,
 .md-editor-preview a {
-  color: #2c2c2c;
-  text-decoration: underline dashed;
-  text-underline-offset: 4px;
+  color: var(--md-link);
+  text-decoration: none;
+  border: 0;
 }
 
+.vditor-reset a:hover,
 .md-editor-preview a:hover {
-  background-color: #2c2c2c;
-  color: #f5f0e8;
+  text-decoration: underline;
+  background-color: transparent;
+  color: var(--md-link);
 }
 
+.vditor-reset mark,
+.md-editor-preview mark {
+  background-color: #fff3a3;
+  color: inherit;
+  padding: 0 0.15em;
+}
+
+/* ---------- 4. 列表（同时补回 Tailwind preflight 清掉的序号） ---------- */
+.vditor-reset ul,
+.vditor-reset ol,
+.md-editor-preview ul,
+.md-editor-preview ol {
+  padding-left: 2em;
+  margin: 0.8em 0;
+}
+
+.vditor-reset ul,
+.md-editor-preview ul {
+  list-style-type: disc;
+}
+
+.vditor-reset ul ul,
+.md-editor-preview ul ul {
+  list-style-type: circle;
+}
+
+.vditor-reset ul ul ul,
+.md-editor-preview ul ul ul {
+  list-style-type: square;
+}
+
+.vditor-reset ol,
+.md-editor-preview ol {
+  list-style-type: decimal;
+}
+
+.vditor-reset li,
+.md-editor-preview li {
+  display: list-item;
+  margin: 0.25em 0;
+}
+
+.vditor-reset li > p,
+.md-editor-preview li > p {
+  margin: 0.2em 0;
+}
+
+.vditor-reset li + li,
+.md-editor-preview li + li {
+  margin-top: 0.25em;
+}
+
+/* ---------- 5. 引用 / 分割线 ---------- */
+.vditor-reset blockquote,
 .md-editor-preview blockquote {
-  border-left: 3px dashed #8c8578;
-  margin: 1.2em 0;
-  padding: 0.4em 1em;
-  background-color: #efe7d8;
-  color: #3f3a33;
+  margin: 0.8em 0;
+  padding: 0 15px;
+  color: var(--md-muted);
+  background-color: var(--md-bg-quote);
+  border-left: 4px solid var(--md-border-strong);
 }
 
+.vditor-reset blockquote > :first-child,
+.md-editor-preview blockquote > :first-child {
+  margin-top: 0;
+}
+
+.vditor-reset blockquote > :last-child,
+.md-editor-preview blockquote > :last-child {
+  margin-bottom: 0;
+}
+
+.vditor-reset hr,
 .md-editor-preview hr {
-  border: none;
-  border-top: 2px dashed rgba(44, 44, 44, 0.4);
+  height: 1px;
   margin: 2em 0;
+  border: 0;
+  border-top: 1px solid var(--md-border);
+  background-color: transparent;
 }
 
+/* ---------- 6. 表格（Typora 细实线 + 表头浅底 + 斑马纹） ---------- */
+.vditor-reset table,
 .md-editor-preview table {
-  border-collapse: collapse;
+  display: block;
   width: 100%;
+  max-width: 100%;
+  margin: 1em 0;
+  overflow: auto;
+  border-collapse: collapse;
+  border-spacing: 0;
+  background-color: transparent;
 }
 
+.vditor-reset table th,
+.vditor-reset table td,
 .md-editor-preview table th,
 .md-editor-preview table td {
-  border: 1px dashed #8c8578;
-  padding: 0.5em 0.75em;
+  padding: 6px 13px;
+  border: 1px solid var(--md-border);
+  background-color: transparent;
 }
 
+.vditor-reset table th,
 .md-editor-preview table th {
-  background-color: #efe7d8;
-  font-style: italic;
+  font-style: normal;
+  font-weight: 600;
+  text-align: left;
+  background-color: #f4f0e6;
 }
 
+.vditor-reset table tr:nth-child(2n) td,
+.md-editor-preview table tr:nth-child(2n) td {
+  background-color: #f8f4ea;
+}
+
+/* ---------- 7. 图片 ---------- */
+.vditor-reset img,
 .md-editor-preview img {
-  border: 2px dashed #8c8578;
-  box-shadow: 3px 3px 0 rgba(44, 44, 44, 0.15);
   max-width: 100%;
-  height: auto;
-}
-
-/* ---------- 行内代码 ---------- */
-.md-editor-preview :not(pre) > code {
-  background-color: #efe7d8 !important;
-  color: #2c2c2c !important;
-  border: 1px dashed rgba(44, 44, 44, 0.45);
-  border-radius: 2px;
-  padding: 0.1em 0.35em;
-  font-size: 0.92em;
-}
-
-/* ---------- 代码块：加深纸色，禁止纯白 ---------- */
-.md-editor-preview pre,
-.md-editor-preview pre code,
-.md-editor-preview .hljs,
-.md-editor pre.hljs {
-  background-color: #efe7d8 !important;
-  color: #2c2c2c !important;
-  border: 1px dashed #8c8578;
-  border-radius: 2px;
-  box-shadow: 2px 2px 0 rgba(44, 44, 44, 0.12);
-}
-
-.md-editor-preview pre {
-  padding: 1rem 1.15rem;
-  overflow-x: auto;
-  line-height: 1.75;
-  font-size: 0.92em;
-}
-
-.md-editor-preview pre code {
-  padding: 0;
-  border: none;
+  border: 0;
+  border-radius: 3px;
   box-shadow: none;
 }
 
-/* ---------- highlight.js 令牌配色（低饱和手绘四色）---------- */
+/* ---------- 8. 行内代码与代码块 ---------- */
+.vditor-reset :not(pre) > code,
+.md-editor-preview :not(pre) > code {
+  padding: 0.2em 0.4em;
+  margin: 0;
+  font-family: var(--md-mono);
+  font-size: 85%;
+  color: #24292e;
+  background-color: var(--md-bg-inline-code);
+  border: 0;
+  border-radius: 3px;
+}
+
+.vditor-reset pre,
+.md-editor-preview pre {
+  margin: 0.9em 0;
+  padding: 14px 16px;
+  overflow: auto;
+  font-family: var(--md-mono);
+  font-size: 85%;
+  line-height: 1.55;
+  color: #24292e;
+  background-color: var(--md-bg-code);
+  border: 0;
+  border-radius: 4px;
+  box-shadow: none;
+}
+
+.vditor-reset pre > code,
+.md-editor-preview pre code,
+.vditor-reset .hljs,
+.md-editor-preview .hljs {
+  display: block;
+  padding: 0;
+  overflow: visible;
+  font-family: var(--md-mono);
+  font-size: inherit;
+  color: inherit;
+  background-color: transparent !important;
+  border: 0;
+  border-radius: 0;
+  box-shadow: none;
+}
+
+/* ---------- 9. 代码高亮：GitHub 配色（Typora 默认同色系） ---------- */
+.vditor-reset .hljs-comment,
+.vditor-reset .hljs-quote,
 .md-editor-preview .hljs-comment,
 .md-editor-preview .hljs-quote {
-  color: #6a6255 !important;
+  color: #6a737d;
   font-style: italic;
 }
 
+.vditor-reset .hljs-keyword,
+.vditor-reset .hljs-selector-tag,
+.vditor-reset .hljs-literal,
+.vditor-reset .hljs-doctag,
+.vditor-reset .hljs-name,
 .md-editor-preview .hljs-keyword,
 .md-editor-preview .hljs-selector-tag,
 .md-editor-preview .hljs-literal,
-.md-editor-preview .hljs-doctag {
-  color: #2b6e96 !important;
-  font-weight: 600;
+.md-editor-preview .hljs-doctag,
+.md-editor-preview .hljs-name {
+  color: #d73a49;
 }
 
+.vditor-reset .hljs-string,
+.vditor-reset .hljs-regexp,
+.vditor-reset .hljs-addition,
+.vditor-reset .hljs-attribute,
+.vditor-reset .hljs-meta .hljs-string,
 .md-editor-preview .hljs-string,
 .md-editor-preview .hljs-regexp,
 .md-editor-preview .hljs-addition,
 .md-editor-preview .hljs-attribute,
 .md-editor-preview .hljs-meta .hljs-string {
-  color: #1f7a4d !important;
+  color: #032f62;
 }
 
+.vditor-reset .hljs-number,
+.vditor-reset .hljs-symbol,
+.vditor-reset .hljs-bullet,
+.vditor-reset .hljs-link,
 .md-editor-preview .hljs-number,
 .md-editor-preview .hljs-symbol,
 .md-editor-preview .hljs-bullet,
 .md-editor-preview .hljs-link {
-  color: #9a6a00 !important;
+  color: #005cc5;
 }
 
+.vditor-reset .hljs-title,
+.vditor-reset .hljs-section,
+.vditor-reset .hljs-title.class_,
+.vditor-reset .hljs-title.function_,
 .md-editor-preview .hljs-title,
 .md-editor-preview .hljs-section,
 .md-editor-preview .hljs-title.class_,
 .md-editor-preview .hljs-title.function_ {
-  color: #2b6e96 !important;
-  text-decoration: underline dashed;
-  text-underline-offset: 3px;
+  color: #6f42c1;
+  text-decoration: none;
 }
 
+.vditor-reset .hljs-built_in,
+.vditor-reset .hljs-type,
+.vditor-reset .hljs-selector-id,
+.vditor-reset .hljs-selector-class,
+.vditor-reset .hljs-deletion,
 .md-editor-preview .hljs-built_in,
 .md-editor-preview .hljs-type,
 .md-editor-preview .hljs-selector-id,
 .md-editor-preview .hljs-selector-class,
 .md-editor-preview .hljs-deletion {
-  color: #b23b2e !important;
+  color: #e36209;
 }
 
+.vditor-reset .hljs-variable,
+.vditor-reset .hljs-template-variable,
+.vditor-reset .hljs-params,
 .md-editor-preview .hljs-variable,
 .md-editor-preview .hljs-template-variable,
 .md-editor-preview .hljs-params {
-  color: #3f3a33 !important;
+  color: #24292e;
 }
 
+.vditor-reset .hljs-emphasis,
 .md-editor-preview .hljs-emphasis {
   font-style: italic;
 }
+
+.vditor-reset .hljs-strong,
 .md-editor-preview .hljs-strong {
-  font-weight: 700;
+  font-weight: 600;
 }
 
-/* 代码块复制按钮 / 语言标签：纸色 + 虚线 */
-.md-editor-preview .md-editor-copy-button,
-.md-editor-preview .copy-button,
-.md-editor-preview pre + .copy-button {
-  background-color: #f5f0e8 !important;
-  color: #2c2c2c !important;
-  border: 1px dashed #2c2c2c !important;
+/* ---------- 10. 阅读端（md-editor-v3 预览）外壳：纸张底色，去掉纯白 ---------- */
+.md-editor,
+.md-editor-preview-wrapper,
+.md-editor-previewOnly {
+  --md-color: #2f2f2f;
+  --md-bk-color: #f5f0e8;
+  --md-border-color: #2c2c2c;
+  background-color: transparent !important;
+  color: #2f2f2f;
+}
+
+.md-editor .md-editor-preview {
+  --md-theme-bg-color: transparent !important;
+  --md-theme-bg-color-inset: #efe9db !important;
+  --md-theme-table-stripe-color: #f8f4ea !important;
+  --md-theme-table-tr-bg-color: transparent !important;
+  --md-theme-code-copy-tips-bg-color: #e4dac8 !important;
+  --md-theme-code-copy-tips-color: #2c2c2c !important;
+  --md-theme-border-color: var(--md-border) !important;
+  --md-theme-border-color-inset: var(--md-border) !important;
+  background-color: transparent !important;
+}
+
+.md-editor-preview {
+  background-color: transparent !important;
+  color: var(--md-text);
+}
+
+.md-editor-preview .md-editor-code-head {
+  padding: 4px 12px;
+  font-family: var(--md-mono);
+  font-size: 12px;
+  color: #6a737d;
+  background-color: #e8e1d1 !important;
+  border-bottom: 1px solid var(--md-border);
+  border-radius: 4px 4px 0 0 !important;
+}
+
+.md-editor-preview .md-editor-code-head + pre {
+  margin-top: 0;
+  border-top-left-radius: 0;
+  border-top-right-radius: 0;
+}
+
+/* md-editor-v3 自带 default-theme 的优先级更高，这里用同等/更高优先级覆盖成 Typora 风格 */
+.md-editor-preview.default-theme {
+  font-size: 16px;
+  line-height: 1.65;
+}
+
+.md-editor-preview.default-theme p {
+  margin: 0.8em 0;
+  line-height: 1.65;
+}
+
+.md-editor-preview.default-theme ul,
+.md-editor-preview.default-theme ol {
+  padding-left: 2em;
+  margin: 0.8em 0;
+}
+
+.md-editor-preview.default-theme li {
+  margin: 0.25em 0;
+  line-height: 1.65;
+  list-style: inherit;
+}
+
+.md-editor-preview.default-theme blockquote {
+  margin: 0.8em 0;
+  padding: 0 15px;
+  color: var(--md-muted);
+  background-color: transparent !important;
+  border-left: 4px solid var(--md-border-strong);
+}
+
+.md-editor-preview.default-theme blockquote p {
+  margin: 0.4em 0;
+}
+
+.md-editor-preview.default-theme a {
+  color: var(--md-link);
+  text-decoration: none;
+}
+
+.md-editor-preview.default-theme a:hover {
+  color: var(--md-link);
+  text-decoration: underline;
+}
+
+.md-editor-preview.default-theme img {
+  padding: 0;
+  margin: 0 auto;
+  background-color: transparent;
+  border: 0;
+  border-radius: 3px;
+}
+
+.md-editor-preview.default-theme table {
+  display: block;
+  width: 100%;
+  max-width: 100%;
+  margin: 1em 0;
+  overflow: auto;
+  border-spacing: 0;
+  border-collapse: collapse;
+  background-color: transparent;
+}
+
+.md-editor-preview.default-theme table tr {
+  background-color: transparent !important;
+}
+
+.md-editor-preview.default-theme table tbody tr:hover {
+  background-color: transparent;
+}
+
+.md-editor-preview.default-theme table tr th,
+.md-editor-preview.default-theme table tr td {
+  padding: 6px 13px;
+  border: 1px solid var(--md-border);
+  background-color: transparent;
+}
+
+.md-editor-preview.default-theme table tr th {
+  font-weight: 600;
+  text-align: left;
+  background-color: #f4f0e6;
+}
+
+.md-editor-preview.default-theme table tr:nth-child(2n) td {
+  background-color: #f8f4ea;
+}
+
+/* 代码块：去掉 md-editor-v3 的标题栏/红绿灯，语言与复制按钮悬停时浮在右上角 */
+.md-editor-preview.default-theme .md-editor-code {
+  position: relative;
+  margin: 1em 0;
+  color: #24292e;
+}
+
+.md-editor-preview.default-theme .md-editor-code .md-editor-code-head {
+  position: absolute !important;
+  top: 0;
+  right: 6px;
+  left: auto;
+  z-index: 2;
+  display: flex !important;
+  align-items: center;
+  gap: 8px;
+  width: auto !important;
+  height: 28px;
+  margin: 0;
+  padding: 0 6px;
+  background-color: transparent !important;
+  border: 0;
+  border-radius: 4px;
+  opacity: 0;
+  transition: opacity 0.15s ease;
+}
+
+.md-editor-preview.default-theme .md-editor-code:hover .md-editor-code-head {
+  opacity: 1;
+}
+
+.md-editor-preview.default-theme .md-editor-code .md-editor-code-flag {
+  display: none !important;
+}
+
+.md-editor-preview.default-theme .md-editor-code .md-editor-code-lang {
+  font-size: 12px;
+  line-height: 1;
+  color: #8a8270;
+}
+
+.md-editor-preview.default-theme .md-editor-code .md-editor-copy-button {
+  color: #8a8270;
+}
+
+.md-editor-preview.default-theme .md-editor-code pre {
+  margin: 0;
+}
+
+.md-editor-preview.default-theme .md-editor-code pre code {
+  padding: 16px;
+  font-family: var(--md-mono);
+  font-size: 14px;
+  line-height: 1.55;
+  color: #24292e !important;
+  background-color: var(--md-bg-code) !important;
+  border-radius: 4px;
+  box-shadow: none;
+}
+
+.md-editor-preview.default-theme .md-editor-code pre code .md-editor-code-block {
+  color: inherit;
+}
+
+/* 关闭 md-editor 对代码块/行内代码的额外底色 */
+.md-editor-preview.default-theme code {
+  border: 0;
+}
+
+.md-editor-preview.default-theme :not(pre) > code {
+  padding: 0.2em 0.4em;
+  color: #24292e;
+  background-color: var(--md-bg-inline-code) !important;
+  border-radius: 3px;
 }
 
 /* ==========================================================================
-   Vditor（正文即时渲染编辑器）手绘化覆盖
-   编辑器默认是浅灰白主题，这里统一改回纸张米色 + 铅笔灰 + 虚线边框。
+   编辑器外壳（Vditor）：边框/工具栏仍用 Sketch 风格
    ========================================================================== */
 
 .vditor {
@@ -366,92 +640,15 @@
   background-color: #f5f0e8 !important;
 }
 
-.vditor-reset {
+/* Vditor 会给编辑区 pre 设置白底，这里让它透出纸张色 */
+.vditor-ir pre.vditor-reset,
+.vditor-ir pre.vditor-reset[contenteditable='true'] {
   background-color: transparent !important;
-  color: #2c2c2c !important;
-  font-family: 'Noto Serif SC', 'Source Han Serif SC', 'Songti SC', Georgia, serif;
-  font-size: 15px;
-  line-height: 1.9;
 }
 
-.vditor-reset h1,
-.vditor-reset h2,
-.vditor-reset h3,
-.vditor-reset h4,
-.vditor-reset h5,
-.vditor-reset h6 {
-  font-family: 'Noto Serif SC', 'Source Han Serif SC', 'Songti SC', Georgia, serif;
-  font-style: italic;
-  color: #2c2c2c;
-}
-
-.vditor-reset a {
-  color: #2c2c2c;
-  text-decoration: underline dashed;
-  text-underline-offset: 4px;
-}
-
-.vditor-reset a:hover {
-  background-color: #2c2c2c;
-  color: #f5f0e8;
-}
-
-.vditor-reset blockquote {
-  border-left: 3px dashed #8c8578;
-  margin: 1.2em 0;
-  padding: 0.4em 1em;
-  background-color: #efe7d8;
-  color: #3f3a33;
-}
-
-.vditor-reset hr {
-  border: none;
-  border-top: 2px dashed rgba(44, 44, 44, 0.4);
-}
-
-.vditor-reset table th,
-.vditor-reset table td {
-  border: 1px dashed #8c8578;
-}
-
-.vditor-reset table {
-  background-color: transparent;
-}
-
-.vditor-reset table th {
-  background-color: #efe7d8;
-  font-style: italic;
-}
-
-.vditor-reset table td {
-  background-color: #f5f0e8;
-}
-
-.vditor-reset table tr:nth-child(2n) td {
-  background-color: #efe7d8;
-}
-
-.vditor-reset img {
-  border: 2px dashed #8c8578;
-  box-shadow: 3px 3px 0 rgba(44, 44, 44, 0.15);
-}
-
-.vditor-reset pre > code,
-.vditor-reset .hljs {
-  background-color: #efe7d8 !important;
-  border: 1px dashed #8c8578;
-  box-shadow: 2px 2px 0 rgba(44, 44, 44, 0.12);
-}
-
-.vditor-reset :not(pre) > code {
-  background-color: #efe7d8 !important;
-  color: #2c2c2c !important;
-  border: 1px dashed rgba(44, 44, 44, 0.45);
-  border-radius: 2px;
-}
-
+/* IR 模式左侧的标题标记（H1/H2/``` 等）保持低调 */
 .vditor-ir__marker {
-  color: #8c8578;
+  color: #b3a992;
 }
 
 .vditor-panel,
@@ -471,35 +668,26 @@
   color: #f5f0e8 !important;
 }
 
-.vditor-counter {
-  color: #6a6255;
-  font-family: 'Noto Serif SC', 'Source Han Serif SC', 'Songti SC', Georgia, serif;
-  font-style: italic;
-}
-
-.vditor--fullscreen {
-  background-color: #f5f0e8 !important;
-}
-
-/* 编辑器内的提示气泡 / 上传状态：纸色 + 虚线 */
 .vditor-tip {
   background-color: #f5f0e8;
   border: 1px dashed #2c2c2c;
   color: #2c2c2c;
 }
 
+/* 源码模式（SV textarea） */
+.vditor-sv {
+  font-family: var(--md-mono, 'SFMono-Regular', Consolas, monospace);
+  font-size: 14px;
+  line-height: 1.7;
+  color: #2f2f2f;
+  background-color: #f5f0e8;
+}
+
 /* ==========================================================================
    编辑器可用性修复
-   1) 工具栏：图标 + 中文名称，提示气泡移到按钮下方（原来在按钮上方，
-      被 .vditor 的 overflow: hidden 裁掉，等于没有提示）；
-   2) 有序列表：Tailwind 的 preflight 把 ol/ul 的 list-style 清成 none，
-      Vditor 只为 ul 补了 list-style-type，导致有序列表没有序号；
-   3) 代码块：展开编辑时源码块和渲染预览同时显示，看起来像两三个格子；
-   4) 表格：即时渲染模式没有增删行列入口，这里补一个悬浮工具条；
-   5) 全屏：祖先卡片的 rotate 变换会让 fixed 以卡片为包含块（见 vditorEnhance.js）。
    ========================================================================== */
 
-/* ---------- 1. 工具栏中文名称 ---------- */
+/* ---------- 工具栏中文名称 ---------- */
 .vditor-toolbar__item > .vditor-tooltipped {
   display: inline-flex;
   align-items: center;
@@ -523,7 +711,7 @@
   white-space: nowrap;
 }
 
-/* 提示气泡改到按钮下方，避免顶部被裁切 */
+/* 提示气泡移到按钮下方，避免被 .vditor 的 overflow: hidden 裁掉 */
 .vditor-toolbar__item .vditor-tooltipped::after {
   top: 100% !important;
   bottom: auto !important;
@@ -542,7 +730,17 @@
   display: none !important;
 }
 
-/* 窄屏只留图标，靠提示气泡兜底 */
+@media (max-width: 720px) {
+  .vditor-toolbar__item .vditor-tb-label {
+    display: none;
+  }
+  .vditor-toolbar__item > .vditor-tooltipped {
+    width: 25px !important;
+    padding: 0 !important;
+    justify-content: center;
+  }
+}
+
 /* 隐藏的原生模式切换项（由「源码」按钮接管 IR / SV 切换） */
 .vditor-toolbar__item > [data-type="edit-mode"] {
   display: none !important;
@@ -556,65 +754,7 @@
   letter-spacing: -0.5px;
 }
 
-/* 源码模式（Vditor SV textarea）手绘化 */
-.vditor-sv {
-  font-family: 'Noto Serif SC', 'Source Han Serif SC', 'Songti SC', Georgia, serif;
-  font-size: 15px;
-  line-height: 1.9;
-  color: #2c2c2c;
-  background-color: #f5f0e8;
-}
-
-@media (max-width: 720px) {
-  .vditor-toolbar__item .vditor-tb-label {
-    display: none;
-  }
-  .vditor-toolbar__item > .vditor-tooltipped {
-    width: 25px !important;
-    padding: 0 !important;
-    justify-content: center;
-  }
-}
-
-/* ---------- 2. 有序 / 无序列表（补 Tailwind preflight 清掉的序号） ---------- */
-.vditor-reset ol,
-.md-editor-preview ol {
-  list-style-type: decimal;
-}
-
-.vditor-reset ul,
-.md-editor-preview ul {
-  list-style-type: disc;
-}
-
-.vditor-reset ul ul,
-.md-editor-preview ul ul {
-  list-style-type: circle;
-}
-
-.vditor-reset ul ul ul,
-.md-editor-preview ul ul ul {
-  list-style-type: square;
-}
-
-.vditor-reset li,
-.md-editor-preview li {
-  display: list-item;
-}
-
-/* 列表项内的段落不再额外撑开（默认 li > p 有 16px 上边距，列表会非常松） */
-.vditor-reset li > p,
-.md-editor-preview li > p {
-  margin-top: 0;
-  margin-bottom: 0;
-}
-
-.vditor-reset li + li,
-.md-editor-preview li + li {
-  margin-top: 0.35em;
-}
-
-/* ---------- 3. 代码块：编辑时只保留一个源码框 ---------- */
+/* ---------- 代码块：编辑时只保留一个源码框 ---------- */
 .vditor-ir__node--expand > .vditor-ir__preview {
   display: none;
 }
@@ -630,17 +770,18 @@
   display: block;
   min-height: 44px;
   padding: 12px 14px;
-  background-color: #efe7d8 !important;
-  color: #2c2c2c !important;
-  border: 1px dashed #8c8578;
-  border-radius: 2px;
-  box-shadow: 2px 2px 0 rgba(44, 44, 44, 0.12);
+  font-family: var(--md-mono);
+  font-size: 85%;
+  line-height: 1.55;
   white-space: pre-wrap;
-  line-height: 1.75;
-  font-size: 0.92em;
+  color: #24292e !important;
+  background-color: var(--md-bg-code);
+  border: 0;
+  border-radius: 4px;
+  box-shadow: none;
 }
 
-/* ---------- 4. 表格操作条（表格正下方，横向） ---------- */
+/* ---------- 表格操作条（表格正下方，横向） ---------- */
 .vditor-table-tools {
   position: absolute;
   z-index: 20;
@@ -681,7 +822,7 @@
   outline: none;
 }
 
-/* ---------- 5. 左侧行号 ---------- */
+/* ---------- 左侧行号 ---------- */
 .vditor-line-numbers {
   position: absolute;
   z-index: 4;
@@ -689,10 +830,10 @@
   overflow: hidden;
   pointer-events: none;
   user-select: none;
-  font-family: 'Noto Serif SC', 'Source Han Serif SC', 'Songti SC', Georgia, serif;
+  font-family: var(--md-mono, 'SFMono-Regular', Consolas, monospace);
   font-size: 10px;
   line-height: 15px;
-  color: #a89e8a;
+  color: #b3a992;
   text-align: right;
 }
 
@@ -709,7 +850,7 @@
   font-variant-numeric: tabular-nums;
 }
 
-/* ---------- 6. 全屏兜底（祖先变换由 vditorEnhance.js 临时清除） ---------- */
+/* ---------- 全屏兜底（祖先变换由 vditorEnhance.js 临时清除） ---------- */
 .vditor--fullscreen {
   position: fixed !important;
   top: 0 !important;

@@ -69,7 +69,12 @@ src/
   全屏时临时清除祖先卡片 `rotate` 变换，避免 `position: fixed` 被卡片限制。
   Vditor 的 lute / 中文语言包 / 图标 / 高亮样式在 `predev`、`prebuild` 时由
   `scripts/copy-vditor.mjs` 拷到 `public/vditor`（已 gitignore），不依赖外网 CDN。
-- 前台阅读用 `MarkdownViewer`（md-editor-v3 预览），与后台编辑器解耦。
+- 正文排版参考 **Typora 默认主题**（`src/styles/markdown.css`）：
+  系统无衬线字体、1.65 行距、粗体标题（h1/h2 带细实线下边框）、实线表格边框 + 斑马纹、
+  浅灰圆角代码块、行内代码浅底、Typora 蓝链接、灰字左边线引用；代码高亮用 GitHub 色系。
+  页面外壳（工具栏、卡片虚线边框、按钮）保持 Sketch 手绘风，正文背景仍是纸张色而非纯白。
+- 前台阅读用 `MarkdownViewer`（md-editor-v3 预览），与后台编辑器共用同一套 Typora 风格内容样式，
+  并额外覆盖 md-editor-v3 `default-theme` 的默认间距/背景/代码块标题栏。
 - `src/styles/markdown.css` 通过 CSS 变量与类覆盖把编辑器/预览的底色、工具栏、边框改为纸色，
   并把 highlight.js 的 `.hljs-*` 令牌映射到低饱和手绘四色；代码块底色为 `#efe7d8`，不使用纯白。
 
