@@ -481,6 +481,12 @@ function installCodeLanguage(root, internal, vditor) {
     const element = inputEl
     inputEl = null
     element.remove()
+    // 输入框就是「原按钮就地变可编辑」：关掉后把按钮还给用户
+    if (anchorNode) {
+      renderButton(langOf(anchorNode))
+      button.hidden = false
+      place()
+    }
   }
 
   const hideButton = () => {
@@ -496,22 +502,25 @@ function installCodeLanguage(root, internal, vditor) {
     button.innerHTML = `${langIconHTML(meta)}<span class="vditor-code-lang__name">${langLabel(value)}</span>`
   }
 
-  /** 双击语言按钮：变成输入框，可手写任意语言标识 */
+  /** 双击语言按钮：按钮原地变成输入框（同位置同尺寸），可手写任意语言标识 */
   const openInput = () => {
     if (!anchorNode) return
     closeInput()
     const rect = button.getBoundingClientRect()
     const rootRect = root.getBoundingClientRect()
     hideMenu()
+    // 按钮让位，输入框正好盖在原按钮的位置上
+    button.hidden = true
     inputEl = document.createElement('input')
     inputEl.type = 'text'
     inputEl.className = 'vditor-code-lang__input'
     inputEl.spellcheck = false
-    inputEl.placeholder = '语言标识，如 js'
+    inputEl.placeholder = '语言标识'
     inputEl.value = langOf(anchorNode)
     inputEl.style.left = `${Math.max(Math.round(rect.left - rootRect.left), 8)}px`
     inputEl.style.top = `${Math.round(rect.top - rootRect.top)}px`
-    inputEl.style.width = `${Math.max(Math.round(rect.width), 128)}px`
+    inputEl.style.width = `${Math.round(rect.width)}px`
+    inputEl.style.height = `${Math.round(rect.height)}px`
     inputEl.addEventListener('mousedown', (event) => event.stopPropagation())
     inputEl.addEventListener('blur', closeInput)
     inputEl.addEventListener('keydown', (event) => {

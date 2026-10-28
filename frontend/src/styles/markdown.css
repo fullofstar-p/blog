@@ -1353,20 +1353,22 @@
   font-weight: 600;
 }
 
-/* 双击语言按钮后的手写输入框 */
+/* 双击语言按钮后的手写输入框：就长在原按钮的位置和尺寸上 */
 .vditor-code-lang__input {
   position: absolute;
   z-index: 41;
-  height: 24px;
-  padding: 0 8px;
+  box-sizing: border-box;
+  height: 20px;
+  padding: 0 6px;
   border: 1px solid #b3a992;
   border-radius: 4px;
   background-color: #faf6ee;
   color: #2c2c2c;
-  font-family: var(--md-mono);
+  font-family: var(--md-font);
   font-size: 12px;
+  line-height: 20px;
   outline: none;
-  box-shadow: 0 2px 10px rgba(44, 44, 44, 0.12);
+  box-shadow: 0 0 0 2px rgba(179, 169, 146, 0.25);
 }
 
 .vditor-code-lang__input::placeholder {
