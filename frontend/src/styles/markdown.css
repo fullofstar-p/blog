@@ -295,6 +295,9 @@
   font-size: inherit;
   color: inherit;
   background-color: transparent !important;
+  /* Vditor 自带一张 20x20 的网格底图（.vditor-reset pre > code），这里去掉 */
+  background-image: none !important;
+  background-size: auto !important;
   border: 0;
   border-radius: 0;
   box-shadow: none;
@@ -1037,56 +1040,147 @@
   flex: 1;
 }
 
-/* ---------- 代码块：编辑时只保留一个源码框 ---------- */
-.typora-editor .vditor-ir__node--expand > .vditor-ir__preview {
+/* ---------- 代码块：编辑态也保持渲染后的高亮效果 ---------- */
+/* 结构：Vditor 在 IR 下有「预览层」(.vditor-ir__preview，已高亮) 和「源码层」
+   (pre.vditor-ir__marker--pre，可编辑)。这里让预览层始终显示、决定高度，源码层
+   绝对定位叠在上面并把文字设成透明，光标/选区正常可见 —— 输入时看到的就是高亮后的
+   代码，展开/收起也不会改变高度，所以没有跳动。 */
+.typora-editor .vditor-ir__node[data-type="code-block"] {
+  position: relative;
+  margin: 0.9em 0;
+}
+
+/* Vditor 给 marker 加了 width/height 过渡，代码块进出编辑态时会跳动，这里关掉 */
+.typora-editor .vditor-ir__node[data-type="code-block"] .vditor-ir__marker {
+  transition: none !important;
+}
+
+/* 围栏：Vditor 编辑态用 ::before/::after 吐出反引号，Typora 不显示 */
+.typora-editor .vditor-ir__node[data-type="code-block"]::before,
+.typora-editor .vditor-ir__node[data-type="code-block"]::after {
+  content: none !important;
+}
+
+/* 非代码块的块级节点（数学公式 / HTML 块等）编辑时仍然只显示源码层 */
+.typora-editor .vditor-ir__node--expand:not([data-type="code-block"]) > .vditor-ir__preview {
   display: none;
 }
 
-.typora-editor .vditor-ir__node--expand .vditor-ir__marker--pre {
+/* 预览层（始终显示，定义代码块尺寸与高亮外观） */
+.typora-editor .vditor-ir__node[data-type="code-block"] > .vditor-ir__preview {
   display: block;
-  width: auto;
-  height: auto;
+  position: relative;
+  margin: 0 !important;
+  padding: 14px 16px !important;
   overflow: visible;
-}
-
-.typora-editor .vditor-ir__node--expand .vditor-ir__marker--pre > code {
-  display: block;
-  min-height: 44px;
-  padding: 14px 16px;
   font-family: var(--md-mono);
-  font-size: 14px;
-  line-height: 1.6;
-  white-space: pre-wrap;
-  color: #2f2f2f !important;
-  background-color: var(--md-bg-code);
+  font-size: 14px !important;
+  line-height: 1.6 !important;
+  white-space: pre-wrap !important;
+  word-break: break-word;
+  color: #24292e;
+  background-color: var(--md-bg-code) !important;
+  background-image: none !important;
   border: 0;
   border-radius: 4px;
+  cursor: text;
+}
+
+.typora-editor .vditor-ir__node[data-type="code-block"] > .vditor-ir__preview > code {
+  display: block;
+  margin: 0;
+  padding: 0 !important;
+  max-height: none !important;
+  overflow: visible;
+  font-family: inherit !important;
+  font-size: inherit !important;
+  line-height: inherit !important;
+  white-space: inherit !important;
+  word-break: break-word !important;
+  overflow-wrap: break-word;
+  color: inherit;
+  background-color: transparent !important;
+  background-image: none !important;
+  border: 0;
+  border-radius: 0;
+}
+
+/* 源码层：可编辑，透明叠在预览层上，尺寸/字体/换行与预览层完全一致。
+   收起时只隐藏不占位（绝对定位），展开/收起高度都是预览层的高度，所以不会跳动。 */
+.typora-editor .vditor-ir__node[data-type="code-block"] > pre.vditor-ir__marker--pre {
+  position: absolute;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  z-index: 2;
+  display: block;
+  width: auto !important;
+  height: auto !important;
+  margin: 0 !important;
+  padding: 14px 16px !important;
+  overflow: hidden;
+  font-family: var(--md-mono);
+  font-size: 14px !important;
+  line-height: 1.6 !important;
+  white-space: pre-wrap !important;
+  word-break: break-word;
+  background-color: transparent !important;
+  background-image: none !important;
+  border: 0;
+  border-radius: 0;
+  box-shadow: none;
+  visibility: hidden;
+  pointer-events: none;
+}
+
+.typora-editor .vditor-ir__node--expand[data-type="code-block"] > pre.vditor-ir__marker--pre {
+  visibility: visible;
+  pointer-events: auto;
+}
+
+/* 展开时选区只落在透明的源码层上，避免拖选跨过代码块时把预览层文字一起复制 */
+.typora-editor .vditor-ir__node--expand[data-type="code-block"] > .vditor-ir__preview {
+  user-select: none;
+}
+
+.typora-editor .vditor-ir__node[data-type="code-block"] > pre.vditor-ir__marker--pre > code {
+  display: block;
+  margin: 0;
+  padding: 0 !important;
+  overflow: visible;
+  font-family: inherit !important;
+  font-size: inherit !important;
+  line-height: inherit !important;
+  white-space: inherit !important;
+  word-break: break-word !important;
+  overflow-wrap: break-word;
+  color: transparent !important;
+  caret-color: #2f2f2f;
+  background-color: transparent !important;
+  background-image: none !important;
+  background-size: auto !important;
+  border: 0;
+  border-radius: 0;
   box-shadow: none;
 }
 
-/* 代码块右上角的复制按钮（Vditor 原生，悬停出现） */
-.typora-editor .vditor-reset pre .vditor-copy span {
-  top: 8px;
-  right: 8px;
-  color: #8c8578;
+/* 输入法组词时先露出源码文字，否则透明文字看不到候选词 */
+.typora-editor .vditor.is-code-composing .vditor-ir__node--expand[data-type="code-block"] > .vditor-ir__preview > code {
+  visibility: hidden;
 }
 
-.typora-editor .vditor-reset pre .vditor-copy svg {
-  width: 14px;
-  height: 14px;
+.typora-editor .vditor.is-code-composing .vditor-ir__node--expand[data-type="code-block"] > pre.vditor-ir__marker--pre > code {
+  color: #2f2f2f !important;
 }
 
-/* ---------- 代码块语言（右下角，可点击选择） ---------- */
-/* hidden 属性必须真正隐藏：本文件里给菜单写了 display:grid，会压过浏览器默认的 [hidden] */
-.vditor-code-lang[hidden],
-.vditor-code-lang__menu[hidden] {
-  display: none !important;
-}
-
-.vditor-code-lang {
+/* 语言标记：不占布局，浮在右下角（和语言按钮同一位置；新建代码块时光标会落进来输入语言） */
+.typora-editor .vditor-ir__node[data-type="code-block"] > .vditor-ir__marker--info {
   position: absolute;
-  z-index: 32;
-  height: 22px;
+  right: 10px;
+  bottom: 4px;
+  z-index: 3;
+  height: 20px;
   padding: 0 7px;
   border: 1px solid #ddd6c8;
   border-radius: 3px;
@@ -1094,7 +1188,97 @@
   color: #8c8578;
   font-family: var(--md-font);
   font-size: 12px;
-  line-height: 20px;
+  line-height: 18px;
+  pointer-events: none;
+}
+
+.typora-editor .vditor-ir__node[data-type="code-block"] > .vditor-ir__marker--info.is-lang-idle {
+  display: none !important;
+}
+
+/* 复制按钮：悬停代码块时出现在右上角（编辑态也有），提示文字放在按钮右侧 */
+.typora-editor .vditor-ir__node[data-type="code-block"] .vditor-copy {
+  display: none;
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  z-index: 5;
+  margin: 0;
+  line-height: 1;
+}
+
+.typora-editor .vditor-ir__node[data-type="code-block"]:hover .vditor-copy {
+  display: block;
+}
+
+.typora-editor .vditor-ir__node[data-type="code-block"] .vditor-copy span {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  border: 1px solid #ddd6c8;
+  border-radius: 3px;
+  background-color: rgba(250, 246, 238, 0.94);
+  color: #8c8578;
+  cursor: pointer;
+}
+
+.typora-editor .vditor-ir__node[data-type="code-block"] .vditor-copy span:hover {
+  border-color: #b3a992;
+  background-color: #efe7d8;
+  color: #2c2c2c;
+}
+
+.typora-editor .vditor-ir__node[data-type="code-block"] .vditor-copy svg {
+  width: 12px;
+  height: 12px;
+}
+
+/* Vditor 默认把提示放图标左边（会盖住代码），改成图标右侧 */
+.typora-editor .vditor-ir__node[data-type="code-block"] .vditor-copy span.vditor-tooltipped__w::after {
+  right: auto;
+  left: 100%;
+  bottom: 50%;
+  margin-right: 0;
+  margin-left: 6px;
+  transform: translateY(50%);
+}
+
+.typora-editor .vditor-ir__node[data-type="code-block"] .vditor-copy span.vditor-tooltipped__w::before {
+  top: 50%;
+  right: -5px;
+  bottom: 50%;
+  left: auto;
+  margin-top: -5px;
+  border-left-color: transparent;
+  border-right-color: #3b3e43;
+}
+
+/* ---------- 代码块语言（右下角，单击列表 / 双击手写） ---------- */
+/* hidden 属性必须真正隐藏：本文件里给菜单写了 display:flex，会压过浏览器默认的 [hidden] */
+.vditor-code-lang[hidden],
+.vditor-code-lang__menu[hidden],
+.vditor-code-lang__input[hidden] {
+  display: none !important;
+}
+
+.vditor-code-lang {
+  position: absolute;
+  z-index: 32;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  height: 20px;
+  padding: 0 7px 0 4px;
+  border: 1px solid #ddd6c8;
+  border-radius: 4px;
+  background-color: rgba(250, 246, 238, 0.94);
+  color: #8c8578;
+  font-family: var(--md-font);
+  font-size: 12px;
+  line-height: 1;
   cursor: pointer;
 }
 
@@ -1104,43 +1288,132 @@
   color: #2c2c2c;
 }
 
+/* 语言图标：品牌色圆角小方块 + 缩写 */
+.vditor-code-lang__icon {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  width: 14px;
+  height: 14px;
+  border-radius: 3px;
+  font-family: var(--md-mono);
+  font-size: 7px;
+  font-weight: 700;
+  line-height: 1;
+  letter-spacing: -0.02em;
+}
+
+.vditor-code-lang__name {
+  max-width: 96px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* 与顶部菜单下拉同款：纸张底 + 细边 + 浮起阴影，行高/悬停色一致 */
 .vditor-code-lang__menu {
   position: absolute;
   z-index: 40;
-  display: grid;
-  grid-template-columns: repeat(3, minmax(64px, 1fr));
-  gap: 2px;
-  width: 232px;
-  padding: 6px;
+  display: block;
+  min-width: 208px;
+  max-height: 300px;
+  padding: 4px;
+  overflow-y: auto;
   border: 1px solid #d8d0c0;
   border-radius: 6px;
   background-color: #faf6ee;
-  box-shadow: 0 8px 20px rgba(44, 44, 44, 0.18);
+  box-shadow: 0 8px 24px rgba(44, 44, 44, 0.16);
 }
 
 .vditor-code-lang__item {
-  height: 24px;
-  padding: 0 6px;
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  width: 100%;
+  height: 30px;
+  padding: 0 10px 0 8px;
   border: 0;
-  border-radius: 3px;
+  border-radius: 4px;
   background-color: transparent;
-  color: #4a463f;
-  font-family: var(--md-font);
-  font-size: 12px;
-  line-height: 1;
+  color: #2c2c2c;
+  font-family: inherit;
+  font-size: 13px;
   text-align: left;
+  white-space: nowrap;
   cursor: pointer;
 }
 
 .vditor-code-lang__item:hover {
   background-color: #efe7d8;
-  color: #2c2c2c;
 }
 
 .vditor-code-lang__item.is-current {
   background-color: #e6dcc6;
-  color: #2c2c2c;
   font-weight: 600;
+}
+
+/* 双击语言按钮后的手写输入框：就长在原按钮的位置和尺寸上 */
+.vditor-code-lang__input {
+  position: absolute;
+  z-index: 41;
+  box-sizing: border-box;
+  height: 20px;
+  padding: 0 6px;
+  border: 1px solid #b3a992;
+  border-radius: 4px;
+  background-color: #faf6ee;
+  color: #2c2c2c;
+  font-family: var(--md-font);
+  font-size: 12px;
+  line-height: 20px;
+  outline: none;
+  box-shadow: 0 0 0 2px rgba(179, 169, 146, 0.25);
+}
+
+.vditor-code-lang__input::placeholder {
+  color: #b3a992;
+}
+
+/* ---------- 水平分隔线：加高点击区，选中后可 Backspace/Delete 删除 ---------- */
+/* hr 在 IR 模式下没有可编辑内容，默认只有 1px 高，几乎点不中也删不掉；
+   这里把元素做成 13px 高的透明区域、1px 画线居中，由 vditorEnhance 处理删除。 */
+.typora-editor .vditor-reset hr {
+  height: 13px;
+  margin: calc(2em - 6px) 0;
+  border: 0;
+  background-color: transparent;
+  background-image: linear-gradient(
+    to bottom,
+    transparent 6px,
+    var(--md-border) 6px,
+    var(--md-border) 7px,
+    transparent 7px
+  );
+  cursor: pointer;
+}
+
+.typora-editor .vditor-reset hr:hover {
+  background-image: linear-gradient(
+    to bottom,
+    transparent 6px,
+    #b3a992 6px,
+    #b3a992 7px,
+    transparent 7px
+  );
+}
+
+.typora-editor .vditor-reset hr.vditor-hr--selected {
+  background-color: rgba(65, 131, 196, 0.22);
+  background-image: linear-gradient(
+    to bottom,
+    transparent 6px,
+    var(--md-link) 6px,
+    var(--md-link) 7px,
+    transparent 7px
+  );
+  border-radius: 3px;
+  box-shadow: 0 0 0 1px rgba(65, 131, 196, 0.28);
 }
 
 /* ---------- 表格工具条（Typora：表格左上角一排图标） ---------- */
