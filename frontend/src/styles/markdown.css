@@ -295,6 +295,9 @@
   font-size: inherit;
   color: inherit;
   background-color: transparent !important;
+  /* Vditor 自带一张 20x20 的网格底图（.vditor-reset pre > code），这里去掉 */
+  background-image: none !important;
+  background-size: auto !important;
   border: 0;
   border-radius: 0;
   box-shadow: none;
@@ -1097,6 +1100,7 @@
   overflow-wrap: break-word;
   color: inherit;
   background-color: transparent !important;
+  background-image: none !important;
   border: 0;
   border-radius: 0;
 }
@@ -1154,6 +1158,8 @@
   color: transparent !important;
   caret-color: #2f2f2f;
   background-color: transparent !important;
+  background-image: none !important;
+  background-size: auto !important;
   border: 0;
   border-radius: 0;
   box-shadow: none;
