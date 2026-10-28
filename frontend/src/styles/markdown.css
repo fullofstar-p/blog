@@ -1155,6 +1155,47 @@
   font-weight: 600;
 }
 
+/* ---------- 水平分隔线：加高点击区，选中后可 Backspace/Delete 删除 ---------- */
+/* hr 在 IR 模式下没有可编辑内容，默认只有 1px 高，几乎点不中也删不掉；
+   这里把元素做成 13px 高的透明区域、1px 画线居中，由 vditorEnhance 处理删除。 */
+.typora-editor .vditor-reset hr {
+  height: 13px;
+  margin: calc(2em - 6px) 0;
+  border: 0;
+  background-color: transparent;
+  background-image: linear-gradient(
+    to bottom,
+    transparent 6px,
+    var(--md-border) 6px,
+    var(--md-border) 7px,
+    transparent 7px
+  );
+  cursor: pointer;
+}
+
+.typora-editor .vditor-reset hr:hover {
+  background-image: linear-gradient(
+    to bottom,
+    transparent 6px,
+    #b3a992 6px,
+    #b3a992 7px,
+    transparent 7px
+  );
+}
+
+.typora-editor .vditor-reset hr.vditor-hr--selected {
+  background-color: rgba(65, 131, 196, 0.22);
+  background-image: linear-gradient(
+    to bottom,
+    transparent 6px,
+    var(--md-link) 6px,
+    var(--md-link) 7px,
+    transparent 7px
+  );
+  border-radius: 3px;
+  box-shadow: 0 0 0 1px rgba(65, 131, 196, 0.28);
+}
+
 /* ---------- 表格工具条（Typora：表格左上角一排图标） ---------- */
 .vditor-table-tools {
   position: absolute;

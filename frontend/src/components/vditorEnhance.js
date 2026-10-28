@@ -429,6 +429,24 @@ function installCodeLanguage(root, internal, vditor) {
     const top = rect.bottom - rootRect.top - buttonRect.height - 8
     button.style.left = `${Math.max(left, 8)}px`
     button.style.top = `${Math.max(top, 8)}px`
+    // 单行代码块高度不够，Vditor 的复制按钮也落在右下角，这里把语言按钮往左让开
+    const copy = anchorNode.querySelector('.vditor-copy span')
+    if (copy) {
+      const copyRect = copy.getBoundingClientRect()
+      const langRect = button.getBoundingClientRect()
+      const overlapped =
+        copyRect.width > 0 &&
+        !(
+          langRect.right <= copyRect.left ||
+          copyRect.right <= langRect.left ||
+          langRect.bottom <= copyRect.top ||
+          copyRect.bottom <= langRect.top
+        )
+      if (overlapped) {
+        const shifted = copyRect.left - rootRect.left - langRect.width - 6
+        button.style.left = `${Math.max(shifted, 8)}px`
+      }
+    }
   }
 
   const hideMenu = () => {
@@ -862,6 +880,137 @@ function installEditingShortcuts(root, internal, vditor) {
 }
 
 /**
+ * 水平分隔线（hr）在 IR 模式下只是一条不可编辑的线：
+ * Vditor 只在 Firefox 里支持「光标在 hr 后一段开头按 Backspace 删除」，
+ * Chromium 下既点不中也没法删。这里补上：
+ * 1. 单击分隔线选中（高亮），Backspace / Delete 删除；
+ * 2. 光标在 hr 后一段开头按 Backspace、在 hr 前一段末尾按 Delete 也能删除。
+ */
+function installHrInteractions(root, internal, vditor) {
+  let selectedHr = null
+
+  const clearSelected = () => {
+    if (!selectedHr) return
+    selectedHr.classList.remove('vditor-hr--selected')
+    selectedHr = null
+  }
+
+  const placeCaret = (block, atStart) => {
+    if (!block) return
+    const range = document.createRange()
+    const target = atStart ? block.firstChild : block.lastChild
+    if (target && target.nodeType === 3) {
+      range.setStart(target, atStart ? 0 : (target.nodeValue || '').length)
+    } else {
+      range.selectNodeContents(block)
+      range.collapse(atStart)
+    }
+    const selection = window.getSelection()
+    selection.removeAllRanges()
+    selection.addRange(range)
+    internal.ir.element.focus()
+  }
+
+  /** 删除分隔线：光标落到后一段开头，没有后一段就落到前一段末尾 */
+  const deleteHr = (hr) => {
+    if (!hr || !internal.ir.element.contains(hr)) return
+    const prev = hr.previousElementSibling
+    const next = hr.nextElementSibling
+    clearSelected()
+    hr.remove()
+    if (next) {
+      placeCaret(next, true)
+    } else if (prev) {
+      placeCaret(prev, false)
+    } else {
+      const paragraph = document.createElement('p')
+      paragraph.setAttribute('data-block', '0')
+      internal.ir.element.appendChild(paragraph)
+      placeCaret(paragraph, true)
+    }
+    // hr 不是可编辑节点，Vditor 不会自己感知；这里直接同步 Markdown 与撤销栈
+    if (internal.options && typeof internal.options.input === 'function') {
+      internal.options.input(vditor.getValue())
+    }
+    if (internal.undo && typeof internal.undo.addToUndoStack === 'function') {
+      internal.undo.addToUndoStack(internal)
+    }
+  }
+
+  const selectHr = (hr) => {
+    clearSelected()
+    selectedHr = hr
+    hr.classList.add('vditor-hr--selected')
+    const next = hr.nextElementSibling
+    const prev = hr.previousElementSibling
+    if (next) placeCaret(next, true)
+    else if (prev) placeCaret(prev, false)
+  }
+
+  // 选中分隔线后按键要能冒泡到 root，所以先把光标放进相邻段落再标记选中
+  const onHrMouse = (event) => {
+    if (internal.currentMode !== 'ir') return
+    const target = event.target
+    const hr = target && target.tagName === 'HR' && internal.ir.element.contains(target) ? target : null
+    if (!hr) return
+    event.preventDefault()
+    event.stopPropagation()
+    selectHr(hr)
+  }
+  const offDown = on(root, 'mousedown', onHrMouse, true)
+  const offClick = on(root, 'click', onHrMouse, true)
+  const offDocDown = on(document, 'mousedown', clearSelected)
+  const offInput = on(internal.ir.element, 'input', clearSelected)
+
+  const adjacentHr = (range, key) => {
+    const start = range.startContainer
+    const element = start && (start.nodeType === 1 ? start : start.parentElement)
+    const block = element && element.closest ? element.closest('p[data-block]') : null
+    if (!block || !internal.ir.element.contains(block)) return null
+    const before = document.createRange()
+    before.selectNodeContents(block)
+    before.setEnd(range.startContainer, range.startOffset)
+    const after = document.createRange()
+    after.selectNodeContents(block)
+    after.setStart(range.startContainer, range.startOffset)
+    const blank = (text) => text.replace(/[\u200b\s]/g, '') === ''
+    if (key === 'Backspace') {
+      if (!blank(before.toString())) return null
+      const prev = block.previousElementSibling
+      return prev && prev.tagName === 'HR' ? prev : null
+    }
+    if (!blank(after.toString())) return null
+    const next = block.nextElementSibling
+    return next && next.tagName === 'HR' ? next : null
+  }
+
+  const onKeydown = (event) => {
+    if (internal.currentMode !== 'ir') return
+    if (event.key === 'Escape' || event.key.indexOf('Arrow') > -1) {
+      clearSelected()
+      return
+    }
+    if (event.key !== 'Backspace' && event.key !== 'Delete') return
+    const selection = window.getSelection()
+    if (!selection || !selection.rangeCount || !selection.isCollapsed) return
+    const hr = selectedHr || adjacentHr(selection.getRangeAt(0), event.key)
+    if (!hr) return
+    event.preventDefault()
+    event.stopPropagation()
+    deleteHr(hr)
+  }
+  const offKey = on(root, 'keydown', onKeydown, true)
+
+  return () => {
+    offDown()
+    offClick()
+    offDocDown()
+    offInput()
+    offKey()
+  }
+}
+
+/**
  * 安装全部增强。返回 dispose 函数，组件卸载时调用。
  * @param {import('vditor').default} vditor Vditor 实例
  */
@@ -874,7 +1023,8 @@ export function enhanceVditor(vditor) {
     installCodeLanguage(root, internal, vditor),
     installCodeBlockLangMarker(root, internal),
     installInlineAutoRender(root, internal),
-    installEditingShortcuts(root, internal, vditor)
+    installEditingShortcuts(root, internal, vditor),
+    installHrInteractions(root, internal, vditor)
   ]
   return () => disposers.forEach((dispose) => dispose())
 }
