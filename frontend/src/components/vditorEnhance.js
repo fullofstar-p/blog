@@ -426,7 +426,7 @@ function installCodeLanguage(root, internal, vditor) {
       rect.right - rootRect.left - buttonRect.width - 10,
       root.clientWidth - buttonRect.width - 8
     )
-    const top = rect.bottom - rootRect.top - buttonRect.height - 8
+    const top = rect.bottom - rootRect.top - buttonRect.height - 4
     button.style.left = `${Math.max(left, 8)}px`
     button.style.top = `${Math.max(top, 8)}px`
     // 单行代码块高度不够，Vditor 的复制按钮也落在右下角，这里把语言按钮往左让开
@@ -526,6 +526,15 @@ function installCodeLanguage(root, internal, vditor) {
       return
     }
     window.clearTimeout(hideTimer)
+    // 正在语言标记里输入语言时只显示那枚角标（它会出现在同样的右下角位置），
+    // 避免和语言按钮重叠成两个「js」
+    const info = node.querySelector('.vditor-ir__marker--info')
+    const selection = window.getSelection()
+    const anchor = selection && selection.rangeCount ? selection.getRangeAt(0).startContainer : null
+    if (info && anchor && info.contains(anchor)) {
+      hideButton()
+      return
+    }
     anchorNode = node
     button.textContent = langOf(node) || '语言'
     button.hidden = false
@@ -1011,6 +1020,23 @@ function installHrInteractions(root, internal, vditor) {
 }
 
 /**
+ * 代码块在编辑态也显示高亮后的样子（CSS 里用预览层 + 透明源码层叠加实现）。
+ * 中文输入法组词时透明文字看不到候选，这里在组合期给编辑器加一个 class，
+ * 让源码文字临时显示、预览文字隐藏，组合结束再切回高亮层。
+ */
+function installCodeBlockComposition(root, internal) {
+  const start = () => root.classList.add('is-code-composing')
+  const end = () => root.classList.remove('is-code-composing')
+  const offStart = on(internal.ir.element, 'compositionstart', start)
+  const offEnd = on(internal.ir.element, 'compositionend', end)
+  return () => {
+    offStart()
+    offEnd()
+    root.classList.remove('is-code-composing')
+  }
+}
+
+/**
  * 安装全部增强。返回 dispose 函数，组件卸载时调用。
  * @param {import('vditor').default} vditor Vditor 实例
  */
@@ -1022,6 +1048,7 @@ export function enhanceVditor(vditor) {
     installTableTools(root, internal, vditor),
     installCodeLanguage(root, internal, vditor),
     installCodeBlockLangMarker(root, internal),
+    installCodeBlockComposition(root, internal),
     installInlineAutoRender(root, internal),
     installEditingShortcuts(root, internal, vditor),
     installHrInteractions(root, internal, vditor)
