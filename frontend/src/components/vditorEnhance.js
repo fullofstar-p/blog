@@ -65,33 +65,52 @@ const TABLE_BUTTONS = [
   }
 ]
 
-/** 代码块语言下拉里提供的常用语言（与 Vditor 内置 highlight.js 对齐） */
-const CODE_LANGS = [
-  'text',
-  'js',
-  'ts',
-  'html',
-  'css',
-  'json',
-  'java',
-  'python',
-  'go',
-  'rust',
-  'sql',
-  'bash',
-  'yaml',
-  'markdown',
-  'c',
-  'cpp',
-  'csharp',
-  'php',
-  'ruby',
-  'kotlin',
-  'swift',
-  'xml',
-  'dockerfile',
-  'diff'
+/**
+ * 代码块语言列表：与 Vditor 内置 highlight.js 对齐。
+ * label 是下拉里展示的完整语言名，short/color 用来画列表和按钮上的语言图标。
+ */
+const LANG_META = [
+  { value: 'text', label: '纯文本', short: 'TXT', color: '#8c8578' },
+  { value: 'js', label: 'JavaScript', short: 'JS', color: '#f7df1e', dark: true },
+  { value: 'ts', label: 'TypeScript', short: 'TS', color: '#3178c6' },
+  { value: 'html', label: 'HTML', short: '<>', color: '#e34f26' },
+  { value: 'css', label: 'CSS', short: '#', color: '#264de4' },
+  { value: 'json', label: 'JSON', short: '{}', color: '#6b7280' },
+  { value: 'java', label: 'Java', short: 'J', color: '#b07219' },
+  { value: 'python', label: 'Python', short: 'PY', color: '#3572a5' },
+  { value: 'go', label: 'Go', short: 'GO', color: '#00add8' },
+  { value: 'rust', label: 'Rust', short: 'RS', color: '#dea584', dark: true },
+  { value: 'sql', label: 'SQL', short: 'DB', color: '#e38c00' },
+  { value: 'bash', label: 'Bash', short: 'SH', color: '#4eaa25' },
+  { value: 'yaml', label: 'YAML', short: 'Y', color: '#cb171e' },
+  { value: 'markdown', label: 'Markdown', short: 'MD', color: '#083fa1' },
+  { value: 'c', label: 'C', short: 'C', color: '#555555' },
+  { value: 'cpp', label: 'C++', short: 'C++', color: '#f34b7d' },
+  { value: 'csharp', label: 'C#', short: 'C#', color: '#178600' },
+  { value: 'php', label: 'PHP', short: 'PHP', color: '#4f5d95' },
+  { value: 'ruby', label: 'Ruby', short: 'RB', color: '#701516' },
+  { value: 'kotlin', label: 'Kotlin', short: 'KT', color: '#a97bff', dark: true },
+  { value: 'swift', label: 'Swift', short: 'SW', color: '#fa7343' },
+  { value: 'xml', label: 'XML', short: 'X', color: '#0060ac' },
+  { value: 'dockerfile', label: 'Dockerfile', short: 'DK', color: '#2496ed' },
+  { value: 'diff', label: 'Diff', short: '±', color: '#6b7280' }
 ]
+
+const LANG_BY_VALUE = new Map(LANG_META.map((item) => [item.value, item]))
+
+/** 语言值 → 展示名（未知的第三方语言原样展示） */
+const langLabel = (value) => {
+  if (!value) return '语言'
+  const meta = LANG_BY_VALUE.get(value)
+  return meta ? meta.label : value
+}
+
+/** 语言图标（带品牌色的圆角小方块） */
+const langIconHTML = (meta) =>
+  `<span class="vditor-code-lang__icon" style="background-color:${meta ? meta.color : '#cfc7b6'};color:${
+    meta && meta.dark ? '#2c2c2c' : '#fff'
+  }">${meta ? meta.short : '?'}</span>`
+
 
 const on = (el, type, handler, options) => {
   el.addEventListener(type, handler, options)
@@ -399,7 +418,7 @@ function installCodeLanguage(root, internal, vditor) {
   button.type = 'button'
   button.className = 'vditor-code-lang'
   button.hidden = true
-  button.title = '选择代码语言'
+  button.title = '单击选择语言，双击输入语言'
   const menu = document.createElement('div')
   menu.className = 'vditor-code-lang__menu'
   menu.hidden = true
@@ -408,6 +427,8 @@ function installCodeLanguage(root, internal, vditor) {
 
   let anchorNode = null
   let hideTimer = 0
+  let clickTimer = 0
+  let inputEl = null
 
   const codeBlocks = () => Array.from(root.querySelectorAll('.vditor-ir__node[data-type="code-block"]'))
 
@@ -450,14 +471,64 @@ function installCodeLanguage(root, internal, vditor) {
   }
 
   const hideMenu = () => {
+    window.clearTimeout(clickTimer)
     menu.hidden = true
     menu.innerHTML = ''
+  }
+
+  const closeInput = () => {
+    if (!inputEl) return
+    const element = inputEl
+    inputEl = null
+    element.remove()
   }
 
   const hideButton = () => {
     button.hidden = true
     anchorNode = null
     hideMenu()
+    closeInput()
+  }
+
+  /** 按语言值渲染按钮（图标 + 完整语言名） */
+  const renderButton = (value) => {
+    const meta = LANG_BY_VALUE.get(value) || null
+    button.innerHTML = `${langIconHTML(meta)}<span class="vditor-code-lang__name">${langLabel(value)}</span>`
+  }
+
+  /** 双击语言按钮：变成输入框，可手写任意语言标识 */
+  const openInput = () => {
+    if (!anchorNode) return
+    closeInput()
+    const rect = button.getBoundingClientRect()
+    const rootRect = root.getBoundingClientRect()
+    hideMenu()
+    inputEl = document.createElement('input')
+    inputEl.type = 'text'
+    inputEl.className = 'vditor-code-lang__input'
+    inputEl.spellcheck = false
+    inputEl.placeholder = '语言标识，如 js'
+    inputEl.value = langOf(anchorNode)
+    inputEl.style.left = `${Math.max(Math.round(rect.left - rootRect.left), 8)}px`
+    inputEl.style.top = `${Math.round(rect.top - rootRect.top)}px`
+    inputEl.style.width = `${Math.max(Math.round(rect.width), 128)}px`
+    inputEl.addEventListener('mousedown', (event) => event.stopPropagation())
+    inputEl.addEventListener('blur', closeInput)
+    inputEl.addEventListener('keydown', (event) => {
+      event.stopPropagation()
+      if (event.key === 'Enter') {
+        event.preventDefault()
+        const value = inputEl.value.trim()
+        closeInput()
+        setLanguage(value)
+      } else if (event.key === 'Escape') {
+        event.preventDefault()
+        closeInput()
+      }
+    })
+    root.appendChild(inputEl)
+    inputEl.focus()
+    inputEl.select()
   }
 
   const setLanguage = (lang) => {
@@ -475,6 +546,19 @@ function installCodeLanguage(root, internal, vditor) {
     if (internal.options && typeof internal.options.input === 'function') {
       internal.options.input(next)
     }
+    // 选完语言把光标放回该代码块里：否则 setValue 后光标可能停在语言标记中，
+    // 悬停时按钮又会被「正在输入语言」的判断隐藏
+    const block = codeBlocks()[index]
+    const code = block && block.querySelector('pre.vditor-ir__marker--pre > code')
+    if (code) {
+      const range = document.createRange()
+      range.selectNodeContents(code)
+      range.collapse(true)
+      const selection = window.getSelection()
+      selection.removeAllRanges()
+      selection.addRange(range)
+      internal.ir.element.focus()
+    }
     pre.scrollTop = savedScroll
   }
 
@@ -482,34 +566,43 @@ function installCodeLanguage(root, internal, vditor) {
     if (!anchorNode) return
     const current = langOf(anchorNode)
     menu.innerHTML = ''
-    CODE_LANGS.forEach((lang) => {
+    LANG_META.forEach((meta) => {
       const item = document.createElement('button')
       item.type = 'button'
       item.className = 'vditor-code-lang__item'
-      item.textContent = lang
-      if (lang === current) item.classList.add('is-current')
+      item.dataset.lang = meta.value
+      item.innerHTML = `${langIconHTML(meta)}<span class="vditor-code-lang__name">${meta.label}</span>`
+      if (meta.value === current) item.classList.add('is-current')
       item.addEventListener('mousedown', (event) => {
         event.preventDefault()
         event.stopPropagation()
-        setLanguage(lang)
+        setLanguage(meta.value)
       })
       menu.appendChild(item)
     })
     menu.hidden = false
     const rect = button.getBoundingClientRect()
     const rootRect = root.getBoundingClientRect()
-    const menuWidth = menu.offsetWidth || 220
+    const menuWidth = menu.offsetWidth || 216
+    const menuHeight = menu.offsetHeight || 320
     const left = Math.min(
       rect.left - rootRect.left + rect.width - menuWidth,
       root.clientWidth - menuWidth - 8
     )
+    let top = rect.bottom - rootRect.top + 4
+    // 下方放不下就向上弹，保证整张列表可见
+    if (top + menuHeight > root.clientHeight - 8) {
+      top = Math.max(rect.top - rootRect.top - menuHeight - 4, 8)
+    }
     menu.style.left = `${Math.max(left, 8)}px`
-    menu.style.top = `${Math.min(rect.bottom - rootRect.top + 4, root.clientHeight - menu.offsetHeight - 8)}px`
+    menu.style.top = `${top}px`
   }
 
   const showFor = (target) => {
     if (internal.currentMode !== 'ir') return
     if (!target || !target.closest) return
+    // 正在手写语言标识时不要抢走输入框
+    if (inputEl) return
     if (target.closest('.vditor-code-lang') || target.closest('.vditor-code-lang__menu')) {
       window.clearTimeout(hideTimer)
       return
@@ -536,7 +629,7 @@ function installCodeLanguage(root, internal, vditor) {
       return
     }
     anchorNode = node
-    button.textContent = langOf(node) || '语言'
+    renderButton(langOf(node))
     button.hidden = false
     place()
   }
@@ -546,7 +639,7 @@ function installCodeLanguage(root, internal, vditor) {
   const offButtonLeave = on(button, 'mouseleave', () => {
     window.clearTimeout(hideTimer)
     hideTimer = window.setTimeout(() => {
-      if (!menu.hidden) return
+      if (!menu.hidden || inputEl) return
       hideButton()
     }, 350)
   })
@@ -554,13 +647,38 @@ function installCodeLanguage(root, internal, vditor) {
     window.clearTimeout(hideTimer)
     hideTimer = window.setTimeout(hideMenu, 250)
   })
-  const offClick = on(button, 'mousedown', (event) => {
+  const offDown = on(button, 'mousedown', (event) => {
     event.preventDefault()
-    if (menu.hidden) openMenu()
-    else hideMenu()
+    event.stopPropagation()
+  })
+  // 单击展开语言列表（延迟一点，双击时取消）
+  const offClick = on(button, 'click', (event) => {
+    event.preventDefault()
+    event.stopPropagation()
+    if (!menu.hidden) {
+      hideMenu()
+      return
+    }
+    window.clearTimeout(clickTimer)
+    clickTimer = window.setTimeout(() => {
+      if (anchorNode) openMenu()
+    }, 200)
+  })
+  // 双击变成输入框，可手写任意语言标识
+  const offDblClick = on(button, 'dblclick', (event) => {
+    event.preventDefault()
+    event.stopPropagation()
+    window.clearTimeout(clickTimer)
+    openInput()
   })
   const offOutside = on(document, 'mousedown', (event) => {
     if (!menu.hidden && !menu.contains(event.target) && event.target !== button) hideMenu()
+    if (inputEl && event.target !== inputEl) closeInput()
+  })
+  const offEsc = on(document, 'keydown', (event) => {
+    if (event.key !== 'Escape') return
+    hideMenu()
+    closeInput()
   })
   const offScroll = on(internal.ir.element, 'scroll', () => {
     if (!button.hidden) {
@@ -578,12 +696,17 @@ function installCodeLanguage(root, internal, vditor) {
     offLeave()
     offButtonLeave()
     offMenuLeave()
+    offDown()
     offClick()
+    offDblClick()
     offOutside()
+    offEsc()
     offScroll()
     offResize()
     offMode()
     window.clearTimeout(hideTimer)
+    window.clearTimeout(clickTimer)
+    closeInput()
     button.remove()
     menu.remove()
   }
@@ -826,6 +949,32 @@ function installEditingShortcuts(root, internal, vditor) {
   const onKeydown = (event) => {
     if (internal.currentMode !== 'ir') return
     if (event.ctrlKey || event.metaKey || event.altKey) return
+
+    // 代码块语言标记里的删除：Vditor 在标记开头按 Backspace 会插入空段落（看起来像换行），
+    // 这里接管：还有字符就正常删，删空后再按 Backspace 把光标送进代码内容
+    if (event.key === 'Backspace' || event.key === 'Delete') {
+      const selection = window.getSelection()
+      if (selection && selection.rangeCount && selection.isCollapsed) {
+        const anchor = selection.anchorNode
+        const element = anchor && (anchor.nodeType === 1 ? anchor : anchor.parentElement)
+        const marker = element && element.closest ? element.closest('.vditor-ir__marker--info') : null
+        if (marker && anchor && anchor.nodeType === 3) {
+          const text = anchor.nodeValue || ''
+          const offset = selection.anchorOffset
+          const strip = (value) => value.replace(/[\u200b\ufeff]/g, '')
+          if (event.key === 'Backspace' && strip(text.slice(0, offset)) === '') {
+            event.preventDefault()
+            event.stopPropagation()
+            return
+          }
+          if (event.key === 'Delete' && strip(text.slice(offset)) === '') {
+            event.preventDefault()
+            event.stopPropagation()
+            return
+          }
+        }
+      }
+    }
 
     if (event.key === 'Tab') {
       const selection = window.getSelection()

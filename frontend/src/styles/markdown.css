@@ -1256,25 +1256,29 @@
   border-right-color: #3b3e43;
 }
 
-/* ---------- 代码块语言（右下角，可点击选择） ---------- */
-/* hidden 属性必须真正隐藏：本文件里给菜单写了 display:grid，会压过浏览器默认的 [hidden] */
+/* ---------- 代码块语言（右下角，单击列表 / 双击手写） ---------- */
+/* hidden 属性必须真正隐藏：本文件里给菜单写了 display:flex，会压过浏览器默认的 [hidden] */
 .vditor-code-lang[hidden],
-.vditor-code-lang__menu[hidden] {
+.vditor-code-lang__menu[hidden],
+.vditor-code-lang__input[hidden] {
   display: none !important;
 }
 
 .vditor-code-lang {
   position: absolute;
   z-index: 32;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
   height: 20px;
-  padding: 0 7px;
+  padding: 0 7px 0 4px;
   border: 1px solid #ddd6c8;
-  border-radius: 3px;
+  border-radius: 4px;
   background-color: rgba(250, 246, 238, 0.94);
   color: #8c8578;
   font-family: var(--md-font);
   font-size: 12px;
-  line-height: 18px;
+  line-height: 1;
   cursor: pointer;
 }
 
@@ -1284,43 +1288,89 @@
   color: #2c2c2c;
 }
 
+/* 语言图标：品牌色圆角小方块 + 缩写 */
+.vditor-code-lang__icon {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  width: 14px;
+  height: 14px;
+  border-radius: 3px;
+  font-family: var(--md-mono);
+  font-size: 7px;
+  font-weight: 700;
+  line-height: 1;
+  letter-spacing: -0.02em;
+}
+
+.vditor-code-lang__name {
+  max-width: 96px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* 与顶部菜单下拉同款：纸张底 + 细边 + 浮起阴影，行高/悬停色一致 */
 .vditor-code-lang__menu {
   position: absolute;
   z-index: 40;
-  display: grid;
-  grid-template-columns: repeat(3, minmax(64px, 1fr));
-  gap: 2px;
-  width: 232px;
-  padding: 6px;
+  display: block;
+  min-width: 208px;
+  max-height: 300px;
+  padding: 4px;
+  overflow-y: auto;
   border: 1px solid #d8d0c0;
   border-radius: 6px;
   background-color: #faf6ee;
-  box-shadow: 0 8px 20px rgba(44, 44, 44, 0.18);
+  box-shadow: 0 8px 24px rgba(44, 44, 44, 0.16);
 }
 
 .vditor-code-lang__item {
-  height: 24px;
-  padding: 0 6px;
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  width: 100%;
+  height: 30px;
+  padding: 0 10px 0 8px;
   border: 0;
-  border-radius: 3px;
+  border-radius: 4px;
   background-color: transparent;
-  color: #4a463f;
-  font-family: var(--md-font);
-  font-size: 12px;
-  line-height: 1;
+  color: #2c2c2c;
+  font-family: inherit;
+  font-size: 13px;
   text-align: left;
+  white-space: nowrap;
   cursor: pointer;
 }
 
 .vditor-code-lang__item:hover {
   background-color: #efe7d8;
-  color: #2c2c2c;
 }
 
 .vditor-code-lang__item.is-current {
   background-color: #e6dcc6;
-  color: #2c2c2c;
   font-weight: 600;
+}
+
+/* 双击语言按钮后的手写输入框 */
+.vditor-code-lang__input {
+  position: absolute;
+  z-index: 41;
+  height: 24px;
+  padding: 0 8px;
+  border: 1px solid #b3a992;
+  border-radius: 4px;
+  background-color: #faf6ee;
+  color: #2c2c2c;
+  font-family: var(--md-mono);
+  font-size: 12px;
+  outline: none;
+  box-shadow: 0 2px 10px rgba(44, 44, 44, 0.12);
+}
+
+.vditor-code-lang__input::placeholder {
+  color: #b3a992;
 }
 
 /* ---------- 水平分隔线：加高点击区，选中后可 Backspace/Delete 删除 ---------- */
