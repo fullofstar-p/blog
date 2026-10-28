@@ -569,6 +569,115 @@ const codeBlockOf = (node) => {
 }
 
 /**
+ * 行内标记即时渲染（Typora 手感）：
+ * Vditor 在 IR 模式下输入完 `**加粗**`、`` `代码` `` 这类行内元素后，会把节点的
+ * 源标记（`**`）保持展开，直到再按空格/方向键才收起，看起来像「渲染不及时」。
+ * 这里补两处：
+ * 1. 输入完成后光标已经离开节点的，立即收起；
+ * 2. 选中文字后用加粗/斜体/删除线/行内代码（快捷键或「格式」菜单）时，也立即收起，
+ *    Typora 里选中文字加粗后看到的是粗体本身，而不是 `**文字**`。
+ * 只处理行内节点（没有 data-block），避免影响代码块/表格。
+ */
+function installInlineAutoRender(root, internal) {
+  const collapseInactiveNodes = () => {
+    if (internal.currentMode !== 'ir') return
+    const selection = window.getSelection()
+    if (!selection || !selection.rangeCount) return
+    const startContainer = selection.getRangeAt(0).startContainer
+    internal.ir.element.querySelectorAll('.vditor-ir__node--expand').forEach((node) => {
+      if (node.hasAttribute('data-block')) return
+      if (node.contains(startContainer)) return
+      node.classList.remove('vditor-ir__node--expand')
+    })
+  }
+
+  /** 收紧选中文字所在的行内节点（选区必须已经覆盖了内容，空选不改） */
+  const collapseSelectedNodes = () => {
+    if (internal.currentMode !== 'ir') return
+    const selection = window.getSelection()
+    if (!selection || !selection.rangeCount || selection.isCollapsed) return
+    const range = selection.getRangeAt(0)
+    internal.ir.element.querySelectorAll('.vditor-ir__node--expand').forEach((node) => {
+      if (node.hasAttribute('data-block')) return
+      if (!node.contains(range.startContainer) || !node.contains(range.endContainer)) return
+      node.classList.remove('vditor-ir__node--expand')
+    })
+  }
+
+  const FORMAT_BUTTONS = ['bold', 'italic', 'strike', 'inline-code']
+  const scheduleCollapseSelected = () => window.setTimeout(collapseSelectedNodes, 0)
+
+  const offInput = on(internal.ir.element, 'input', (event) => {
+    if (event.isComposing) return
+    collapseInactiveNodes()
+  })
+  // 中文输入法走 compositionend，Vditor 在这之后才重渲染
+  const offComposition = on(internal.ir.element, 'compositionend', () => {
+    window.setTimeout(collapseInactiveNodes, 0)
+  })
+  // 快捷键：Vditor 在 keydown 里处理 ⌘/Ctrl + B/I/U
+  const offKeydown = on(root, 'keydown', (event) => {
+    const mod = isMac() ? event.metaKey : event.ctrlKey
+    if (!mod || event.altKey || event.shiftKey) return
+    const key = (event.key || '').toLowerCase()
+    if (key !== 'b' && key !== 'i' && key !== 'u') return
+    scheduleCollapseSelected()
+  })
+  // 「格式」菜单是点击隐藏工具栏里的按钮实现的
+  const offClick = on(root, 'click', (event) => {
+    const target = event.target
+    const button = target && target.closest ? target.closest('.vditor-toolbar button') : null
+    if (!button) return
+    if (!FORMAT_BUTTONS.includes(button.getAttribute('data-type'))) return
+    scheduleCollapseSelected()
+  })
+
+  return () => {
+    offInput()
+    offComposition()
+    offKeydown()
+    offClick()
+  }
+}
+
+/**
+ * 代码块语言行（Vditor 的 `.vditor-ir__marker--info`）只在正在输入语言时显示。
+ * Typora 的语言标识只在代码块右下角出现（对应这里的 .vditor-code-lang 按钮），
+ * 代码块上方不应该多出一行「js」。不能直接用 CSS 永久隐藏：新建代码块时光标
+ * 会落在这行里，display:none 会导致语言被当成代码内容。所以按光标位置切换。
+ */
+function installCodeBlockLangMarker(root, internal) {
+  const INFO = '.vditor-ir__node[data-type="code-block"] > .vditor-ir__marker--info'
+  let frame = 0
+
+  const sync = () => {
+    frame = 0
+    if (internal.currentMode !== 'ir') return
+    const selection = window.getSelection()
+    const anchor = selection && selection.rangeCount ? selection.getRangeAt(0).startContainer : null
+    internal.ir.element.querySelectorAll(INFO).forEach((marker) => {
+      marker.classList.toggle('is-lang-idle', !(anchor && marker.contains(anchor)))
+    })
+  }
+
+  const schedule = () => {
+    if (frame) return
+    frame = window.requestAnimationFrame(sync)
+  }
+
+  const offSelection = on(document, 'selectionchange', schedule)
+  const offInput = on(internal.ir.element, 'input', schedule)
+  const offClick = on(root, 'click', schedule)
+
+  return () => {
+    offSelection()
+    offInput()
+    offClick()
+    if (frame) window.cancelAnimationFrame(frame)
+  }
+}
+
+/**
  * 代码块里 Tab / Shift+Tab 缩进；Markdown 里「表格源码 + 回车」转成真正的表格。
  */
 function installEditingShortcuts(root, internal, vditor) {
@@ -627,7 +736,7 @@ function installEditingShortcuts(root, internal, vditor) {
   }
 
   /** 把只有列表标记的段落转成真正的列表（Vditor 只有回车才转，这里补上空格触发） */
-  const convertList = (block, ordered) => {
+  const convertList = (block, ordered, startNumber) => {
     const selection = window.getSelection()
     if (!selection) return
     const range = document.createRange()
@@ -638,6 +747,34 @@ function installEditingShortcuts(root, internal, vditor) {
     const item = internal.toolbar && internal.toolbar.elements[ordered ? 'ordered-list' : 'list']
     const action = item && item.children[0]
     if (action) action.click()
+    // Vditor 新建的有序列表固定从 1 开始；用户手写「2. + 空格」时保留起始序号，
+    // 否则被其他内容隔断的列表会重新从 1 编号
+    if (ordered && startNumber > 1) {
+      applyListStart(startNumber)
+    }
+  }
+
+  /**
+   * 把刚生成的有序列表改成从指定序号开始。
+   * 需要同时改 ol 的 start / data-marker 和每个 li 的 data-marker：
+   * Vditor 用 li 的 data-marker 生成 Markdown，只改 start 会在保存时丢序号。
+   */
+  const applyListStart = (startNumber) => {
+    const selection = window.getSelection()
+    if (!selection || !selection.rangeCount) return
+    const anchor = selection.getRangeAt(0).startContainer
+    const element = anchor && (anchor.nodeType === 1 ? anchor : anchor.parentElement)
+    const list = element && element.closest ? element.closest('ol') : null
+    if (!list || !internal.ir.element.contains(list)) return
+    list.setAttribute('start', String(startNumber))
+    list.setAttribute('data-marker', `${startNumber}.`)
+    Array.from(list.children).forEach((child, index) => {
+      if (child.tagName === 'LI') child.setAttribute('data-marker', `${startNumber + index}.`)
+    })
+    // 让 v-model / 字数统计立刻拿到新 Markdown
+    if (internal.options && typeof internal.options.input === 'function') {
+      internal.options.input(vditor.getValue())
+    }
   }
 
   const outdent = () => {
@@ -682,15 +819,18 @@ function installEditingShortcuts(root, internal, vditor) {
       const element = anchor && (anchor.nodeType === 1 ? anchor : anchor.parentElement)
       const block = element && element.closest ? element.closest('p') : null
       if (!block || !internal.ir.element.contains(block)) return
+      // 已经在列表项里时不接管：交给 Vditor 的列表逻辑，否则会把当前列表改坏
+      if (element.closest('li')) return
       const text = (block.textContent || '').trim()
-      const ordered = /^\d+[.)]$/.test(text)
+      const orderedMatch = /^(\d+)[.)]$/.exec(text)
+      const ordered = Boolean(orderedMatch)
       const unordered = /^[-*+]$/.test(text)
       if (!ordered && !unordered) return
       // 只在标记位于行尾时转换，避免正文里的短横线被误转
       if (selection.focusOffset < (anchor.nodeValue || '').length) return
       event.preventDefault()
       event.stopPropagation()
-      convertList(block, ordered)
+      convertList(block, ordered, ordered ? parseInt(orderedMatch[1], 10) : 0)
       return
     }
 
@@ -732,6 +872,8 @@ export function enhanceVditor(vditor) {
   const disposers = [
     installTableTools(root, internal, vditor),
     installCodeLanguage(root, internal, vditor),
+    installCodeBlockLangMarker(root, internal),
+    installInlineAutoRender(root, internal),
     installEditingShortcuts(root, internal, vditor)
   ]
   return () => disposers.forEach((dispose) => dispose())

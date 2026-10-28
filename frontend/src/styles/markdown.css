@@ -1042,6 +1042,18 @@
   display: none;
 }
 
+/* Typora 不显示代码块围栏：Vditor 编辑态用 ::before/::after 吐出 ```，这里去掉 */
+.typora-editor .vditor-ir__node[data-type="code-block"]::before,
+.typora-editor .vditor-ir__node[data-type="code-block"]::after {
+  content: none !important;
+}
+
+/* 语言标识行也隐藏（Typora 只在右下角显示语言，对应 .vditor-code-lang 按钮）。
+   新建代码块时光标会落在这行里输入语言，所以只在光标离开后隐藏（JS 加 is-lang-idle）。 */
+.typora-editor .vditor-ir__node[data-type="code-block"] > .vditor-ir__marker--info.is-lang-idle {
+  display: none !important;
+}
+
 .typora-editor .vditor-ir__node--expand .vditor-ir__marker--pre {
   display: block;
   width: auto;
