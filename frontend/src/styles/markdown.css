@@ -738,17 +738,26 @@
 
 /* ---------- 主体：大纲侧栏 + 编辑区 ---------- */
 .typora-editor__body {
+  position: relative;
   display: flex;
   min-height: 0;
 }
 
+/* 大纲改成覆盖在编辑区上方：不再挤占正文宽度，打开/关闭不会让整篇大文档重新排版。
+   第一次打开后才挂载，之后用 v-show 切换，几百个标题按钮也不会反复销毁重建。 */
 .typora-editor__sidebar {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 0;
+  z-index: 30;
   display: flex;
-  flex: 0 0 220px;
+  width: 220px;
   flex-direction: column;
   min-width: 0;
   border-right: 1px solid #e4dac8;
   background-color: #f7f2e6;
+  box-shadow: 2px 0 10px rgba(44, 44, 44, 0.12);
 }
 
 .typora-editor__sidebar-head {

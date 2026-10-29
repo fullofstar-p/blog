@@ -143,14 +143,79 @@ export function runCommand(vditor, cmd) {
   return true
 }
 
+const normalizeMarkdown = (value) =>
+  String(value || '')
+    .replace(/\r\n?/g, '\n')
+    .replace(/\s+$/, '')
+
+/**
+ * 能否复用现成的 IR DOM 退出源码模式：
+ * 只有源码 textarea 的内容和进入源码模式时完全一致（用户只是看了一眼、没改），
+ * 才能跳过 Vditor 的整篇 Md2VditorIRDOM；否则必须重建。
+ */
+export function canExitSourceFast(vditor, sourceSnapshot) {
+  const internal = vditor && vditor.vditor
+  if (!internal || internal.currentMode !== 'sv') return false
+  if (!internal.sv || !internal.sv.element || !internal.ir || !internal.ir.element) return false
+  if (typeof sourceSnapshot !== 'string' || !sourceSnapshot) return false
+  return normalizeMarkdown(internal.sv.element.value) === normalizeMarkdown(sourceSnapshot)
+}
+
+/**
+ * 复用 IR DOM 退出源码模式：照常触发 Vditor 的 setEditMode（这样模式、焦点、工具栏、
+ * 撤销栈状态都由 Vditor 维护），但在本次切换里让 innerHTML 赋值变成空操作、同时
+ * 让 Md2VditorIRDOM 直接返回空串，跳过重建整篇 DOM 的开销。
+ */
+function exitSourceModeReusingDom(vditor) {
+  const internal = vditor.vditor
+  const elements = internal.toolbar && internal.toolbar.elements
+  const item = elements && elements['edit-mode']
+  const button = item && item.querySelector('button[data-mode="ir"]')
+  const irElement = internal.ir && internal.ir.element
+  const lute = internal.lute
+  if (!button || !irElement || !lute) return false
+  const descriptor = Object.getOwnPropertyDescriptor(Element.prototype, 'innerHTML')
+  if (!descriptor || !descriptor.get || !descriptor.set) return false
+
+  patchUndoStack(internal.undo)
+  const originalRender = lute.Md2VditorIRDOM
+  lute.Md2VditorIRDOM = () => ''
+  try {
+    Object.defineProperty(irElement, 'innerHTML', {
+      configurable: true,
+      get() {
+        return descriptor.get.call(irElement)
+      },
+      set() {
+        /* 跳过这次 innerHTML 重建，保留现有 IR DOM */
+      }
+    })
+  } catch (error) {
+    lute.Md2VditorIRDOM = originalRender
+    return false
+  }
+
+  try {
+    button.click()
+  } finally {
+    lute.Md2VditorIRDOM = originalRender
+    delete irElement.innerHTML
+  }
+  patchUndoStack(internal.undo)
+  return true
+}
+
 /** 源码模式：IR ↔ SV，复用 Vditor 的模式面板（同样隐藏） */
-export function toggleSourceMode(vditor, markdown) {
+export function toggleSourceMode(vditor, markdown, options = {}) {
   const internal = vditor && vditor.vditor
   if (!internal) return false
   const elements = internal.toolbar && internal.toolbar.elements
   const item = elements && elements['edit-mode']
   if (!item) return false
   const target = internal.currentMode === 'sv' ? 'ir' : 'sv'
+  if (target === 'ir' && options.reuseIrDom) {
+    return exitSourceModeReusingDom(vditor)
+  }
   const button = item.querySelector(`button[data-mode="${target}"]`)
   if (!button) return false
 

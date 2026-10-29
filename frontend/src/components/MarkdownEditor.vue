@@ -7,6 +7,7 @@ import { enhanceVditor } from '@/components/vditorEnhance'
 import {
   MENUS,
   activeHeadingIndex,
+  canExitSourceFast,
   getMode,
   isMac,
   parseHeadings,
@@ -67,6 +68,9 @@ const dialogPrimary = ref(null)
 
 const openMenu = ref('')
 const outlineOpen = ref(false)
+// 大纲侧栏第一次打开后才挂载 DOM；之后用 v-show 切换，避免反复销毁/重建几百个标题按钮，
+// 也避免侧栏挤占宽度导致整篇大文档重新排版（侧栏改成覆盖在编辑区上方）。
+const outlineMounted = ref(false)
 const headings = ref([])
 const activeHeading = ref(-1)
 const isSource = ref(false)
@@ -87,11 +91,15 @@ let unmounted = false
 let outlineTimer = 0
 let statsTimer = 0
 let headingFrame = 0
+// 大纲侧栏关闭时只记一个 dirty 标记，等打开时再解析标题，避免每次输入都重建大纲数据
+let outlineDirty = false
 // 一份最新的 Markdown 文本缓存：Vditor 的 getValue() 在大文档下要序列化整棵 IR DOM
 // （十几万字约 0.8s），输入 / 大纲 / 字数都改用缓存，避免每次输入都重新序列化。
 let latestMarkdown = props.modelValue || ''
 // 等待用户确认导入方式的文件内容（{ content, fileName, title }）
 let pendingImport = null
+// 进入源码模式时的正文快照：退出时只有内容和它一致才能复用现有 IR DOM
+let sourceSnapshot = null
 
 // 工具栏配置保留（元素、快捷键、命令都在），整条工具栏由 CSS 隐藏，交互走顶部菜单
 const toolbar = [
@@ -165,16 +173,34 @@ function scheduleStats(delay = 180) {
   }, delay)
 }
 
+/** 标题列表没变化时不替换数组，避免输入时让侧栏的几百个按钮全部重新渲染 */
+function headingsEqual(left, right) {
+  if (left.length !== right.length) return false
+  for (let index = 0; index < left.length; index += 1) {
+    const a = left[index]
+    const b = right[index]
+    if (a.level !== b.level || a.text !== b.text || a.line !== b.line) return false
+  }
+  return true
+}
+
 function refreshOutline() {
   outlineTimer = 0
   if (!vditor) return
-  headings.value = parseHeadings(latestMarkdown)
-  if (!headings.value.length) activeHeading.value = -1
+  const next = parseHeadings(latestMarkdown)
+  outlineDirty = false
+  if (headingsEqual(headings.value, next)) return
+  headings.value = next
+  if (!next.length) activeHeading.value = -1
 }
 
 function scheduleOutline(delay = 180) {
   window.clearTimeout(outlineTimer)
-  outlineTimer = window.setTimeout(refreshOutline, delay)
+  outlineTimer = window.setTimeout(() => {
+    outlineTimer = 0
+    if (outlineOpen.value) refreshOutline()
+    else outlineDirty = true
+  }, delay)
 }
 
 function syncActiveHeading() {
@@ -500,10 +526,10 @@ function closeMenus() {
 
 function toggleOutline() {
   outlineOpen.value = !outlineOpen.value
-  if (outlineOpen.value) {
-    refreshOutline()
-    nextTick(scheduleActiveHeading)
-  }
+  if (!outlineOpen.value) return
+  outlineMounted.value = true
+  if (outlineDirty || !headings.value.length) refreshOutline()
+  nextTick(scheduleActiveHeading)
 }
 
 function gotoHeading(index) {
@@ -518,13 +544,41 @@ function gotoHeading(index) {
 async function toggleSource() {
   if (!vditor || busy.active) return
   const toSource = getMode(vditor) !== 'sv'
+  const finishSwitch = () => {
+    if (toSource) sourceSnapshot = latestMarkdown
+    else sourceSnapshot = null
+  }
+
+  // 源码没改过：让 Vditor 正常切回（模式/焦点/撤销栈状态都由它维护），
+  // 但跳过重建整篇 IR DOM，所以不会卡；快速路径失败时继续走普通切换。
+  if (!toSource && canExitSourceFast(vditor, sourceSnapshot)) {
+    if (toggleSourceMode(vditor, latestMarkdown, { reuseIrDom: true })) {
+      handleModeChange()
+      sourceSnapshot = null
+      vditor.focus()
+      return
+    }
+  }
+
+  // 小文档切换很快，不需要遮罩（遮罩本身要等两帧）
+  if (latestMarkdown.length < 30000) {
+    if (toggleSourceMode(vditor, latestMarkdown)) {
+      handleModeChange()
+      finishSwitch()
+    }
+    vditor.focus()
+    return
+  }
+
   busy.active = true
   busy.text = toSource ? '正在打开源码模式…' : '正在切回即时渲染…'
   await nextTick()
   await nextFrame()
   try {
-    toggleSourceMode(vditor, latestMarkdown)
-    handleModeChange()
+    if (toggleSourceMode(vditor, latestMarkdown)) {
+      handleModeChange()
+      finishSwitch()
+    }
   } finally {
     busy.active = false
   }
@@ -909,7 +963,7 @@ onBeforeUnmount(() => {
     </div>
 
     <div class="typora-editor__body" :style="{ height: `${editorHeight}px` }">
-      <aside v-if="outlineOpen" class="typora-editor__sidebar">
+      <aside v-if="outlineMounted" v-show="outlineOpen" class="typora-editor__sidebar">
         <div class="typora-editor__sidebar-head">
           <span>大纲</span>
           <button
