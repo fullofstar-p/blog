@@ -15,10 +15,35 @@ export const isMac = () => /Mac|iPhone|iPad/.test(navigator.platform || '')
 export const modLabel = () => (isMac() ? '⌘' : 'Ctrl+')
 
 /**
- * 顶部菜单（顺序、分隔、快捷键提示按 Typora 的「段落 / 格式 / 编辑 / 视图」组织）。
- * cmd 为 'link' / 'image' / 'outline' / 'source' / 'fullscreen' 时由组件接管。
+ * 顶部菜单（顺序、分隔、快捷键提示按 Typora 的「文件 / 编辑 / 段落 / 格式 / 视图」组织）。
+ * cmd 为 'new' / 'import' / 'export-md' / 'export-html' / 'export-pdf' /
+ * 'link' / 'image' / 'outline' / 'source' / 'fullscreen' 时由组件接管。
  */
 export const MENUS = [
+  {
+    key: 'file',
+    label: '文件',
+    items: [
+      { cmd: 'new', label: '新建', hint: 'N' },
+      { divider: true },
+      { cmd: 'import', label: '导入 Markdown…', hint: 'O' },
+      { divider: true },
+      { cmd: 'export-md', label: '导出 Markdown…' },
+      { cmd: 'export-html', label: '导出 HTML…' },
+      { cmd: 'export-pdf', label: '导出 PDF（打印）…' }
+    ]
+  },
+  {
+    key: 'edit',
+    label: '编辑',
+    items: [
+      { cmd: 'undo', label: '撤销', hint: 'Z' },
+      { cmd: 'redo', label: '重做', hint: 'Y' },
+      { divider: true },
+      { cmd: 'outdent', label: '减少缩进' },
+      { cmd: 'indent', label: '增加缩进' }
+    ]
+  },
   {
     key: 'paragraph',
     label: '段落',
@@ -53,17 +78,6 @@ export const MENUS = [
       { divider: true },
       { cmd: 'link', label: '链接', hint: 'K' },
       { cmd: 'image', label: '图片' }
-    ]
-  },
-  {
-    key: 'edit',
-    label: '编辑',
-    items: [
-      { cmd: 'undo', label: '撤销', hint: 'Z' },
-      { cmd: 'redo', label: '重做', hint: 'Y' },
-      { divider: true },
-      { cmd: 'outdent', label: '减少缩进' },
-      { cmd: 'indent', label: '增加缩进' }
     ]
   },
   {

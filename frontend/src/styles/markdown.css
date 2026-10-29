@@ -940,6 +940,28 @@
   font-weight: 600;
 }
 
+/* 导入/新建对话框的说明文字：比标题轻，允许换行 */
+.typora-editor__dialog-desc {
+  margin: 0 0 8px;
+  color: #5c564c;
+  font-size: 13px;
+  line-height: 1.6;
+  word-break: break-word;
+}
+
+.typora-editor__dialog-desc strong {
+  color: #2c2c2c;
+  font-weight: 600;
+}
+
+.typora-editor__dialog-meta {
+  margin: 0;
+  color: #8c8578;
+  font-size: 12px;
+  line-height: 1.6;
+  word-break: break-word;
+}
+
 .typora-editor__field {
   display: flex;
   align-items: center;
@@ -973,6 +995,7 @@
 
 .typora-editor__dialog-actions {
   display: flex;
+  flex-wrap: wrap;
   justify-content: flex-end;
   gap: 8px;
   margin-top: 14px;
