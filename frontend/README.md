@@ -63,11 +63,20 @@ src/
   菜单右侧固定「大纲」「源码」「全屏」三个开关。
 - **文件菜单（导入 / 导出）**：`新建`（`Ctrl+N`，正文非空时先弹确认框）、
   `导入 Markdown…`（`Ctrl+O`，也支持把 `.md` 文件直接拖进编辑器）、`导出 Markdown…`、
-  `导出 HTML…`、`导出 PDF（打印）…`。导入会去掉 BOM、把 CRLF 统一成 LF；
+  `导出 HTML…`、`导出 PDF…`。导入会去掉 BOM、把 CRLF 统一成 LF；
   正文不为空时先选「替换正文 / 插入到光标处」；标题输入框为空时用文档首个标题或文件名回填。
   导出 Markdown 的文件名取「文章标题 → 正文首个标题 → 日期」；导出的 HTML 是可直接双击打开的
-  独立文件（纸张排版 + GitHub 代码高亮，与阅读页一致）；PDF 走浏览器打印窗口的「另存为 PDF」。
-  相关纯函数在 `src/components/markdownIO.js`，不经过后端接口。
+  独立文件（纸张排版 + GitHub 代码高亮，与阅读页一致）；PDF 也是**直接下载**：浏览器端按块分页，
+  逐页 html2canvas 截图后由 jsPDF 拼成 A4 PDF（`jsPDF` / `html2canvas` 按需动态加载，不进首屏包体），
+  不再弹打印对话框。PDF 里的中文是图片、不能选中复制；正文图片会先尝试转 data URL 内联，
+  跨域取不到的图片（MinIO 默认没配 CORS 头）显示为 `[图片：alt]` 占位。
+  相关纯函数在 `src/components/markdownIO.js`，PDF 分页在 `src/components/markdownPdf.js`，都不经过后端接口。
+- **长文档性能**：编辑器缓存一份最新的 Markdown 文本（`latestMarkdown`），输入、大纲、字数统计
+  不再每次调用 `Vditor.getValue()` 把整棵 IR DOM 序列化一遍（十几万字一次约 0.8s）；字数统计做
+  180ms 防抖；导入 / 切换源码模式 / 生成 PDF 时显示遮罩提示。切换源码模式时会临时跳过 Vditor
+  对整篇文档的 undo diff，并用缓存代替 IR→Markdown 序列化（首次切换时尤为明显）。
+  实测 138KB / 7100 行文档：导入约 5.3s → 1.9s，切到源码模式 3.0s → 0.2s
+  （切回即时渲染约 1.1s，主要是 Vditor 重建 IR DOM 的固有成本），800 个标题的大纲正常。
 - **底部状态栏**：显示 `Markdown`、当前模式（即时渲染 / 源码模式）与实时字数；
   字数由 `utils/wordCount.js` 去掉 Markdown 标记后统计，页面右侧不再重复显示。
 - **大纲侧栏**：在左侧展开渲染后的标题树，点击精确滚动正文容器到对应标题；

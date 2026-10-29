@@ -23,10 +23,10 @@ import {
   highlightHtml,
   isMarkdownFile,
   normalizeImportText,
-  printHtml,
   sanitizeFileName,
   suggestTitle
 } from '@/components/markdownIO'
+import { exportMarkdownPdf } from '@/components/markdownPdf'
 import { toastError, toastSuccess } from '@/utils/toast'
 import { countArticle } from '@/utils/wordCount'
 
@@ -77,13 +77,19 @@ const stats = ref({ words: 0, chars: 0 })
 const linkDialog = reactive({ open: false, text: '', url: '' })
 // 导入 / 新建的确认对话框（导入时还要在「替换正文」和「插入到光标处」之间选）
 const ioDialog = reactive({ open: false, kind: '', fileName: '', title: '' })
+// 长文档导入 / 切换视图 / 生成 PDF 时的遮罩提示（这些操作会阻塞主线程）
+const busy = reactive({ active: false, text: '' })
 
 let vditor = null
 let disposeEnhance = null
 let ready = false
 let unmounted = false
 let outlineTimer = 0
+let statsTimer = 0
 let headingFrame = 0
+// 一份最新的 Markdown 文本缓存：Vditor 的 getValue() 在大文档下要序列化整棵 IR DOM
+// （十几万字约 0.8s），输入 / 大纲 / 字数都改用缓存，避免每次输入都重新序列化。
+let latestMarkdown = props.modelValue || ''
 // 等待用户确认导入方式的文件内容（{ content, fileName, title }）
 let pendingImport = null
 
@@ -122,8 +128,9 @@ const modeLabel = computed(() => (isSource.value ? '源码模式' : '即时渲�
 const editorHeight = computed(() => Math.max(props.minHeight - CHROME_HEIGHT, 260))
 
 function onInput(value) {
-  emit('update:modelValue', value)
-  applyStats(value)
+  latestMarkdown = typeof value === 'string' ? value : ''
+  emit('update:modelValue', latestMarkdown)
+  scheduleStats()
   scheduleOutline()
 }
 
@@ -144,15 +151,24 @@ async function uploadImages(files) {
 }
 
 function applyStats(value) {
-  const source = typeof value === 'string' ? value : props.modelValue
+  const source = typeof value === 'string' ? value : latestMarkdown
   const next = countArticle(source || '')
   stats.value = { words: next.words, chars: next.chars }
+}
+
+/** 字数统计要跑十几条正则，大文档下不必每个按键都算，停顿后再更新状态栏 */
+function scheduleStats(delay = 180) {
+  window.clearTimeout(statsTimer)
+  statsTimer = window.setTimeout(() => {
+    statsTimer = 0
+    applyStats()
+  }, delay)
 }
 
 function refreshOutline() {
   outlineTimer = 0
   if (!vditor) return
-  headings.value = parseHeadings(vditor.getValue())
+  headings.value = parseHeadings(latestMarkdown)
   if (!headings.value.length) activeHeading.value = -1
 }
 
@@ -173,7 +189,10 @@ function scheduleActiveHeading() {
 }
 
 function handleModeChange() {
-  isSource.value = getMode(vditor) === 'sv'
+  const mode = getMode(vditor)
+  isSource.value = mode === 'sv'
+  // 源码模式的内容就是 textarea.value，读取很便宜；顺手同步成 Vditor 规范化后的文本
+  if (vditor && mode === 'sv') latestMarkdown = vditor.getValue()
   scheduleOutline(80)
   scheduleActiveHeading()
   // 通知 vditorEnhance 里的表格工具条/行号等按当前模式显隐
@@ -239,12 +258,17 @@ function run(cmd) {
  * ------------------------------------------------------------------------- */
 
 function currentMarkdown() {
-  return vditor ? vditor.getValue() : props.modelValue || ''
+  // 用缓存而不是 vditor.getValue()：大文档序列化要 0.8s 左右，导入判空/导出都应即时返回
+  return latestMarkdown
 }
 
 function isBlankMarkdown(value) {
   return !String(value || '').trim()
 }
+
+/** 等一帧真正绘制完成：长任务开始前先让遮罩提示显示出来，避免「点了没反应」 */
+const nextFrame = () =>
+  new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)))
 
 function focusDialogPrimary() {
   if (dialogPrimary.value) dialogPrimary.value.focus()
@@ -273,6 +297,9 @@ function applyNewDocument() {
   ioDialog.open = false
   pendingImport = null
   vditor.setValue('')
+  latestMarkdown = ''
+  window.clearTimeout(statsTimer)
+  applyStats('')
   onInput('')
   vditor.focus()
   toastSuccess('已新建空白文档')
@@ -327,17 +354,34 @@ async function handleImportFile(file) {
 }
 
 /** 应用导入：replace 覆盖正文（仍可撤销），insert 插入到当前光标处 */
-function applyImport(mode) {
-  if (!vditor || !pendingImport) return
+async function applyImport(mode) {
+  if (!vditor || !pendingImport || busy.active) return
   const { content, fileName, title } = pendingImport
   pendingImport = null
   ioDialog.open = false
-  if (mode === 'insert') vditor.insertMD(content)
-  else vditor.setValue(content, false)
-  onInput(vditor.getValue())
-  vditor.focus()
-  scheduleOutline(80)
+  busy.active = true
+  busy.text = '正在导入 Markdown…'
+  await nextTick()
+  await nextFrame()
+  try {
+    if (mode === 'insert') {
+      vditor.insertMD(content)
+      latestMarkdown = vditor.getValue()
+    } else {
+      // 直接用读入的文本作为正文，不再把整棵 IR DOM 序列化回 Markdown。
+      // 十几万字的文档 getValue() 要 0.8s 左右，导入阶段本来就要渲染一次，能省则省。
+      vditor.setValue(content, false)
+      latestMarkdown = content
+    }
+  } finally {
+    busy.active = false
+  }
+  window.clearTimeout(statsTimer)
+  applyStats()
+  emit('update:modelValue', latestMarkdown)
   emit('import-file', { mode, fileName, title })
+  scheduleOutline(60)
+  vditor.focus()
   toastSuccess(mode === 'insert' ? `已插入 ${fileName}` : `已导入 ${fileName}`)
 }
 
@@ -390,15 +434,35 @@ function exportHtml() {
   toastSuccess(`已导出 ${name}.html`)
 }
 
-/** PDF 用浏览器打印实现：打开打印窗口，用户在打印对话框里选「另存为 PDF」 */
-function exportPdf() {
-  if (!vditor) return
-  const html = buildExportHtml({ title: exportTitle(), bodyHtml: exportBodyHtml() })
-  if (!printHtml(html)) {
-    toastError('打印窗口被浏览器拦截，请允许本站弹出窗口后重试')
+/** PDF 和 Markdown/HTML 一样直接下载：浏览器端分页渲染后生成 pdf 文件 */
+async function exportPdf() {
+  if (!vditor || busy.active) return
+  const name = exportBaseName()
+  const bodyHtml = exportBodyHtml()
+  if (!bodyHtml.trim()) {
+    toastError('正文为空，暂时没有可导出的内容')
     return
   }
-  toastSuccess('已打开打印窗口，选择「另存为 PDF」即可导出')
+  busy.active = true
+  busy.text = '正在生成 PDF…'
+  await nextTick()
+  await nextFrame()
+  try {
+    const pages = await exportMarkdownPdf({
+      bodyHtml,
+      title: exportTitle(),
+      fileName: `${name}.pdf`,
+      onProgress: (page, total) => {
+        busy.text = `正在生成 PDF（${page}/${total} 页）…`
+      }
+    })
+    toastSuccess(`已导出 ${name}.pdf（${pages} 页）`)
+  } catch (error) {
+    console.error('[markdown] 导出 PDF 失败', error)
+    toastError((error && error.message) || 'PDF 生成失败，请稍后再试')
+  } finally {
+    busy.active = false
+  }
 }
 
 /**
@@ -451,10 +515,19 @@ function gotoHeading(index) {
   scrollToHeading(vditor, index, heading.line)
 }
 
-function toggleSource() {
-  if (!vditor) return
-  toggleSourceMode(vditor)
-  handleModeChange()
+async function toggleSource() {
+  if (!vditor || busy.active) return
+  const toSource = getMode(vditor) !== 'sv'
+  busy.active = true
+  busy.text = toSource ? '正在打开源码模式…' : '正在切回即时渲染…'
+  await nextTick()
+  await nextFrame()
+  try {
+    toggleSourceMode(vditor, latestMarkdown)
+    handleModeChange()
+  } finally {
+    busy.active = false
+  }
   vditor.focus()
 }
 
@@ -729,16 +802,19 @@ onMounted(() => {
 watch(
   () => props.modelValue,
   (value) => {
+    const next = value || ''
     if (!vditor || !ready) {
-      applyStats(value)
+      latestMarkdown = next
+      applyStats(next)
       return
     }
-    const current = vditor.getValue()
-    if ((value || '') !== current) {
-      vditor.setValue(value || '', true)
-      applyStats(value)
-      scheduleOutline(120)
-    }
+    // 自己 emit 出去的值（输入/导入）直接忽略：不能再调 getValue() 序列化整篇文档
+    if (next === latestMarkdown) return
+    latestMarkdown = next
+    vditor.setValue(next, true)
+    window.clearTimeout(statsTimer)
+    applyStats(next)
+    scheduleOutline(120)
   }
 )
 
@@ -759,6 +835,7 @@ onBeforeUnmount(() => {
     root.value.removeEventListener('drop', onEditorDrop, true)
   }
   window.clearTimeout(outlineTimer)
+  window.clearTimeout(statsTimer)
   if (headingFrame) window.cancelAnimationFrame(headingFrame)
   // 组件卸载时如果还处于 CSS 兜底全屏，恢复页面滚动与祖先样式
   if (cssFullscreen.value) setCssFullscreen(root.value, false)
@@ -771,6 +848,7 @@ onBeforeUnmount(() => {
     ref="root"
     class="typora-editor"
     :class="{ 'typora-editor--fullscreen': cssFullscreen }"
+    :aria-busy="busy.active ? 'true' : 'false'"
     @keydown="onKeydown"
   >
     <div class="typora-editor__menubar">
@@ -932,6 +1010,11 @@ onBeforeUnmount(() => {
               </button>
             </div>
           </template>
+        </div>
+
+        <div v-if="busy.active" class="typora-editor__busy" role="status" aria-live="polite">
+          <span class="typora-editor__busy-spinner" aria-hidden="true"></span>
+          <span>{{ busy.text }}</span>
         </div>
       </div>
     </div>

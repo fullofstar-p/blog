@@ -147,23 +147,121 @@ function escapeHtml(value) {
     .replace(/"/g, '&quot;')
 }
 
-/** 与阅读页 `.typora-page` 一致的纸张排版（导出文件不依赖站点 CSS） */
-const PAGE_CSS = `
+/** 页面根选择器占位符：导出 HTML 用 `.typora-page`，生成 PDF 时换成离屏容器 */
+const PAGE_ROOT = '@page-root@'
+
+const FONT_STACK =
+  "-apple-system, BlinkMacSystemFont, 'Segoe UI', 'Helvetica Neue', 'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei', Arial, sans-serif"
+const MONO_STACK = "'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, 'Courier New', monospace"
+
+/**
+ * 正文排版（与阅读页一致）。所有选择器都以 @page-root@ 开头：
+ * 导出 HTML 时替换成 `.typora-page`，生成 PDF 时替换成离屏页面容器，
+ * 这样同一套排版既能生成独立 HTML，也能用于 html2canvas 截图。
+ */
+const TYPOGRAPHY_CSS = `
+${PAGE_ROOT} {
+  color: #2f2f2f;
+  font-family: ${FONT_STACK};
+  font-size: 16px;
+  font-style: normal;
+  font-weight: 400;
+  line-height: 1.65;
+  letter-spacing: 0;
+  text-align: left;
+  -webkit-font-smoothing: antialiased;
+  overflow-wrap: break-word;
+}
+${PAGE_ROOT} > :first-child { margin-top: 0; }
+${PAGE_ROOT} h1,
+${PAGE_ROOT} h2,
+${PAGE_ROOT} h3,
+${PAGE_ROOT} h4,
+${PAGE_ROOT} h5,
+${PAGE_ROOT} h6 {
+  margin: 1.4em 0 0.7em;
+  font-family: ${FONT_STACK};
+  font-style: normal;
+  font-weight: 600;
+  line-height: 1.35;
+  letter-spacing: 0;
+  color: #222222;
+}
+${PAGE_ROOT} h1 { font-size: 2em; padding-bottom: 0.25em; border-bottom: 1px solid #ddd6c8; }
+${PAGE_ROOT} h2 { font-size: 1.5em; padding-bottom: 0.2em; border-bottom: 1px solid #ddd6c8; }
+${PAGE_ROOT} h3 { font-size: 1.25em; }
+${PAGE_ROOT} h4 { font-size: 1em; }
+${PAGE_ROOT} h5 { font-size: 0.875em; }
+${PAGE_ROOT} h6 { font-size: 0.85em; color: #777777; }
+${PAGE_ROOT} p { margin: 0.8em 0; }
+${PAGE_ROOT} strong { font-weight: 600; color: #1f1f1f; }
+${PAGE_ROOT} em { font-style: italic; }
+${PAGE_ROOT} a { color: #4183c4; text-decoration: none; background-color: transparent; }
+${PAGE_ROOT} a:hover { text-decoration: underline; }
+${PAGE_ROOT} mark { background-color: #fff3a3; padding: 0 0.15em; }
+${PAGE_ROOT} ul,
+${PAGE_ROOT} ol { margin: 0.8em 0; padding-left: 2em; }
+${PAGE_ROOT} ul { list-style-type: disc; }
+${PAGE_ROOT} ul ul { list-style-type: circle; }
+${PAGE_ROOT} ul ul ul { list-style-type: square; }
+${PAGE_ROOT} ol { list-style-type: decimal; }
+${PAGE_ROOT} li { display: list-item; margin: 0.25em 0; }
+${PAGE_ROOT} li > p { margin: 0.2em 0; }
+${PAGE_ROOT} blockquote {
+  margin: 0.8em 0;
+  padding: 0 1em;
+  color: #777777;
+  border-left: 3px solid #ddd6c8;
+}
+${PAGE_ROOT} blockquote > :first-child { margin-top: 0; }
+${PAGE_ROOT} blockquote > :last-child { margin-bottom: 0; }
+${PAGE_ROOT} hr { height: 1px; margin: 1.8em 0; border: 0; background-color: #ddd6c8; }
+${PAGE_ROOT} img { max-width: 100%; }
+${PAGE_ROOT} table { border-collapse: collapse; margin: 0.8em 0; max-width: 100%; }
+${PAGE_ROOT} th,
+${PAGE_ROOT} td { padding: 6px 13px; border: 1px solid #ddd6c8; }
+${PAGE_ROOT} th { font-weight: 600; background-color: #f3eddf; }
+${PAGE_ROOT} tbody tr:nth-child(2n) { background-color: #f8f3e8; }
+${PAGE_ROOT} code,
+${PAGE_ROOT} pre,
+${PAGE_ROOT} kbd,
+${PAGE_ROOT} samp { font-family: ${MONO_STACK}; }
+${PAGE_ROOT} code {
+  padding: 0.15em 0.35em;
+  border-radius: 3px;
+  background-color: #ece5d6;
+  font-size: 0.9em;
+}
+${PAGE_ROOT} pre {
+  margin: 0.9em 0;
+  padding: 14px 16px;
+  overflow: auto;
+  border-radius: 4px;
+  background-color: #efe9db;
+}
+${PAGE_ROOT} pre code {
+  display: block;
+  padding: 0;
+  background-color: transparent;
+  font-size: 14px;
+  line-height: 1.6;
+}
+${PAGE_ROOT} .task-list-item { list-style: none; }
+${PAGE_ROOT} .task-list-item input { margin-right: 0.4em; }
+${PAGE_ROOT} .footnotes {
+  margin-top: 2em;
+  padding-top: 1em;
+  border-top: 1px solid #ddd6c8;
+  font-size: 0.85em;
+}
+`
+
+/** 独立 HTML 的页面外壳（纸张卡片、页面居中） */
+const EXPORT_SHELL_CSS = `
 :root { color-scheme: light; }
 * { box-sizing: border-box; }
 html { background-color: #f5f0e8; }
-body {
-  margin: 0;
-  padding: 40px 16px;
-  background-color: #f5f0e8;
-  color: #2f2f2f;
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Helvetica Neue', 'PingFang SC',
-    'Hiragino Sans GB', 'Microsoft YaHei', Arial, sans-serif;
-  font-size: 16px;
-  line-height: 1.65;
-  letter-spacing: 0;
-  -webkit-font-smoothing: antialiased;
-}
+body { margin: 0; padding: 40px 16px; background-color: #f5f0e8; }
 .typora-page {
   max-width: 860px;
   margin: 0 auto;
@@ -172,65 +270,10 @@ body {
   border: 1px solid #e4dac8;
   border-radius: 5px;
 }
-.typora-page > :first-child { margin-top: 0; }
-h1, h2, h3, h4, h5, h6 {
-  margin: 1.4em 0 0.7em;
-  font-weight: 600;
-  line-height: 1.35;
-  color: #222222;
-}
-h1 { font-size: 2em; padding-bottom: 0.25em; border-bottom: 1px solid #ddd6c8; }
-h2 { font-size: 1.5em; padding-bottom: 0.2em; border-bottom: 1px solid #ddd6c8; }
-h3 { font-size: 1.25em; }
-h4 { font-size: 1em; }
-h5 { font-size: 0.875em; }
-h6 { font-size: 0.85em; color: #777777; }
-p { margin: 0.8em 0; }
-strong { font-weight: 600; color: #1f1f1f; }
-a { color: #4183c4; text-decoration: none; }
-a:hover { text-decoration: underline; }
-mark { background-color: #fff3a3; padding: 0 0.15em; }
-ul, ol { margin: 0.8em 0; padding-left: 2em; }
-li { margin: 0.25em 0; }
-li > p { margin: 0.2em 0; }
-blockquote {
-  margin: 0.8em 0;
-  padding: 0 1em;
-  color: #777777;
-  border-left: 3px solid #ddd6c8;
-}
-blockquote > :first-child { margin-top: 0; }
-blockquote > :last-child { margin-bottom: 0; }
-hr { height: 1px; margin: 1.8em 0; border: 0; background-color: #ddd6c8; }
-img { max-width: 100%; }
-table { border-collapse: collapse; margin: 0.8em 0; max-width: 100%; }
-th, td { padding: 6px 13px; border: 1px solid #ddd6c8; }
-th { font-weight: 600; background-color: #f3eddf; }
-tbody tr:nth-child(2n) { background-color: #f8f3e8; }
-code {
-  padding: 0.15em 0.35em;
-  border-radius: 3px;
-  background-color: #ece5d6;
-  font-family: 'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, 'Courier New', monospace;
-  font-size: 0.9em;
-}
-pre {
-  margin: 0.9em 0;
-  padding: 14px 16px;
-  overflow: auto;
-  border-radius: 4px;
-  background-color: #efe9db;
-}
-pre code {
-  display: block;
-  padding: 0;
-  background-color: transparent;
-  font-size: 14px;
-  line-height: 1.6;
-}
-.task-list-item { list-style: none; }
-.task-list-item input { margin-right: 0.4em; }
-.footnotes { margin-top: 2em; padding-top: 1em; border-top: 1px solid #ddd6c8; font-size: 0.85em; }
+`
+
+/** 打印（浏览器另存为 PDF 的兜底场景） */
+const PRINT_CSS = `
 @page { margin: 16mm 14mm; }
 @media print {
   html, body { background-color: #ffffff; }
@@ -251,6 +294,16 @@ const CODE_OVERRIDE_CSS = `
 pre code.hljs { background-color: transparent !important; padding: 0 !important; }
 `
 
+/** 正文排版 CSS：把根选择器换成调用方给的容器 */
+export function pageTypographyCss(rootSelector = '.typora-page') {
+  return TYPOGRAPHY_CSS.split(PAGE_ROOT).join(rootSelector)
+}
+
+/** 代码高亮主题 + 纸张色覆盖，导出 HTML / 生成 PDF 共用 */
+export function codeThemeCss() {
+  return `${githubCodeCss}\n${CODE_OVERRIDE_CSS}`
+}
+
 /**
  * 生成可直接打开的独立 HTML 文档。
  * @param {{ title?: string, bodyHtml: string }} options
@@ -265,9 +318,10 @@ export function buildExportHtml({ title = '', bodyHtml = '' } = {}) {
 <meta name="generator" content="blog-markdown-export" />
 <title>${pageTitle}</title>
 <style>
-${PAGE_CSS}
-${githubCodeCss}
-${CODE_OVERRIDE_CSS}
+${EXPORT_SHELL_CSS}
+${pageTypographyCss('.typora-page')}
+${codeThemeCss()}
+${PRINT_CSS}
 </style>
 </head>
 <body>
@@ -277,29 +331,4 @@ ${bodyHtml}
 </body>
 </html>
 `
-}
-
-/**
- * 用浏览器打印导出 PDF：把 HTML 写进新窗口并调起打印对话框，用户选「另存为 PDF」。
- * 必须在用户点击的同步调用链里执行，否则会被当成弹窗拦截。
- * @returns {boolean} 是否成功打开打印窗口
- */
-export function printHtml(html) {
-  const win = window.open('', '_blank')
-  if (!win || !win.document) return false
-  win.document.open()
-  win.document.write(html)
-  win.document.close()
-  const run = () => {
-    try {
-      win.focus()
-      win.print()
-    } catch (error) {
-      console.warn('[markdown] 调起打印失败', error)
-    }
-  }
-  // 等图片与内联样式就绪再打印，避免 PDF 缺图
-  if (win.document.readyState === 'complete') window.setTimeout(run, 250)
-  else win.addEventListener('load', () => window.setTimeout(run, 250))
-  return true
 }

@@ -917,6 +917,43 @@
   flex: 1;
 }
 
+/* ---------- 长任务遮罩：导入 / 切换视图 / 生成 PDF 时覆盖编辑区 ---------- */
+.typora-editor__busy {
+  position: absolute;
+  inset: 0;
+  z-index: 80;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  background-color: rgba(245, 240, 232, 0.74);
+  color: #5c564c;
+  font-family: var(--md-font);
+  font-size: 13px;
+  cursor: progress;
+}
+
+.typora-editor__busy-spinner {
+  width: 14px;
+  height: 14px;
+  border: 2px solid #cfc5b0;
+  border-top-color: #6b6355;
+  border-radius: 50%;
+  animation: typora-busy-spin 0.8s linear infinite;
+}
+
+@keyframes typora-busy-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .typora-editor__busy-spinner {
+    animation-duration: 2s;
+  }
+}
+
 /* ---------- 插入链接对话框 ---------- */
 .typora-editor__dialog {
   position: absolute;
