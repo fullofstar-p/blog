@@ -744,7 +744,8 @@
 }
 
 /* 大纲改成覆盖在编辑区上方：不再挤占正文宽度，打开/关闭不会让整篇大文档重新排版。
-   第一次打开后才挂载，之后用 v-show 切换，几百个标题按钮也不会反复销毁重建。 */
+   第一次打开后才挂载，之后只切换 .is-open：用 transform/opacity 做滑入滑出，
+   几百个标题按钮不销毁重建，也不会触发正文重排。 */
 .typora-editor__sidebar {
   position: absolute;
   top: 0;
@@ -758,6 +759,26 @@
   border-right: 1px solid #e4dac8;
   background-color: #f7f2e6;
   box-shadow: 2px 0 10px rgba(44, 44, 44, 0.12);
+  visibility: hidden;
+  opacity: 0;
+  pointer-events: none;
+  transform: translateX(-102%);
+  transition: transform 0.18s ease, opacity 0.18s ease, visibility 0s linear 0.18s;
+}
+
+.typora-editor__sidebar.is-open {
+  visibility: visible;
+  opacity: 1;
+  pointer-events: auto;
+  transform: translateX(0);
+  transition: transform 0.18s ease, opacity 0.18s ease, visibility 0s;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .typora-editor__sidebar,
+  .typora-editor__sidebar.is-open {
+    transition: none;
+  }
 }
 
 .typora-editor__sidebar-head {

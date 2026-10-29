@@ -971,7 +971,13 @@ onBeforeUnmount(() => {
     </div>
 
     <div class="typora-editor__body" :style="{ height: `${editorHeight}px` }">
-      <aside v-if="outlineMounted" v-show="outlineOpen" class="typora-editor__sidebar">
+      <aside
+        v-if="outlineMounted"
+        class="typora-editor__sidebar"
+        :class="{ 'is-open': outlineOpen }"
+        aria-label="文档大纲"
+        :aria-hidden="outlineOpen ? 'false' : 'true'"
+      >
         <div class="typora-editor__sidebar-head">
           <span>大纲</span>
           <button
