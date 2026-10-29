@@ -532,6 +532,14 @@ function toggleOutline() {
   nextTick(scheduleActiveHeading)
 }
 
+/** 点击正文（编辑区）时自动收起大纲，避免覆盖式侧栏挡住刚点的位置 */
+function onSurfaceClick(event) {
+  if (!outlineOpen.value) return
+  const target = event.target
+  if (target && target.closest && target.closest('.typora-editor__sidebar')) return
+  outlineOpen.value = false
+}
+
 function gotoHeading(index) {
   if (!vditor) return
   const heading = headings.value[index]
@@ -992,7 +1000,7 @@ onBeforeUnmount(() => {
         </nav>
       </aside>
 
-      <div class="typora-editor__surface">
+      <div class="typora-editor__surface" @click.capture="onSurfaceClick">
         <div ref="host" class="vditor-host"></div>
 
         <div v-if="linkDialog.open" class="typora-editor__dialog" role="dialog" aria-label="插入链接">
