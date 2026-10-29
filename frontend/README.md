@@ -67,8 +67,11 @@ src/
   正文不为空时先选「替换正文 / 插入到光标处」；标题输入框为空时用文档首个标题或文件名回填。
   导出 Markdown 的文件名取「文章标题 → 正文首个标题 → 日期」；导出的 HTML 是可直接双击打开的
   独立文件（纸张排版 + GitHub 代码高亮，与阅读页一致）；PDF 也是**直接下载**：浏览器端按块分页，
-  逐页 html2canvas 截图后由 jsPDF 拼成 A4 PDF（`jsPDF` / `html2canvas` 按需动态加载，不进首屏包体），
-  不再弹打印对话框。PDF 里的中文是图片、不能选中复制；正文图片会先尝试转 data URL 内联，
+  每批多页拼进一个 SVG `foreignObject` 交给浏览器原生渲染（比 html2canvas 逐元素读样式快约 7 倍），
+  再按页裁开交给 jsPDF 拼成 A4 PDF（`jspdf` 按需动态加载，`html2canvas` 仅作兼容兜底），
+  不再弹打印对话框；页数越多自动降低渲染倍率与 JPEG 质量（10 页内 2x、40 页内 1.75x、
+  120 页内 1.5x、更多页 1.35x）。实测 60 页约 3.3s、300 页约 10s（约 33MB）。
+  PDF 里的中文是图片、不能选中复制；正文图片会先尝试转 data URL 内联，
   跨域取不到的图片（MinIO 默认没配 CORS 头）显示为 `[图片：alt]` 占位。
   相关纯函数在 `src/components/markdownIO.js`，PDF 分页在 `src/components/markdownPdf.js`，都不经过后端接口。
 - **长文档性能**：编辑器缓存一份最新的 Markdown 文本（`latestMarkdown`），输入、大纲、字数统计
