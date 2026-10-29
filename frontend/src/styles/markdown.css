@@ -738,17 +738,49 @@
 
 /* ---------- 主体：大纲侧栏 + 编辑区 ---------- */
 .typora-editor__body {
+  position: relative;
   display: flex;
   min-height: 0;
 }
 
+/* 大纲改成覆盖在编辑区上方：不再挤占正文宽度，打开/关闭不会让整篇大文档重新排版。
+   第一次打开后才挂载，之后由 Vue Transition + v-show 切换：用 transform/opacity 做滑入滑出，
+   几百个标题按钮不销毁重建，也不会触发正文重排。 */
 .typora-editor__sidebar {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 0;
+  z-index: 30;
   display: flex;
-  flex: 0 0 220px;
+  width: 220px;
   flex-direction: column;
   min-width: 0;
   border-right: 1px solid #e4dac8;
   background-color: #f7f2e6;
+  box-shadow: 2px 0 10px rgba(44, 44, 44, 0.12);
+}
+
+.outline-panel-enter-active,
+.outline-panel-leave-active {
+  transition: transform 0.18s ease, opacity 0.18s ease;
+}
+
+.outline-panel-enter-from,
+.outline-panel-leave-to {
+  transform: translateX(-102%);
+  opacity: 0;
+}
+
+.outline-panel-leave-active {
+  pointer-events: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .outline-panel-enter-active,
+  .outline-panel-leave-active {
+    transition: none;
+  }
 }
 
 .typora-editor__sidebar-head {
@@ -917,6 +949,43 @@
   flex: 1;
 }
 
+/* ---------- 长任务遮罩：导入 / 切换视图 / 生成 PDF 时覆盖编辑区 ---------- */
+.typora-editor__busy {
+  position: absolute;
+  inset: 0;
+  z-index: 80;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  background-color: rgba(245, 240, 232, 0.74);
+  color: #5c564c;
+  font-family: var(--md-font);
+  font-size: 13px;
+  cursor: progress;
+}
+
+.typora-editor__busy-spinner {
+  width: 14px;
+  height: 14px;
+  border: 2px solid #cfc5b0;
+  border-top-color: #6b6355;
+  border-radius: 50%;
+  animation: typora-busy-spin 0.8s linear infinite;
+}
+
+@keyframes typora-busy-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .typora-editor__busy-spinner {
+    animation-duration: 2s;
+  }
+}
+
 /* ---------- 插入链接对话框 ---------- */
 .typora-editor__dialog {
   position: absolute;
@@ -938,6 +1007,28 @@
   color: #2c2c2c;
   font-size: 14px;
   font-weight: 600;
+}
+
+/* 导入/新建对话框的说明文字：比标题轻，允许换行 */
+.typora-editor__dialog-desc {
+  margin: 0 0 8px;
+  color: #5c564c;
+  font-size: 13px;
+  line-height: 1.6;
+  word-break: break-word;
+}
+
+.typora-editor__dialog-desc strong {
+  color: #2c2c2c;
+  font-weight: 600;
+}
+
+.typora-editor__dialog-meta {
+  margin: 0;
+  color: #8c8578;
+  font-size: 12px;
+  line-height: 1.6;
+  word-break: break-word;
 }
 
 .typora-editor__field {
@@ -973,6 +1064,7 @@
 
 .typora-editor__dialog-actions {
   display: flex;
+  flex-wrap: wrap;
   justify-content: flex-end;
   gap: 8px;
   margin-top: 14px;

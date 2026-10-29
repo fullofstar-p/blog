@@ -15,10 +15,35 @@ export const isMac = () => /Mac|iPhone|iPad/.test(navigator.platform || '')
 export const modLabel = () => (isMac() ? '⌘' : 'Ctrl+')
 
 /**
- * 顶部菜单（顺序、分隔、快捷键提示按 Typora 的「段落 / 格式 / 编辑 / 视图」组织）。
- * cmd 为 'link' / 'image' / 'outline' / 'source' / 'fullscreen' 时由组件接管。
+ * 顶部菜单（顺序、分隔、快捷键提示按 Typora 的「文件 / 编辑 / 段落 / 格式 / 视图」组织）。
+ * cmd 为 'new' / 'import' / 'export-md' / 'export-html' / 'export-pdf' /
+ * 'link' / 'image' / 'outline' / 'source' / 'fullscreen' 时由组件接管。
  */
 export const MENUS = [
+  {
+    key: 'file',
+    label: '文件',
+    items: [
+      { cmd: 'new', label: '新建', hint: 'N' },
+      { divider: true },
+      { cmd: 'import', label: '导入 Markdown…', hint: 'O' },
+      { divider: true },
+      { cmd: 'export-md', label: '导出 Markdown…' },
+      { cmd: 'export-html', label: '导出 HTML…' },
+      { cmd: 'export-pdf', label: '导出 PDF…' }
+    ]
+  },
+  {
+    key: 'edit',
+    label: '编辑',
+    items: [
+      { cmd: 'undo', label: '撤销', hint: 'Z' },
+      { cmd: 'redo', label: '重做', hint: 'Y' },
+      { divider: true },
+      { cmd: 'outdent', label: '减少缩进' },
+      { cmd: 'indent', label: '增加缩进' }
+    ]
+  },
   {
     key: 'paragraph',
     label: '段落',
@@ -53,17 +78,6 @@ export const MENUS = [
       { divider: true },
       { cmd: 'link', label: '链接', hint: 'K' },
       { cmd: 'image', label: '图片' }
-    ]
-  },
-  {
-    key: 'edit',
-    label: '编辑',
-    items: [
-      { cmd: 'undo', label: '撤销', hint: 'Z' },
-      { cmd: 'redo', label: '重做', hint: 'Y' },
-      { divider: true },
-      { cmd: 'outdent', label: '减少缩进' },
-      { cmd: 'indent', label: '增加缩进' }
     ]
   },
   {
@@ -129,18 +143,137 @@ export function runCommand(vditor, cmd) {
   return true
 }
 
+const normalizeMarkdown = (value) =>
+  String(value || '')
+    .replace(/\r\n?/g, '\n')
+    .replace(/\s+$/, '')
+
+/**
+ * 能否复用现成的 IR DOM 退出源码模式：
+ * 只有源码 textarea 的内容和进入源码模式时完全一致（用户只是看了一眼、没改），
+ * 才能跳过 Vditor 的整篇 Md2VditorIRDOM；否则必须重建。
+ */
+export function canExitSourceFast(vditor, sourceSnapshot) {
+  const internal = vditor && vditor.vditor
+  if (!internal || internal.currentMode !== 'sv') return false
+  if (!internal.sv || !internal.sv.element || !internal.ir || !internal.ir.element) return false
+  if (typeof sourceSnapshot !== 'string' || !sourceSnapshot) return false
+  return normalizeMarkdown(internal.sv.element.value) === normalizeMarkdown(sourceSnapshot)
+}
+
+/**
+ * 复用 IR DOM 退出源码模式：照常触发 Vditor 的 setEditMode（这样模式、焦点、工具栏、
+ * 撤销栈状态都由 Vditor 维护），但在本次切换里让 innerHTML 赋值变成空操作、同时
+ * 让 Md2VditorIRDOM 直接返回空串，跳过重建整篇 DOM 的开销。
+ */
+function exitSourceModeReusingDom(vditor) {
+  const internal = vditor.vditor
+  const elements = internal.toolbar && internal.toolbar.elements
+  const item = elements && elements['edit-mode']
+  const button = item && item.querySelector('button[data-mode="ir"]')
+  const irElement = internal.ir && internal.ir.element
+  const lute = internal.lute
+  if (!button || !irElement || !lute) return false
+  const descriptor = Object.getOwnPropertyDescriptor(Element.prototype, 'innerHTML')
+  if (!descriptor || !descriptor.get || !descriptor.set) return false
+
+  patchUndoStack(internal.undo)
+  const originalRender = lute.Md2VditorIRDOM
+  lute.Md2VditorIRDOM = () => ''
+  try {
+    Object.defineProperty(irElement, 'innerHTML', {
+      configurable: true,
+      get() {
+        return descriptor.get.call(irElement)
+      },
+      set() {
+        /* 跳过这次 innerHTML 重建，保留现有 IR DOM */
+      }
+    })
+  } catch (error) {
+    lute.Md2VditorIRDOM = originalRender
+    return false
+  }
+
+  try {
+    button.click()
+  } finally {
+    lute.Md2VditorIRDOM = originalRender
+    delete irElement.innerHTML
+  }
+  patchUndoStack(internal.undo)
+  return true
+}
+
 /** 源码模式：IR ↔ SV，复用 Vditor 的模式面板（同样隐藏） */
-export function toggleSourceMode(vditor) {
+export function toggleSourceMode(vditor, markdown, options = {}) {
   const internal = vditor && vditor.vditor
   if (!internal) return false
   const elements = internal.toolbar && internal.toolbar.elements
   const item = elements && elements['edit-mode']
   if (!item) return false
   const target = internal.currentMode === 'sv' ? 'ir' : 'sv'
+  if (target === 'ir' && options.reuseIrDom) {
+    return exitSourceModeReusingDom(vditor)
+  }
   const button = item.querySelector(`button[data-mode="${target}"]`)
   if (!button) return false
+
+  const undo = internal.undo
+  const lute = internal.lute
+  const markdownText = typeof markdown === 'string' ? markdown : ''
+  const undoState = undo && undo[target]
+  const normalize = (value) => String(value || '').replace('<wbr>', '').replace(/\s+$/, '')
+  // 只有「目标模式还没有 undo 历史」或「两个模式的正文没有实质差异」时才能跳过
+  // undo diff：否则撤销栈里的补丁基线会和当前正文对不上，撤销可能改坏内容。
+  const canSkipUndo = Boolean(
+    markdownText &&
+      undoState &&
+      (undoState.undoStack.length === 0 || normalize(undoState.lastText) === normalize(markdownText))
+  )
+
+  if (canSkipUndo) {
+    // 大文档切换模式时，Vditor 会做两件很贵的事：
+    // 1. setEditMode 用 getMarkdown() 把整棵 IR DOM 序列化成 Markdown；
+    // 2. undoDelay(800ms) 后在 addToUndoStack 里再序列化一次并做 diff。
+    // 这里把当前缓存的 Markdown 作为目标模式的 undo 基线，切换过程中用缓存
+    // 替代 IR→Markdown 序列化，并在本次切换的 undo 记录完成前跳过 addToUndoStack。
+    undoState.lastText = markdownText
+    patchUndoStack(undo)
+    const original = lute && lute.VditorIRDOM2Md
+    if (original) lute.VditorIRDOM2Md = () => markdownText
+    try {
+      button.click()
+    } finally {
+      if (original) lute.VditorIRDOM2Md = original
+    }
+    patchUndoStack(undo)
+    return true
+  }
+
   button.click()
   return true
+}
+
+/** 切换模式期间临时跳过 undo diff（跨多次切换共用同一个定时器恢复） */
+let undoRestoreTimer = 0
+let pendingUndoOwner = null
+let pendingAddToUndoStack = null
+
+function patchUndoStack(undo) {
+  if (!pendingAddToUndoStack && undo && typeof undo.addToUndoStack === 'function') {
+    pendingUndoOwner = undo
+    pendingAddToUndoStack = undo.addToUndoStack
+    undo.addToUndoStack = () => {}
+  }
+  if (!pendingAddToUndoStack) return
+  window.clearTimeout(undoRestoreTimer)
+  // processAfterRender 会把 addToUndoStack 推迟到 undoDelay(800ms) 之后，留足余量恢复
+  undoRestoreTimer = window.setTimeout(() => {
+    if (pendingUndoOwner) pendingUndoOwner.addToUndoStack = pendingAddToUndoStack
+    pendingUndoOwner = null
+    pendingAddToUndoStack = null
+  }, 1400)
 }
 
 export function getMode(vditor) {

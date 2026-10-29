@@ -89,6 +89,12 @@ function toggleTag(tagId) {
   else form.tagIds.push(tagId)
 }
 
+/** 导入 Markdown 后，标题还是空的话用文件里的第一个标题/文件名回填 */
+function onImported(payload) {
+  const suggested = String((payload && payload.title) || '').trim()
+  if (!form.title.trim() && suggested) form.title = suggested.slice(0, 200)
+}
+
 function buildPayload(status) {
   return {
     title: form.title.trim(),
@@ -144,7 +150,7 @@ watch(
           {{ isEdit ? '编辑文章' : '写新文章' }}
         </h2>
         <p class="mt-1 font-serif text-sm italic text-ink-500">
-          正文使用 Markdown 即时渲染；顶部菜单栏可插入标题/列表/表格/代码块，右侧「大纲」「源码」切换侧栏与 Markdown 源码模式，表格旁会浮出操作按钮，底部状态栏显示字数。
+          正文使用 Markdown 即时渲染；顶部菜单栏可插入标题/列表/表格/代码块，「文件」菜单可新建、导入 / 导出 Markdown（也支持把 .md 文件直接拖进编辑器），右侧「大纲」「源码」切换侧栏与 Markdown 源码模式，表格旁会浮出操作按钮，底部状态栏显示字数。
         </p>
       </div>
       <span
@@ -269,8 +275,10 @@ watch(
         <div class="mt-4">
           <MarkdownEditor
             v-model="form.content"
+            :file-name="form.title"
             placeholder="用 Markdown 写正文；图片可直接粘贴或拖入编辑器…"
             :min-height="520"
+            @import-file="onImported"
           />
         </div>
       </section>

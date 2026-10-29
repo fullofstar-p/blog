@@ -1,6 +1,7 @@
 <script setup>
-import { computed, onMounted, ref, watch } from 'vue'
+import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
+import ArticleToc from '@/components/ArticleToc.vue'
 import CommentSection from '@/components/CommentSection.vue'
 import MarkdownViewer from '@/components/MarkdownViewer.vue'
 import SketchButton from '@/components/SketchButton.vue'
@@ -11,6 +12,7 @@ import TagPill from '@/components/TagPill.vue'
 import { deleteArticle, getArticle } from '@/api/article'
 import { useAuthStore } from '@/store/auth'
 import { formatDate, formatViews } from '@/utils/format'
+import { parseMarkdownHeadings } from '@/utils/markdownToc'
 import { toastSuccess } from '@/utils/toast'
 
 const props = defineProps({
@@ -30,23 +32,100 @@ const canManage = computed(() =>
   Boolean(article.value && auth.user && (auth.user.id === article.value.authorId || auth.isAdmin))
 )
 const tags = computed(() => (article.value && Array.isArray(article.value.tags) ? article.value.tags : []))
+const headings = computed(() =>
+  article.value && article.value.content ? parseMarkdownHeadings(article.value.content) : []
+)
+
+// 阅读进度（0-100）与当前高亮的目录项
+const readingProgress = ref(0)
+const activeHeading = ref(-1)
+const tocOpen = ref(false)
+let scrollFrame = 0
+let readingTimer = 0
+
+/** 预览区里已渲染的标题，顺序与 Markdown 里的标题一一对应 */
+function previewHeadingElements() {
+  const root = document.querySelector('.typora-page .md-editor-preview')
+  if (!root) return []
+  return Array.from(root.querySelectorAll('h1, h2, h3, h4, h5, h6'))
+}
+
+/** 滚动定位时让标题不被 sticky 顶部导航挡住 */
+function readingOffset() {
+  const header = document.querySelector('header')
+  return (header ? header.offsetHeight : 0) + 24
+}
+
+function updateReadingState() {
+  scrollFrame = 0
+  const documentElement = document.documentElement
+  const maxScroll = documentElement.scrollHeight - window.innerHeight
+  readingProgress.value =
+    maxScroll > 0 ? Math.min(100, Math.max(0, (window.scrollY / maxScroll) * 100)) : 0
+
+  const elements = previewHeadingElements()
+  const line = readingOffset()
+  let current = -1
+  elements.forEach((element, index) => {
+    if (element.getBoundingClientRect().top <= line) current = index
+  })
+  activeHeading.value = current
+}
+
+function scheduleReadingState() {
+  if (scrollFrame) return
+  scrollFrame = window.requestAnimationFrame(updateReadingState)
+}
+
+function scrollToHeading(index) {
+  const element = previewHeadingElements()[index]
+  tocOpen.value = false
+  if (!element) return
+  const top = element.getBoundingClientRect().top + window.scrollY - readingOffset()
+  const reduceMotion =
+    typeof window.matchMedia === 'function' &&
+    window.matchMedia('(prefers-reduced-motion: reduce)').matches
+  window.scrollTo({ top: Math.max(0, top), behavior: reduceMotion ? 'instant' : 'smooth' })
+  activeHeading.value = index
+}
 
 async function load() {
   loading.value = true
   error.value = ''
   article.value = null
+  activeHeading.value = -1
+  readingProgress.value = 0
+  tocOpen.value = false
   try {
     const data = await getArticle(props.id)
     article.value = data
     if (data && data.title) document.title = `${data.title} · 技术分享博客`
+    await nextTick()
+    scheduleReadingState()
+    // MdPreview 渲染 / 封面图加载完成后高度还会变，再校正一次
+    window.clearTimeout(readingTimer)
+    readingTimer = window.setTimeout(scheduleReadingState, 320)
   } catch (err) {
     error.value = (err && err.message) || '文章加载失败或不存在'
   } finally {
     loading.value = false
+    scheduleReadingState()
   }
 }
 
-onMounted(load)
+onMounted(() => {
+  load()
+  window.addEventListener('scroll', scheduleReadingState, { passive: true })
+  window.addEventListener('resize', scheduleReadingState)
+})
+
+onBeforeUnmount(() => {
+  window.removeEventListener('scroll', scheduleReadingState)
+  window.removeEventListener('resize', scheduleReadingState)
+  window.clearTimeout(readingTimer)
+  if (scrollFrame) window.cancelAnimationFrame(scrollFrame)
+})
+
 watch(
   () => props.id,
   () => load()
@@ -84,7 +163,33 @@ async function confirmDelete() {
     </SketchEmpty>
 
     <template v-else-if="article">
-      <article class="mx-auto max-w-3xl">
+      <div
+        class="reading-progress"
+        role="progressbar"
+        aria-label="阅读进度"
+        aria-valuemin="0"
+        aria-valuemax="100"
+        :aria-valuenow="Math.round(readingProgress)"
+      >
+        <span class="reading-progress__bar" :style="{ width: `${readingProgress}%` }"></span>
+      </div>
+
+      <button
+        v-if="headings.length"
+        type="button"
+        class="reading-toc-toggle sketch-btn sketch-btn-sm lg:hidden"
+        :aria-expanded="tocOpen ? 'true' : 'false'"
+        aria-controls="reading-toc-mobile"
+        @click="tocOpen = !tocOpen"
+      >
+        目录
+      </button>
+      <div v-if="headings.length && tocOpen" id="reading-toc-mobile" class="reading-toc-mobile lg:hidden">
+        <ArticleToc :headings="headings" :active-index="activeHeading" @select="scrollToHeading" />
+      </div>
+
+      <div class="lg:grid lg:grid-cols-[minmax(0,1fr)_15rem] lg:gap-10">
+        <article class="mx-auto max-w-3xl">
         <nav class="mb-4 flex flex-wrap items-center gap-2 font-serif text-xs italic text-ink-300" aria-label="面包屑">
           <RouterLink :to="{ name: 'home' }" class="sketch-link">首页</RouterLink>
           <span aria-hidden="true">/</span>
@@ -184,6 +289,13 @@ async function confirmDelete() {
           这是草稿：发布后才会对读者展示，评论功能也会随之开放。
         </p>
       </article>
+
+        <aside v-if="headings.length" class="hidden lg:block">
+          <div class="sticky top-24">
+            <ArticleToc :headings="headings" :active-index="activeHeading" @select="scrollToHeading" />
+          </div>
+        </aside>
+      </div>
 
       <SketchModal v-model="deleteOpen" title="删除文章">
         <p class="font-serif text-sm leading-relaxed text-ink-700">
