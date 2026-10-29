@@ -138,3 +138,114 @@
 .typora-page .md-editor-preview.default-theme .md-editor-code .md-editor-copy-button:hover {
   background-color: rgba(0, 0, 0, 0.06) !important;
 }
+
+/* ---------- 3. 阅读进度条与目录 ---------- */
+.reading-progress {
+  position: fixed;
+  top: 0;
+  right: 0;
+  left: 0;
+  z-index: 50;
+  height: 3px;
+  background-color: transparent;
+  pointer-events: none;
+}
+
+.reading-progress__bar {
+  display: block;
+  width: 0;
+  height: 100%;
+  background-color: #b23b2e;
+  transition: width 0.08s linear;
+}
+
+/* 桌面端：正文右侧的 sticky 目录 */
+.reading-toc {
+  border-left: 2px dashed rgba(44, 44, 44, 0.22);
+  padding-left: 14px;
+}
+
+.reading-toc__title {
+  margin: 0 0 8px;
+  color: #8c8578;
+  font-family: var(--md-font, -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Microsoft YaHei', Arial, sans-serif);
+  font-size: 12px;
+  font-style: italic;
+  letter-spacing: 0.08em;
+}
+
+.reading-toc__list {
+  max-height: calc(100vh - 14rem);
+  margin: 0;
+  padding: 0;
+  overflow: auto;
+  list-style: none;
+}
+
+.reading-toc__item {
+  display: block;
+  width: 100%;
+  padding: 4px 8px;
+  overflow: hidden;
+  border: 0;
+  border-left: 2px solid transparent;
+  border-radius: 3px;
+  background-color: transparent;
+  color: #5c564c;
+  font-family: var(--md-font, -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Microsoft YaHei', Arial, sans-serif);
+  font-size: 13px;
+  line-height: 1.5;
+  text-align: left;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: background-color 0.12s ease, color 0.12s ease;
+}
+
+.reading-toc__item:hover {
+  background-color: #f1e9da;
+}
+
+.reading-toc__item.is-active {
+  border-left-color: #2c2c2c;
+  background-color: #efe7d8;
+  color: #2c2c2c;
+  font-weight: 600;
+}
+
+/* 移动端：右下角浮动按钮 + 抽屉目录 */
+.reading-toc-toggle {
+  position: fixed;
+  right: 16px;
+  bottom: 16px;
+  z-index: 45;
+  min-height: 44px;
+  padding: 0 16px;
+  background-color: #faf6ee;
+  box-shadow: 3px 3px 0 rgba(44, 44, 44, 0.15);
+}
+
+.reading-toc-mobile {
+  position: fixed;
+  right: 16px;
+  bottom: 72px;
+  z-index: 45;
+  width: 18rem;
+  max-width: calc(100vw - 32px);
+  max-height: 60vh;
+  padding: 14px 16px;
+  overflow: auto;
+  border: 1px solid #d8d0c0;
+  border-radius: 6px;
+  background-color: #faf6ee;
+  box-shadow: 0 12px 32px rgba(44, 44, 44, 0.18);
+}
+
+.reading-toc-mobile .reading-toc {
+  border-left: 0;
+  padding-left: 0;
+}
+
+.reading-toc-mobile .reading-toc__list {
+  max-height: calc(60vh - 48px);
+}

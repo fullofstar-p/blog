@@ -143,6 +143,12 @@ src/
 - 正文是一张 **Typora 式纸张页面**（`.typora-page`，样式在 `src/styles/markdown-reading.css`）：
   纸张底 `#faf6ee`、1px `#e4dac8` 实线边框、5px 圆角、最大宽度 860px 居中、
   上下 40px / 左右 48px 内边距；没有站点其它卡片的虚线边框和轻微倾斜。
+- **阅读目录（TOC）**：用 `utils/markdownToc.js` 从 Markdown 解析标题（跳过代码块），
+  桌面端在正文右侧显示 sticky 目录，点击平滑滚动到对应标题（会扣掉顶部导航高度），
+  滚动时按可视区域高亮当前标题；窄屏改为右下角「目录」按钮 + 抽屉，选择后自动收起。
+  目录文字去掉行内标记，层级用缩进表示；目录容器自己滚动，不会把整页拉回目录位置。
+- **阅读进度条**：页面顶部 3px 细条，按 `scrollY / (scrollHeight - innerHeight)` 实时计算，
+  滚动事件用 `requestAnimationFrame` 节流；`prefers-reduced-motion` 下点击目录用瞬时滚动。
 - 阅读态代码高亮改为**本地 highlight.js + GitHub 浅色主题**：`MarkdownViewer.vue` 里把
   `highlight.js/lib/common` 实例交给 md-editor-v3，不再从 unpkg 运行时拉
   `highlight.min.js` / `atom-one-dark`；`scripts/copy-vditor.mjs` 会把
