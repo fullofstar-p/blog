@@ -152,9 +152,9 @@ watch(
 
     <div
       v-else-if="error"
-      class="flex flex-col items-start gap-3 border-2 border-dashed border-[#b23b2e]/60 bg-paper-soft/70 p-5"
+      class="flex flex-col items-start gap-3 border-2 border-dashed border-sketchred/60 bg-paper-soft/70 p-5"
     >
-      <p class="font-serif text-sm italic text-[#b23b2e]" role="alert">{{ error }}</p>
+      <p class="font-serif text-sm italic text-sketchred" role="alert">{{ error }}</p>
       <button type="button" class="sketch-btn min-h-[44px] px-4" @click="search">重新搜索</button>
     </div>
 

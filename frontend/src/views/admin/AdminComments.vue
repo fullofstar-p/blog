@@ -15,15 +15,17 @@ const total = ref(0)
 const pageNum = ref(1)
 const pageSize = 10
 const loading = ref(false)
+const refreshing = ref(false)
+const loadedOnce = ref(false)
 const error = ref('')
 const processingId = ref(null)
 const deleteTarget = ref(null)
 const deleting = ref(false)
 
 const statusMap = {
-  0: { label: '待审核', cls: 'border-[#9a6a00]/60 text-[#7a5300]' },
-  1: { label: '已通过', cls: 'border-[#1f7a4d]/60 text-[#1f7a4d]' },
-  2: { label: '已拒绝', cls: 'border-[#b23b2e]/60 text-[#b23b2e]' }
+  0: { label: '待审核', cls: 'border-sketchyellow/60 text-sketchyellow-deep' },
+  1: { label: '已通过', cls: 'border-sketchgreen/60 text-sketchgreen' },
+  2: { label: '已拒绝', cls: 'border-sketchred/60 text-sketchred' }
 }
 
 const filterOptions = [
@@ -34,7 +36,10 @@ const filterOptions = [
 ]
 
 async function load() {
-  loading.value = true
+  // 首次才显示骨架屏，切换审核状态/翻页时保留列表刷新，避免闪烁
+  const showSkeleton = !loadedOnce.value || Boolean(error.value)
+  if (showSkeleton) loading.value = true
+  else refreshing.value = true
   error.value = ''
   try {
     const params = { pageNum: pageNum.value, pageSize }
@@ -47,6 +52,8 @@ async function load() {
     comments.value = []
   } finally {
     loading.value = false
+    refreshing.value = false
+    loadedOnce.value = true
   }
 }
 
@@ -106,6 +113,7 @@ onMounted(load)
         <h2 class="font-serif text-2xl italic text-pencil md:text-3xl">评论审核</h2>
         <p class="mt-1 font-serif text-sm italic text-ink-500">
           共 {{ total }} 条评论；通过后才会出现在文章下方。
+          <span v-if="refreshing" class="ml-1 text-ink-300" role="status">· 更新中…</span>
         </p>
       </div>
       <div class="flex flex-wrap gap-2" role="group" aria-label="按审核状态筛选">
@@ -131,9 +139,9 @@ onMounted(load)
 
     <div
       v-else-if="error"
-      class="mt-5 flex flex-col items-start gap-3 border-2 border-dashed border-[#b23b2e]/60 bg-paper-soft/70 p-5"
+      class="mt-5 flex flex-col items-start gap-3 border-2 border-dashed border-sketchred/60 bg-paper-soft/70 p-5"
     >
-      <p class="font-serif text-sm italic text-[#b23b2e]" role="alert">{{ error }}</p>
+      <p class="font-serif text-sm italic text-sketchred" role="alert">{{ error }}</p>
       <button type="button" class="sketch-btn min-h-[44px] px-4" @click="load">重新加载</button>
     </div>
 
@@ -144,7 +152,12 @@ onMounted(load)
       icon="✉"
     />
 
-    <div v-else class="mt-5 space-y-4">
+    <div
+      v-else
+      class="mt-5 space-y-4 transition-opacity duration-150"
+      :class="{ 'pointer-events-none opacity-60': refreshing }"
+      :aria-busy="refreshing ? 'true' : 'false'"
+    >
       <article
         v-for="comment in comments"
         :key="comment.id"

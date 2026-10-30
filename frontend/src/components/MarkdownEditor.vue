@@ -288,6 +288,29 @@ function currentMarkdown() {
   return latestMarkdown
 }
 
+/**
+ * 强制从 Vditor 读取最新 Markdown。
+ *
+ * Vditor 的 input 回调受 undoDelay 影响，用户刚输入完立刻点发布时，父组件的
+ * v-model 可能还没收到最后一段内容；提交前调用这里同步一次，避免误报「正文为空」。
+ * 只应在提交等低频操作里调用（getValue 会序列化整篇文档）。
+ */
+function getMarkdown() {
+  if (!vditor || !ready) {
+    return latestMarkdown || props.modelValue || ''
+  }
+  try {
+    const value = vditor.getValue()
+    latestMarkdown = typeof value === 'string' ? value : ''
+  } catch (error) {
+    console.warn('[markdown] 读取正文失败，使用缓存', error)
+  }
+  if (latestMarkdown !== props.modelValue) {
+    emit('update:modelValue', latestMarkdown)
+  }
+  return latestMarkdown
+}
+
 function isBlankMarkdown(value) {
   return !String(value || '').trim()
 }
@@ -886,6 +909,8 @@ watch(
     if (open) scheduleActiveHeading()
   }
 )
+
+defineExpose({ getMarkdown })
 
 onBeforeUnmount(() => {
   unmounted = true

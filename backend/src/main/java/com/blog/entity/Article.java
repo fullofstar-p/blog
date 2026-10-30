@@ -52,4 +52,7 @@ public class Article {
     @TableLogic
     @TableField(select = false)
     private Integer deleted;
+
+    /** 进入回收站的时间；未删除时为 NULL */
+    private LocalDateTime deletedTime;
 }

@@ -62,7 +62,7 @@ onMounted(load)
           <div class="sketch-skeleton h-8 w-20"></div>
           <div class="sketch-skeleton h-4 w-28"></div>
         </div>
-        <p v-else-if="error" class="mt-4 font-serif text-sm italic text-[#b23b2e]" role="alert">
+        <p v-else-if="error" class="mt-4 font-serif text-sm italic text-sketchred" role="alert">
           {{ error }}
           <button type="button" class="sketch-link mt-2 block" @click="load">重新加载</button>
         </p>

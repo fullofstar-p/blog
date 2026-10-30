@@ -23,6 +23,7 @@
         <result column="view_count" property="viewCount"/>
         <result column="create_time" property="createTime"/>
         <result column="update_time" property="updateTime"/>
+        <result column="deleted_time" property="deletedTime"/>
     </resultMap>
 
     <resultMap id="ArticleDetailMap" type="com.blog.vo.ArticleDetailVO" extends="ArticleSummaryMap">
@@ -264,6 +265,89 @@
         GROUP BY YEAR(a.create_time), MONTH(a.create_time)
         ORDER BY stat_year DESC, stat_month DESC
     </select>
+
+    <!-- ===================== P0-8 回收站 ===================== -->
+
+    <!-- 回收站分页：只查 deleted = 1 的文章，按进入回收站时间倒序 -->
+    <select id="selectRecyclePage" resultMap="ArticleSummaryMap">
+        SELECT
+        <include refid="BaseColumns"/>,
+        a.deleted_time
+        <include refid="BaseFrom"/>
+        WHERE a.deleted = 1
+        <if test="keyword != null and keyword != ''">
+            AND (a.title LIKE CONCAT('%', #{keyword}, '%')
+                 OR a.summary LIKE CONCAT('%', #{keyword}, '%'))
+        </if>
+        ORDER BY a.deleted_time DESC, a.id DESC
+    </select>
+
+    <select id="selectRecycleCount" resultType="long">
+        SELECT COUNT(*)
+        FROM article a
+        WHERE a.deleted = 1
+        <if test="keyword != null and keyword != ''">
+            AND (a.title LIKE CONCAT('%', #{keyword}, '%')
+                 OR a.summary LIKE CONCAT('%', #{keyword}, '%'))
+        </if>
+    </select>
+
+    <!-- 逻辑删除：保留 article_tag 关联，恢复后标签不丢 -->
+    <update id="markDeleted">
+        UPDATE article
+        SET deleted = 1,
+            deleted_time = NOW()
+        WHERE id = #{id}
+          AND deleted = 0
+    </update>
+
+    <update id="restore">
+        UPDATE article
+        SET deleted = 0,
+            deleted_time = NULL
+        WHERE id = #{id}
+          AND deleted = 1
+    </update>
+
+    <!-- 物理删除：仅允许删除回收站中的文章 -->
+    <delete id="purge">
+        DELETE
+        FROM article
+        WHERE id = #{id}
+          AND deleted = 1
+    </delete>
+
+    <update id="markDeletedBatch">
+        UPDATE article
+        SET deleted = 1,
+            deleted_time = NOW()
+        WHERE deleted = 0
+          AND id IN
+        <foreach collection="ids" item="id" open="(" separator="," close=")">
+            #{id}
+        </foreach>
+    </update>
+
+    <update id="restoreBatch">
+        UPDATE article
+        SET deleted = 0,
+            deleted_time = NULL
+        WHERE deleted = 1
+          AND id IN
+        <foreach collection="ids" item="id" open="(" separator="," close=")">
+            #{id}
+        </foreach>
+    </update>
+
+    <delete id="purgeBatch">
+        DELETE
+        FROM article
+        WHERE deleted = 1
+          AND id IN
+        <foreach collection="ids" item="id" open="(" separator="," close=")">
+            #{id}
+        </foreach>
+    </delete>
 
     <!-- 按当前页文章 ID 批量取标签（含标签的已发布文章数），替代原先逐行相关子查询。
          一次请求只跑这一条，且只扫当前页涉及的标签，列表不再随总文章数变慢。 -->

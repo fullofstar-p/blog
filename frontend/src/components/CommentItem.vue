@@ -147,7 +147,7 @@ async function onLike() {
             class="inline-flex min-h-[44px] items-center gap-1 border-2 border-dashed px-2 font-serif text-xs italic transition-colors"
             :class="
               liked
-                ? 'border-[#b23b2e]/60 text-[#b23b2e]'
+                ? 'border-sketchred/60 text-sketchred'
                 : 'border-transparent text-ink-500 hover:border-pencil/50 hover:bg-pencil hover:text-paper'
             "
             :aria-label="liked ? `取消点赞，当前 ${likeCount} 个赞` : `点赞，当前 ${likeCount} 个赞`"
@@ -171,7 +171,7 @@ async function onLike() {
           <button
             v-if="canDelete"
             type="button"
-            class="inline-flex min-h-[44px] items-center border-2 border-dashed border-transparent px-2 font-serif text-xs italic text-[#b23b2e] transition-colors hover:border-[#b23b2e] hover:bg-[#b23b2e] hover:text-paper"
+            class="inline-flex min-h-[44px] items-center border-2 border-dashed border-transparent px-2 font-serif text-xs italic text-sketchred transition-colors hover:border-sketchred hover:bg-sketchred hover:text-paper"
             @click="emit('delete', comment.id)"
           >
             删除

@@ -25,7 +25,20 @@
   --md-bg-code: #efe9db;
   --md-bg-inline-code: #ece5d6;
   --md-bg-quote: transparent;
+  --md-bg-mark: #fff3a3;
+  --md-bg-table-head: #efe7d8;
+  --md-bg-table-stripe: #f7f2e6;
+  --md-code-text: #24292e;
+  --md-code-head-text: #6a737d;
+  --md-code-head-bg: #e8e1d1;
   --md-link: #4183c4;
+  --md-hl-comment: #6a737d;
+  --md-hl-keyword: #d73a49;
+  --md-hl-string: #032f62;
+  --md-hl-number: #005cc5;
+  --md-hl-title: #6f42c1;
+  --md-hl-builtin: #e36209;
+  --md-hl-variable: #24292e;
   font-family: var(--md-font);
   font-size: 16px;
   line-height: 1.65;
@@ -104,7 +117,7 @@
 .vditor-reset strong,
 .md-editor-preview strong {
   font-weight: 600;
-  color: #1f1f1f;
+  color: var(--md-heading);
 }
 
 .vditor-reset em,
@@ -133,7 +146,7 @@
 
 .vditor-reset mark,
 .md-editor-preview mark {
-  background-color: #fff3a3;
+  background-color: var(--md-bg-mark);
   color: inherit;
   padding: 0 0.15em;
 }
@@ -239,12 +252,12 @@
   font-style: normal;
   font-weight: 600;
   text-align: left;
-  background-color: #efe7d8;
+  background-color: var(--md-bg-table-head);
 }
 
 .vditor-reset table tr:nth-child(2n) td,
 .md-editor-preview table tr:nth-child(2n) td {
-  background-color: #f7f2e6;
+  background-color: var(--md-bg-table-stripe);
 }
 
 /* ---------- 7. 图片 ---------- */
@@ -263,7 +276,7 @@
   margin: 0;
   font-family: var(--md-mono);
   font-size: 85%;
-  color: #24292e;
+  color: var(--md-code-text);
   background-color: var(--md-bg-inline-code);
   border: 0;
   border-radius: 3px;
@@ -277,7 +290,7 @@
   font-family: var(--md-mono);
   font-size: 85%;
   line-height: 1.55;
-  color: #24292e;
+  color: var(--md-code-text);
   background-color: var(--md-bg-code);
   border: 0;
   border-radius: 4px;
@@ -308,7 +321,7 @@
 .vditor-reset .hljs-quote,
 .md-editor-preview .hljs-comment,
 .md-editor-preview .hljs-quote {
-  color: #6a737d;
+  color: var(--md-hl-comment);
   font-style: italic;
 }
 
@@ -322,7 +335,7 @@
 .md-editor-preview .hljs-literal,
 .md-editor-preview .hljs-doctag,
 .md-editor-preview .hljs-name {
-  color: #d73a49;
+  color: var(--md-hl-keyword);
 }
 
 .vditor-reset .hljs-string,
@@ -335,7 +348,7 @@
 .md-editor-preview .hljs-addition,
 .md-editor-preview .hljs-attribute,
 .md-editor-preview .hljs-meta .hljs-string {
-  color: #032f62;
+  color: var(--md-hl-string);
 }
 
 .vditor-reset .hljs-number,
@@ -346,7 +359,7 @@
 .md-editor-preview .hljs-symbol,
 .md-editor-preview .hljs-bullet,
 .md-editor-preview .hljs-link {
-  color: #005cc5;
+  color: var(--md-hl-number);
 }
 
 .vditor-reset .hljs-title,
@@ -357,7 +370,7 @@
 .md-editor-preview .hljs-section,
 .md-editor-preview .hljs-title.class_,
 .md-editor-preview .hljs-title.function_ {
-  color: #6f42c1;
+  color: var(--md-hl-title);
   text-decoration: none;
 }
 
@@ -371,7 +384,7 @@
 .md-editor-preview .hljs-selector-id,
 .md-editor-preview .hljs-selector-class,
 .md-editor-preview .hljs-deletion {
-  color: #e36209;
+  color: var(--md-hl-builtin);
 }
 
 .vditor-reset .hljs-variable,
@@ -380,7 +393,7 @@
 .md-editor-preview .hljs-variable,
 .md-editor-preview .hljs-template-variable,
 .md-editor-preview .hljs-params {
-  color: #24292e;
+  color: var(--md-hl-variable);
 }
 
 .vditor-reset .hljs-emphasis,
@@ -397,20 +410,20 @@
 .md-editor,
 .md-editor-preview-wrapper,
 .md-editor-previewOnly {
-  --md-color: #2f2f2f;
-  --md-bk-color: #f5f0e8;
-  --md-border-color: #2c2c2c;
+  --md-color: var(--md-text);
+  --md-bk-color: var(--md-bg);
+  --md-border-color: var(--md-border);
   background-color: transparent !important;
-  color: #2f2f2f;
+  color: var(--md-text);
 }
 
 .md-editor .md-editor-preview {
   --md-theme-bg-color: transparent !important;
-  --md-theme-bg-color-inset: #efe9db !important;
-  --md-theme-table-stripe-color: #f8f4ea !important;
+  --md-theme-bg-color-inset: var(--md-bg-code) !important;
+  --md-theme-table-stripe-color: var(--md-bg-table-stripe) !important;
   --md-theme-table-tr-bg-color: transparent !important;
-  --md-theme-code-copy-tips-bg-color: #e4dac8 !important;
-  --md-theme-code-copy-tips-color: #2c2c2c !important;
+  --md-theme-code-copy-tips-bg-color: var(--paper-edge) !important;
+  --md-theme-code-copy-tips-color: var(--pencil) !important;
   --md-theme-border-color: var(--md-border) !important;
   --md-theme-border-color-inset: var(--md-border) !important;
   background-color: transparent !important;
@@ -425,8 +438,8 @@
   padding: 4px 12px;
   font-family: var(--md-mono);
   font-size: 12px;
-  color: #6a737d;
-  background-color: #e8e1d1 !important;
+  color: var(--md-code-head-text);
+  background-color: var(--md-code-head-bg) !important;
   border-bottom: 1px solid var(--md-border);
   border-radius: 4px 4px 0 0 !important;
 }
@@ -519,18 +532,18 @@
 .md-editor-preview.default-theme table tr th {
   font-weight: 600;
   text-align: left;
-  background-color: #f4f0e6;
+  background-color: var(--md-bg-table-head);
 }
 
 .md-editor-preview.default-theme table tr:nth-child(2n) td {
-  background-color: #f8f4ea;
+  background-color: var(--md-bg-table-stripe);
 }
 
 /* 代码块：去掉 md-editor-v3 的标题栏/红绿灯，语言与复制按钮悬停时浮在右上角 */
 .md-editor-preview.default-theme .md-editor-code {
   position: relative;
   margin: 1em 0;
-  color: #24292e;
+  color: var(--md-code-text);
 }
 
 .md-editor-preview.default-theme .md-editor-code .md-editor-code-head {
@@ -564,11 +577,11 @@
 .md-editor-preview.default-theme .md-editor-code .md-editor-code-lang {
   font-size: 12px;
   line-height: 1;
-  color: #8a8270;
+  color: var(--md-muted);
 }
 
 .md-editor-preview.default-theme .md-editor-code .md-editor-copy-button {
-  color: #8a8270;
+  color: var(--md-muted);
 }
 
 .md-editor-preview.default-theme .md-editor-code pre {
@@ -580,7 +593,7 @@
   font-family: var(--md-mono);
   font-size: 14px;
   line-height: 1.55;
-  color: #24292e !important;
+  color: var(--md-code-text) !important;
   background-color: var(--md-bg-code) !important;
   border-radius: 4px;
   box-shadow: none;
@@ -597,7 +610,7 @@
 
 .md-editor-preview.default-theme :not(pre) > code {
   padding: 0.2em 0.4em;
-  color: #24292e;
+  color: var(--md-code-text);
   background-color: var(--md-bg-inline-code) !important;
   border-radius: 3px;
 }
@@ -1170,7 +1183,7 @@
   line-height: 1.6 !important;
   white-space: pre-wrap !important;
   word-break: break-word;
-  color: #24292e;
+  color: var(--md-code-text);
   background-color: var(--md-bg-code) !important;
   background-image: none !important;
   border: 0;
@@ -1571,4 +1584,323 @@
   .typora-editor__tool {
     padding: 0 6px;
   }
+}
+
+/* ==========================================================================
+   暗色模式：Markdown 排版变量 + Typora 编辑器外壳
+   --------------------------------------------------------------------------
+   正文变量集中在这里覆盖，编辑器/阅读页共用；外壳的固定色逐项覆盖。
+   ========================================================================== */
+html.dark .vditor-reset,
+html.dark .md-editor-preview {
+  --md-text: #d9d3c6;
+  --md-heading: #f0ebe0;
+  --md-muted: #a49b8a;
+  --md-border: #3d3931;
+  --md-border-strong: #4f4a40;
+  --md-bg: #1c1b18;
+  --md-bg-code: #191815;
+  --md-bg-inline-code: #2f2b25;
+  --md-bg-mark: #54461f;
+  --md-bg-table-head: #2a2721;
+  --md-bg-table-stripe: #1f1e1a;
+  --md-code-text: #c9d1d9;
+  --md-code-head-text: #9c9484;
+  --md-code-head-bg: #2a2723;
+  --md-link: #83b7de;
+  --md-hl-comment: #8b949e;
+  --md-hl-keyword: #ff7b72;
+  --md-hl-string: #a5d6ff;
+  --md-hl-number: #79c0ff;
+  --md-hl-title: #d2a8ff;
+  --md-hl-builtin: #ffa657;
+  --md-hl-variable: #c9d1d9;
+}
+
+html.dark .vditor-reset table tr,
+html.dark .md-editor-preview table tr,
+html.dark .md-editor-preview.default-theme table tr {
+  background-color: transparent !important;
+}
+
+html.dark .vditor-reset table th,
+html.dark .md-editor-preview table th,
+html.dark .md-editor-preview.default-theme table tr th {
+  background-color: var(--md-bg-table-head) !important;
+  color: var(--md-heading);
+}
+
+html.dark .vditor-reset table td,
+html.dark .md-editor-preview table td {
+  background-color: transparent;
+}
+
+html.dark .vditor-reset table tr:nth-child(2n) td,
+html.dark .md-editor-preview table tr:nth-child(2n) td {
+  background-color: var(--md-bg-table-stripe);
+}
+
+html.dark .typora-editor {
+  border-color: #3a362f;
+  background-color: #1c1b18;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.5);
+}
+
+html.dark .typora-editor__menubar {
+  background-color: #24221e;
+  border-bottom-color: #37332c;
+}
+
+html.dark .typora-editor__menu-btn {
+  color: #d9d3c6;
+}
+
+html.dark .typora-editor__menu-btn:hover,
+html.dark .typora-editor__menu-btn.is-open {
+  background-color: #37332c;
+}
+
+html.dark .typora-editor__dropdown,
+html.dark .vditor-code-lang__menu {
+  border-color: #3a362f;
+  background-color: #24221e;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.55);
+}
+
+html.dark .typora-editor__item,
+html.dark .vditor-code-lang__item {
+  color: #d9d3c6;
+}
+
+html.dark .typora-editor__item:hover,
+html.dark .vditor-code-lang__item:hover {
+  background-color: #302c26;
+}
+
+html.dark .typora-editor__item-hint {
+  color: #9c9484;
+}
+
+html.dark .typora-editor__divider {
+  background-color: #37332c;
+}
+
+html.dark .typora-editor__tool {
+  color: #b0a795;
+}
+
+html.dark .typora-editor__tool:hover {
+  background-color: #37332c;
+  color: #f0ebe0;
+}
+
+html.dark .typora-editor__tool.is-active {
+  background-color: #4a4439;
+  color: #f0ebe0;
+}
+
+html.dark .typora-editor__sidebar {
+  border-right-color: #37332c;
+  background-color: #21201c;
+  box-shadow: 2px 0 10px rgba(0, 0, 0, 0.45);
+}
+
+html.dark .typora-editor__sidebar-head,
+html.dark .typora-editor__sidebar-close {
+  color: #9c9484;
+}
+
+html.dark .typora-editor__sidebar-close:hover {
+  background-color: #37332c;
+  color: #f0ebe0;
+}
+
+html.dark .typora-editor__outline-item {
+  color: #c9c2b4;
+}
+
+html.dark .typora-editor__outline-item:hover {
+  background-color: #37332c;
+}
+
+html.dark .typora-editor__outline-item.is-active {
+  background-color: #4a4439;
+  color: #f0ebe0;
+}
+
+html.dark .typora-editor__outline-empty {
+  color: #9c9484;
+}
+
+html.dark .typora-editor .vditor {
+  background-color: #1c1b18 !important;
+  --ir-heading-color: #7d7464;
+  --ir-title-color: #7d7464;
+  --ir-bi-color: #7d7464;
+  --ir-bracket-color: #7d7464;
+  --ir-paren-color: #7d7464;
+  --ir-link-color: #83b7de;
+}
+
+html.dark .typora-editor .vditor-content,
+html.dark .typora-editor .vditor-ir,
+html.dark .typora-editor .vditor-sv {
+  background-color: #1c1b18 !important;
+}
+
+html.dark .typora-editor .vditor-ir pre.vditor-reset {
+  color: var(--md-text);
+  caret-color: #e7e1d5;
+}
+
+html.dark .typora-editor .vditor-sv {
+  color: #d9d3c6;
+}
+
+html.dark .typora-editor .vditor-ir__marker {
+  color: #7d7464;
+}
+
+html.dark .typora-editor .vditor-reset ::selection {
+  background-color: #4a4439;
+  color: inherit;
+}
+
+html.dark .typora-editor__statusbar {
+  border-top-color: #37332c;
+  background-color: #24221e;
+  color: #9c9484;
+}
+
+html.dark .typora-editor__busy {
+  background-color: rgba(27, 26, 23, 0.78);
+  color: #c9c2b4;
+}
+
+html.dark .typora-editor__busy-spinner {
+  border-color: #4a4439;
+  border-top-color: #d9d3c6;
+}
+
+html.dark .typora-editor__dialog {
+  border-color: #3a362f;
+  background-color: #24221e;
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.55);
+}
+
+html.dark .typora-editor__dialog-title,
+html.dark .typora-editor__dialog-desc strong {
+  color: #f0ebe0;
+}
+
+html.dark .typora-editor__dialog-desc {
+  color: #b0a795;
+}
+
+html.dark .typora-editor__dialog-meta,
+html.dark .typora-editor__field {
+  color: #9c9484;
+}
+
+html.dark .typora-editor__field input,
+html.dark .typora-editor__btn {
+  border-color: #4a4439;
+  background-color: #1b1a17;
+  color: #e7e1d5;
+}
+
+html.dark .typora-editor__field input:focus {
+  border-color: #7d7464;
+  box-shadow: 0 0 0 3px rgba(255, 255, 255, 0.08);
+}
+
+html.dark .typora-editor__btn:hover {
+  background-color: #37332c;
+}
+
+html.dark .typora-editor__btn--primary {
+  border-color: #e7e1d5;
+  background-color: #e7e1d5;
+  color: #1b1a17;
+}
+
+html.dark .typora-editor__btn--primary:hover {
+  background-color: #f5f0e8;
+}
+
+html.dark .typora-editor:fullscreen,
+html.dark .typora-editor--fullscreen {
+  background-color: #1b1a17;
+}
+
+html.dark .typora-editor .vditor-ir__node[data-type='code-block'] > .vditor-ir__preview {
+  color: var(--md-code-text);
+}
+
+html.dark .typora-editor .vditor-ir__node[data-type='code-block'] > pre.vditor-ir__marker--pre > code {
+  caret-color: #e7e1d5;
+}
+
+html.dark .typora-editor .vditor.is-code-composing .vditor-ir__node--expand[data-type='code-block'] > pre.vditor-ir__marker--pre > code {
+  color: #d9d3c6 !important;
+}
+
+html.dark .typora-editor .vditor-ir__node[data-type='code-block'] > .vditor-ir__marker--info,
+html.dark .typora-editor .vditor-ir__node[data-type='code-block'] .vditor-copy span,
+html.dark .vditor-code-lang {
+  border-color: #4a4439;
+  background-color: rgba(36, 34, 30, 0.94);
+  color: #9c9484;
+}
+
+html.dark .typora-editor .vditor-ir__node[data-type='code-block'] .vditor-copy span:hover,
+html.dark .vditor-code-lang:hover {
+  border-color: #7d7464;
+  background-color: #37332c;
+  color: #f0ebe0;
+}
+
+html.dark .vditor-code-lang__item.is-current {
+  background-color: #4a4439;
+}
+
+html.dark .vditor-code-lang__input {
+  border-color: #7d7464;
+  background-color: #24221e;
+  color: #e7e1d5;
+}
+
+html.dark .vditor-code-lang__input::placeholder {
+  color: #7d7464;
+}
+
+html.dark .vditor-table-tools {
+  border-color: #3a362f;
+  background-color: #24221e;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.45);
+}
+
+html.dark .vditor-table-tools button {
+  color: #b0a795;
+}
+
+html.dark .vditor-table-tools button:hover,
+html.dark .vditor-table-tools button:focus-visible {
+  background-color: #37332c;
+  color: #f0ebe0;
+}
+
+html.dark .vditor-table-tools button[data-op='table-del']:hover {
+  background-color: #4a2a26;
+  color: #ff9d91;
+}
+
+html.dark .typora-editor .vditor-reset hr:hover {
+  background-image: linear-gradient(
+    to bottom,
+    transparent 6px,
+    #7d7464 6px,
+    #7d7464 7px,
+    transparent 7px
+  );
 }

@@ -81,11 +81,13 @@ CREATE TABLE `article` (
   `create_time` DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
   `update_time` DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
   `deleted`     TINYINT      NOT NULL DEFAULT 0 COMMENT '逻辑删除：0 正常 / 1 已删除',
+  `deleted_time` DATETIME    DEFAULT NULL COMMENT '删除时间（回收站；NULL 表示未删除）',
   PRIMARY KEY (`id`),
   KEY `idx_article_category` (`category_id`),
   KEY `idx_article_author` (`author_id`),
   KEY `idx_article_status_time` (`status`, `create_time`),
   KEY `idx_article_top` (`is_top`),
+  KEY `idx_article_deleted_time` (`deleted`, `deleted_time`),
   FULLTEXT KEY `ft_article_ngram` (`title`, `summary`, `content`) WITH PARSER ngram
 ) ENGINE = InnoDB DEFAULT CHARSET = utf8mb4 COLLATE = utf8mb4_unicode_ci COMMENT = '文章表';
 
@@ -99,6 +101,31 @@ CREATE TABLE `article_tag` (
   PRIMARY KEY (`article_id`, `tag_id`),
   KEY `idx_article_tag_tag` (`tag_id`)
 ) ENGINE = InnoDB DEFAULT CHARSET = utf8mb4 COLLATE = utf8mb4_unicode_ci COMMENT = '文章标签关联表';
+
+-- ----------------------------------------------------------------------------
+-- 站点每日统计（PV / UV）：由 Redis 增量定时落库
+-- ----------------------------------------------------------------------------
+DROP TABLE IF EXISTS `site_daily_stat`;
+CREATE TABLE `site_daily_stat` (
+  `stat_date`   DATE     NOT NULL COMMENT '统计日期',
+  `pv`          BIGINT   NOT NULL DEFAULT 0 COMMENT '页面浏览量（PV）',
+  `uv`          BIGINT   NOT NULL DEFAULT 0 COMMENT '独立访客（UV，按日去重）',
+  `update_time` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+  PRIMARY KEY (`stat_date`)
+) ENGINE = InnoDB DEFAULT CHARSET = utf8mb4 COLLATE = utf8mb4_unicode_ci COMMENT = '站点每日访问统计';
+
+-- ----------------------------------------------------------------------------
+-- 文章每日阅读统计：用于区间热门文章
+-- ----------------------------------------------------------------------------
+DROP TABLE IF EXISTS `article_daily_stat`;
+CREATE TABLE `article_daily_stat` (
+  `article_id`  BIGINT   NOT NULL COMMENT '文章 ID',
+  `stat_date`   DATE     NOT NULL COMMENT '统计日期',
+  `pv`          BIGINT   NOT NULL DEFAULT 0 COMMENT '当日阅读量',
+  `update_time` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+  PRIMARY KEY (`article_id`, `stat_date`),
+  KEY `idx_article_daily_date` (`stat_date`)
+) ENGINE = InnoDB DEFAULT CHARSET = utf8mb4 COLLATE = utf8mb4_unicode_ci COMMENT = '文章每日阅读统计';
 
 -- ----------------------------------------------------------------------------
 -- 评论表（两级：parent_id 为 NULL 表示一级评论，否则为回复）

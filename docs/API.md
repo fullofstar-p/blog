@@ -202,7 +202,25 @@ FileVO      { url, objectKey, originalName, size, contentType }
 | ---- | ---- | ---- | ---- | --------- |
 | GET | `/api/admin/articles` | ADMIN | `pageNum, pageSize, status?, keyword?, categoryId?` | `PageResult<ArticleSummaryVO>` |
 | PUT | `/api/admin/articles/{id}/top` | ADMIN | `{ isTop: 0 \| 1 }` | `null` |
-| DELETE | `/api/admin/articles/{id}` | ADMIN | - | `null` |
+| DELETE | `/api/admin/articles/{id}` | ADMIN | - | `null`（逻辑删除，进入回收站） |
+| GET | `/api/admin/articles/recycle` | ADMIN | `pageNum, pageSize, keyword?` | `PageResult<ArticleSummaryVO>`（含 `deletedTime`） |
+| PUT | `/api/admin/articles/{id}/restore` | ADMIN | - | `ArticleSummaryVO` |
+| DELETE | `/api/admin/articles/{id}/purge` | ADMIN | - | `null`（彻底删除，不可恢复） |
+| PUT | `/api/admin/articles/batch/top` | ADMIN | `{ ids: number[], isTop: 0 \| 1 }` | 受影响文章数 |
+| POST | `/api/admin/articles/batch/delete` | ADMIN | `{ ids: number[] }` | 进入回收站的文章数 |
+| POST | `/api/admin/articles/batch/restore` | ADMIN | `{ ids: number[] }` | 恢复的文章数 |
+| POST | `/api/admin/articles/batch/purge` | ADMIN | `{ ids: number[] }` | 彻底删除的文章数（仅回收站中的文章） |
+
+批量接口单次最多 100 篇；`ids` 会去空、去重。批量彻底删除同时清理标签关联、评论与每日统计。
+
+## 10.1 管理端内容看板
+
+| 方法 | 路径 | 权限 | 入参 | 出参 data |
+| ---- | ---- | ---- | ---- | --------- |
+| GET | `/api/admin/stats/dashboard` | ADMIN | `days?`（7–90，默认 30） | `DashboardVO`：totals / today / range / trend / topArticles / publish（365 天热力图 + 连续天数） |
+
+统计说明：访问已发布文章详情时记录 PV 与 UV（HyperLogLog，按日去重），Redis 每 60 秒落库到
+`site_daily_stat` / `article_daily_stat`；发布热力图按已发布文章的 `create_time` 聚合。
 
 ## 11. 健康检查
 
@@ -223,7 +241,9 @@ FileVO      { url, objectKey, originalName, size, contentType }
 | `/about` | AboutPage | 关于 |
 | `/login`、`/register` | Login / Register | 认证 |
 | `/profile` | Profile | 个人资料、头像上传 |
-| `/admin` | AdminLayout | 需 ADMIN |
-| `/admin/articles`、`/admin/articles/new`、`/admin/articles/:id/edit` | 文章管理/编辑 |
+| `/admin` | AdminLayout | 需 ADMIN，默认跳转内容看板 |
+| `/admin/dashboard` | AdminDashboard | 内容看板（PV/UV、趋势、热门、发布热力图） |
+| `/admin/articles`、`/admin/articles/new`、`/admin/articles/:id/edit` | 文章管理/编辑（编辑器内含自动保存草稿） |
+| `/admin/recycle` | 回收站（恢复 / 彻底删除） |
 | `/admin/comments` | 评论审核 |
 | `/admin/categories`、`/admin/tags`、`/admin/users` | 分类/标签/用户管理 |

@@ -201,7 +201,7 @@ onMounted(() => {
           <h1 class="font-serif text-3xl italic text-pencil md:text-4xl">{{ auth.displayName }}</h1>
           <div class="mt-2 flex flex-wrap gap-2">
             <span class="sketch-badge">@{{ auth.user ? auth.user.username : '—' }}</span>
-            <span class="sketch-badge border-[#2b6e96]/60 text-[#2b6e96]">
+            <span class="sketch-badge border-sketchblue/60 text-sketchblue">
               {{ auth.isAdmin ? 'ADMIN' : 'USER' }}
             </span>
           </div>
@@ -343,9 +343,9 @@ onMounted(() => {
 
           <div
             v-else-if="myError"
-            class="flex flex-col items-start gap-3 border-2 border-dashed border-[#b23b2e]/60 p-4"
+            class="flex flex-col items-start gap-3 border-2 border-dashed border-sketchred/60 p-4"
           >
-            <p class="font-serif text-sm italic text-[#b23b2e]" role="alert">{{ myError }}</p>
+            <p class="font-serif text-sm italic text-sketchred" role="alert">{{ myError }}</p>
             <button type="button" class="sketch-btn min-h-[44px] px-4" @click="loadMyArticles">
               重新加载
             </button>
@@ -379,8 +379,8 @@ onMounted(() => {
                       class="sketch-badge"
                       :class="
                         article.status === 1
-                          ? 'border-[#1f7a4d]/60 text-[#1f7a4d]'
-                          : 'border-[#9a6a00]/60 text-[#7a5300]'
+                          ? 'border-sketchgreen/60 text-sketchgreen'
+                          : 'border-sketchyellow/60 text-sketchyellow-deep'
                       "
                     >
                       {{ article.status === 1 ? '已发布' : '草稿' }}

@@ -220,7 +220,7 @@ defineExpose({ pick, remove })
         v-if="error"
         class="mt-3 flex flex-col gap-2 border-t border-dashed border-pencil/40 pt-3 sm:flex-row sm:items-center sm:justify-between"
       >
-        <p class="font-serif text-sm italic text-[#b23b2e]" role="alert">{{ error }}</p>
+        <p class="font-serif text-sm italic text-sketchred" role="alert">{{ error }}</p>
         <button
           v-if="pendingFile"
           type="button"

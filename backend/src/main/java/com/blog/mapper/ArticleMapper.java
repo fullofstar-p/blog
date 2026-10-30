@@ -96,4 +96,45 @@ public interface ArticleMapper extends BaseMapper<Article> {
      * 按年月归档统计。
      */
     List<ArchiveRowDTO> selectArchive();
+
+    /**
+     * 回收站分页（仅 deleted = 1）。
+     */
+    IPage<ArticleSummaryVO> selectRecyclePage(IPage<ArticleSummaryVO> page,
+                                              @Param("keyword") String keyword);
+
+    /**
+     * 回收站总数（与 {@link #selectRecyclePage} 同一套筛选条件）。
+     */
+    long selectRecycleCount(@Param("keyword") String keyword);
+
+    /**
+     * 逻辑删除：deleted 置 1 并记录进入回收站的时间。
+     *
+     * @return 受影响行数（0 表示文章不存在或已在回收站）
+     */
+    int markDeleted(@Param("id") Long id);
+
+    /**
+     * 从回收站恢复：deleted 置 0 并清空删除时间。
+     *
+     * @return 受影响行数（0 表示文章不存在或不在回收站）
+     */
+    int restore(@Param("id") Long id);
+
+    /** 批量逻辑删除，仅处理未删除的文章 */
+    int markDeletedBatch(@Param("ids") List<Long> ids);
+
+    /** 批量从回收站恢复 */
+    int restoreBatch(@Param("ids") List<Long> ids);
+
+    /** 批量物理删除（仅删除回收站中的文章） */
+    int purgeBatch(@Param("ids") List<Long> ids);
+
+    /**
+     * 彻底删除（物理删除），仅允许删除回收站中的文章。
+     *
+     * @return 受影响行数（0 表示文章不存在或不在回收站）
+     */
+    int purge(@Param("id") Long id);
 }

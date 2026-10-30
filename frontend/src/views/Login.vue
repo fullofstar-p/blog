@@ -74,7 +74,7 @@ onMounted(() => {
 
         <p
           v-if="submitError"
-          class="mt-4 border-l-2 border-dashed border-[#b23b2e] pl-3 font-serif text-sm italic text-[#b23b2e]"
+          class="mt-4 border-l-2 border-dashed border-sketchred pl-3 font-serif text-sm italic text-sketchred"
           role="alert"
         >
           {{ submitError }}

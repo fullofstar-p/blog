@@ -26,4 +26,7 @@ public class ArticleSummaryVO {
     private List<TagVO> tags;
     private LocalDateTime createTime;
     private LocalDateTime updateTime;
+
+    /** 仅回收站列表返回：进入回收站的时间 */
+    private LocalDateTime deletedTime;
 }

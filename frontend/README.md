@@ -28,9 +28,9 @@ npm run format     # Prettier 格式化
 ```
 src/
 ├── api/         # 按 docs/API.md 封装的接口模块 + Axios 实例
-├── components/  # Sketch 通用组件、上传、Markdown、评论、管理布局
+├── components/  # Sketch 通用组件、上传、Markdown、评论、管理布局、主题切换
 ├── router/      # 路由与登录/管理员守卫
-├── store/       # auth（token 持久化）、meta（分类/标签缓存）
+├── store/       # auth（token 持久化）、meta（分类/标签缓存）、theme（暗色模式）
 ├── styles/      # Tailwind 入口、纸张纹理、手绘组件类、编辑器覆盖、阅读页纸张
 ├── utils/       # 格式化、Toast
 └── views/       # 前台页面 + admin/ 管理后台
@@ -38,20 +38,64 @@ src/
 
 ## Sketch Style 设计令牌
 
-| 令牌 | 值 | 用途 |
-| ---- | -- | ---- |
-| `paper` | `#f5f0e8` | 纸张底色（禁止纯白） |
-| `paper.deep` | `#efe7d8` | 加深纸色（代码块、侧栏） |
-| `pencil` | `#2c2c2c` | 铅笔灰主色 |
-| 强调色 | `#b23b2e` / `#2b6e96` / `#1f7a4d` / `#7a5300` | 低饱和红蓝绿黄（已按 AA 对比度加深） |
-| `shadow-sketch` | `3px 3px 0 rgba(44,44,44,.15)` | 手绘硬阴影 |
+| 令牌（Tailwind 类） | 亮色 | 暗色 | 用途 |
+| ---- | ---- | ---- | ---- |
+| `paper` | `#f5f0e8` | `#1b1a17` | 纸张底色（禁止纯白） |
+| `paper-soft` / `paper-deep` | `#faf6ee` / `#efe7d8` | `#24221e` / `#161513` | 卡片/代码块/侧栏的纸张层次 |
+| `pencil` | `#2c2c2c` | `#e7e1d5` | 铅笔灰主色（暗色为粉笔白） |
+| `ink-700/500/300` | 深灰阶 | 浅灰阶 | 正文/次要文字 |
+| 强调色 | `#b23b2e` / `#2b6e96` / `#1f7a4d` / `#9a6a00` | `#e07a6e` / `#7cb3d6` / `#6fc79a` / `#d6ad5c` | 低饱和红蓝绿黄（已按 AA 对比度调整） |
+| `shadow-sketch` | `3px 3px 0 rgba(44,44,44,.15)` | 纯黑投影 | 手绘硬阴影 |
 
+- 颜色全部绑定 CSS 变量（`src/styles/main.css` 的 `:root` / `html.dark`），Tailwind 只写语义 token；
+  强调色用 `text-sketchred` / `border-sketchgreen` 等类，不再出现 `text-[#...]` 固定色。
 - 边框统一 `border-2 border-dashed`（全局默认 `border-style: dashed`）。
 - 标题使用 `font-serif italic`；卡片/元素交替 `rotate-[-0.5deg]` / `rotate-[0.5deg]`。
 - 手绘组件类：`sketch-card`、`sketch-btn`、`sketch-input`、`sketch-badge`、`sketch-wavy`、
   `sketch-skeleton`、`sketch-tape`。
 - 交互三态：`hover` 铅笔涂黑反白、`active` 压纸（位移 + 阴影减小）、`focus-visible` 虚线描边。
 - 所有动画在 `prefers-reduced-motion: reduce` 下降级；可交互元素最小 44px。
+
+## 暗色模式
+
+- 顶栏主题按钮（◐/☀/☾）打开三选一菜单：**跟随系统 / 浅色 / 深色**；选择写入 `localStorage`
+  （`blog.theme`），刷新与重开浏览器保持，多标签页通过 `storage` 事件同步。
+- `system` 模式监听 `prefers-color-scheme`，系统切换深浅色时页面实时跟随；`index.html` 在首屏
+  渲染前先应用 `<html class="dark">` 与 `color-scheme`，避免暗色用户先看到一帧白纸。
+- 主题实现：`src/store/theme.js`（模式状态 / 系统监听 / DOM class 切换）、
+  `src/components/ThemeToggle.vue`（菜单与无障碍属性）；配色由 `main.css` 的 CSS 变量驱动。
+- 编辑器与阅读页单独处理：`markdown.css` 覆盖 `--md-*` 排版变量与 Typora 外壳（菜单、大纲、源码、
+  对话框、代码块语言列表、表格工具条），`markdown-reading.css` 覆盖纸张页面、目录、进度条、
+  复制按钮；代码高亮使用 GitHub Dark 色系。
+- 导出的 Markdown / HTML / PDF 保持浅色纸张排版，不跟随界面暗色。
+
+## 内容看板
+
+后台默认首页（`/admin/dashboard`，`views/admin/AdminDashboard.vue`）：
+
+- 概览卡片：今日 PV/UV、所选区间 PV/UV、总阅读量、文章/草稿/评论/用户。
+- **阅读趋势**：纯 SVG 折线图（不引入图表库），PV 实线 + 面积、UV 虚线，近 7 / 30 / 90 天切换；
+  鼠标悬停显示当天日期与 PV/UV；没有数据时显示采集提示。
+- **热门文章**：区间内有每日阅读数据时按区间 PV 排名，否则按总阅读量；显示排名、分类、作者、
+  总阅读与创建时间。
+- **发布热力图**：GitHub 贡献图布局，过去一年 53 周 × 7 天，按当日发布文章数分 5 级着色
+  （`.dashboard-heatmap` / `.heat-0..4`，颜色沿用主题变量，亮/暗色自动适配）；月份与星期标签、
+  每个格子带日期/发布数 tooltip，并展示当前连续、最长连续与全年发布总数。
+- 看板数据每 60 秒自动刷新（也可手动刷新）；移动端热力图横向滚动，不撑破页面。
+
+数据来自 `GET /api/admin/stats/dashboard?days=30`；PV/UV 统计说明见 [README.md](../README.md)
+与 [ROADMAP.md](../docs/ROADMAP.md) 第 8 节。
+
+## 批量管理与列表刷新
+
+- 文章管理：当前页全选/半选（`sketch-checkbox`）、批量置顶/取消置顶、批量删除；删除确认后进入回收站，
+  可在回收站批量恢复。
+- 回收站：批量恢复、批量彻底删除（同时清理标签关联、评论与每日统计）。
+- 批量接口单次最多 100 篇，后端会去空、去重；批量置顶/删除/恢复/彻底删除分别走
+  `batch/top`、`batch/delete`、`batch/restore`、`batch/purge`。
+- **列表不闪烁**：首次加载才显示骨架屏，之后筛选/重置/翻页/操作后刷新时保留现有表格并加
+  `opacity-60` + `aria-busy`，表头显示「更新中…」，不会再出现「表格 → 骨架屏 → 表格」的闪烁。
+  文章管理、回收站、评论审核、用户管理都已改为该模式。
 
 ## Markdown / 代码高亮
 
@@ -137,6 +181,19 @@ src/
 - 不显示行号（Typora 即时渲染也没有行号），左侧留白只保留标题标记。
   Vditor 的 lute / 中文语言包 / 图标 / 高亮样式在 `predev`、`prebuild` 时由
   `scripts/copy-vditor.mjs` 拷到 `public/vditor`（已 gitignore），不依赖外网 CDN。
+
+**自动保存草稿（P0-2）**：`AdminArticleEdit.vue` 在内容变化 700ms 防抖后写 localStorage
+（`utils/articleDraft.js`，新文章存 `new` 键、编辑页存文章 ID），同时每 15 秒把草稿
+（`status=0`，含标题/摘要/正文/封面/分类/标签）写回服务端；新文章第一次自动保存会创建草稿并记住
+ID，之后只更新不重复建稿。已发布文章只写本地草稿，不会自动改线上内容。编辑器右上角显示
+「本地草稿已保存 / 正在自动保存 / 已自动保存 HH:mm:ss / 自动保存失败」；刷新或重新进入时若本地草稿
+比服务端新，会弹「发现未保存的草稿」供恢复/丢弃；有未保存修改时关闭页面或站内跳转会先提示，
+离开前再落一次本地草稿。
+
+**回收站（P0-8）**：后台「回收站」（`/admin/recycle`，`AdminRecycle.vue`）列出已删除文章
+（标题/原状态/分类/作者/删除时间），支持按标题摘要搜索、分页、恢复和彻底删除；
+恢复后文章回到文章列表（标签保留），彻底删除会物理删除文章、标签关联与评论，不可恢复。
+管理后台「文章管理」的删除文案同步改为「进入回收站，可以恢复」，侧边导航新增「回收站」入口。
 
 **阅读页**用 `MarkdownViewer`（md-editor-v3 预览）与后台编辑器共用同一套 Typora 排版：
 

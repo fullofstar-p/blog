@@ -48,7 +48,7 @@ onBeforeUnmount(() => {
   <Teleport to="body">
     <div
       v-if="modelValue"
-      class="fixed inset-0 z-40 flex items-end justify-center bg-[#2c2c2c]/45 p-4 sm:items-center"
+      class="fixed inset-0 z-40 flex items-end justify-center bg-overlay/45 p-4 sm:items-center"
       @click.self="close"
     >
       <div

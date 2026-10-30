@@ -93,16 +93,16 @@ watch(
       <p class="mt-3 font-serif text-sm italic text-ink-500">
         {{ tag ? `共 ${tag.articleCount ?? total} 篇相关文章` : '按标签翻阅文章' }}
       </p>
-      <p v-if="metaError" class="mt-2 font-serif text-xs italic text-[#b23b2e]">{{ metaError }}</p>
+      <p v-if="metaError" class="mt-2 font-serif text-xs italic text-sketchred">{{ metaError }}</p>
     </header>
 
     <SketchLoading v-if="loading" :rows="3" label="正在加载标签文章" />
 
     <div
       v-else-if="error"
-      class="flex flex-col items-start gap-3 border-2 border-dashed border-[#b23b2e]/60 bg-paper-soft/70 p-5"
+      class="flex flex-col items-start gap-3 border-2 border-dashed border-sketchred/60 bg-paper-soft/70 p-5"
     >
-      <p class="font-serif text-sm italic text-[#b23b2e]" role="alert">{{ error }}</p>
+      <p class="font-serif text-sm italic text-sketchred" role="alert">{{ error }}</p>
       <button type="button" class="sketch-btn min-h-[44px] px-4" @click="retry">重新加载</button>
     </div>
 

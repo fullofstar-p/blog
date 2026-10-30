@@ -28,7 +28,7 @@ defineProps({
           <div class="mb-2 flex flex-wrap items-center gap-2">
             <span
               v-if="article.isTop === 1"
-              class="sketch-badge border-[#b23b2e]/60 text-[#b23b2e]"
+              class="sketch-badge border-sketchred/60 text-sketchred"
             >
               ★ 置顶
             </span>
@@ -37,7 +37,7 @@ defineProps({
             </span>
             <span
               v-if="article.status === 0"
-              class="sketch-badge border-[#9a6a00]/60 text-[#7a5300]"
+              class="sketch-badge border-sketchyellow/60 text-sketchyellow-deep"
             >
               草稿
             </span>

@@ -20,8 +20,8 @@ public interface ArticleService {
     /** 置顶文章列表 */
     List<ArticleSummaryVO> top(int limit);
 
-    /** 文章详情（阅读量 +1，10 分钟缓存） */
-    ArticleDetailVO detail(Long id);
+    /** 文章详情（阅读量 +1、PV/UV 统计，10 分钟缓存） */
+    ArticleDetailVO detail(Long id, String visitorKey);
 
     /** 按年月归档 */
     List<ArchiveVO> archive();
@@ -45,6 +45,27 @@ public interface ArticleService {
     /** 管理端置顶/取消置顶 */
     void updateTop(Long id, Integer isTop);
 
-    /** 管理端删除文章 */
+    /** 管理端删除文章（逻辑删除，进入回收站） */
     void adminDelete(Long id);
+
+    /** 回收站分页 */
+    PageResult<ArticleSummaryVO> recyclePage(int pageNum, int pageSize, String keyword);
+
+    /** 从回收站恢复文章 */
+    ArticleSummaryVO restore(Long id);
+
+    /** 彻底删除回收站中的文章（不可恢复） */
+    void purge(Long id);
+
+    /** 批量置顶 / 取消置顶，返回受影响行数 */
+    int batchUpdateTop(List<Long> ids, Integer isTop);
+
+    /** 批量删除（进入回收站），返回受影响行数 */
+    int batchDelete(List<Long> ids);
+
+    /** 批量从回收站恢复，返回受影响行数 */
+    int batchRestore(List<Long> ids);
+
+    /** 批量彻底删除，返回受影响行数 */
+    int batchPurge(List<Long> ids);
 }

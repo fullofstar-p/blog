@@ -207,10 +207,10 @@ async function confirmDelete() {
 
         <header class="border-b-2 border-dashed border-pencil/50 pb-6">
           <div class="mb-3 flex flex-wrap items-center gap-2">
-            <span v-if="article.isTop === 1" class="sketch-badge border-[#b23b2e]/60 text-[#b23b2e]">
+            <span v-if="article.isTop === 1" class="sketch-badge border-sketchred/60 text-sketchred">
               ★ 置顶
             </span>
-            <span v-if="article.status === 0" class="sketch-badge border-[#9a6a00]/60 text-[#7a5300]">
+            <span v-if="article.status === 0" class="sketch-badge border-sketchyellow/60 text-sketchyellow-deep">
               草稿
             </span>
             <span v-if="article.categoryName" class="sketch-badge">{{ article.categoryName }}</span>
@@ -285,7 +285,7 @@ async function confirmDelete() {
         </nav>
 
         <CommentSection v-if="article.status === 1" :article-id="article.id" />
-        <p v-else class="mt-10 border-l-2 border-dashed border-[#9a6a00] pl-3 font-serif text-sm italic text-[#7a5300]">
+        <p v-else class="mt-10 border-l-2 border-dashed border-sketchyellow pl-3 font-serif text-sm italic text-sketchyellow-deep">
           这是草稿：发布后才会对读者展示，评论功能也会随之开放。
         </p>
       </article>

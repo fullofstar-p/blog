@@ -249,3 +249,55 @@
 .reading-toc-mobile .reading-toc__list {
   max-height: calc(60vh - 48px);
 }
+
+/* ---------- 4. 暗色模式：纸张页面、目录、进度条 ---------- */
+html.dark .typora-page {
+  background-color: #23211d;
+  border-color: #3a362f;
+}
+
+html.dark .typora-page .md-editor-preview .md-editor-code .md-editor-copy-button,
+html.dark .typora-page .md-editor-preview.default-theme .md-editor-code .md-editor-copy-button {
+  background-color: rgba(35, 33, 29, 0.92) !important;
+  color: #a49b8a;
+  box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.08);
+}
+
+html.dark .typora-page .md-editor-preview .md-editor-code .md-editor-copy-button:hover,
+html.dark .typora-page .md-editor-preview.default-theme .md-editor-code .md-editor-copy-button:hover {
+  background-color: rgba(255, 255, 255, 0.1) !important;
+}
+
+html.dark .reading-progress__bar {
+  background-color: #e07a6e;
+}
+
+html.dark .reading-toc {
+  border-left-color: rgba(231, 225, 213, 0.22);
+}
+
+html.dark .reading-toc__title {
+  color: #9c9484;
+}
+
+html.dark .reading-toc__item {
+  color: #b0a795;
+}
+
+html.dark .reading-toc__item:hover {
+  background-color: #2a2723;
+}
+
+html.dark .reading-toc__item.is-active {
+  border-left-color: #e7e1d5;
+  background-color: #37332c;
+  color: #f0ebe0;
+}
+
+html.dark .reading-toc-toggle,
+html.dark .reading-toc-mobile {
+  border: 1px solid #3a362f;
+  background-color: #24221e;
+  color: #e7e1d5;
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.55);
+}

@@ -104,9 +104,9 @@ onMounted(loadArchive)
 
     <div
       v-else-if="archiveError"
-      class="flex flex-col items-start gap-3 border-2 border-dashed border-[#b23b2e]/60 bg-paper-soft/70 p-5"
+      class="flex flex-col items-start gap-3 border-2 border-dashed border-sketchred/60 bg-paper-soft/70 p-5"
     >
-      <p class="font-serif text-sm italic text-[#b23b2e]" role="alert">{{ archiveError }}</p>
+      <p class="font-serif text-sm italic text-sketchred" role="alert">{{ archiveError }}</p>
       <button type="button" class="sketch-btn min-h-[44px] px-4" @click="loadArchive">
         重新加载
       </button>
@@ -177,9 +177,9 @@ onMounted(loadArchive)
 
         <div
           v-else-if="listError"
-          class="flex flex-col items-start gap-3 border-2 border-dashed border-[#b23b2e]/60 bg-paper-soft/70 p-5"
+          class="flex flex-col items-start gap-3 border-2 border-dashed border-sketchred/60 bg-paper-soft/70 p-5"
         >
-          <p class="font-serif text-sm italic text-[#b23b2e]" role="alert">{{ listError }}</p>
+          <p class="font-serif text-sm italic text-sketchred" role="alert">{{ listError }}</p>
           <button type="button" class="sketch-btn min-h-[44px] px-4" @click="loadArticles">
             重新加载
           </button>

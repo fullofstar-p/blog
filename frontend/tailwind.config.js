@@ -1,42 +1,53 @@
 /** @type {import('tailwindcss').Config} */
 // Sketch Style 主题扩展：纸张色 / 铅笔灰 / 手绘阴影 / 倾斜 / 手写衬线字体
+//
+// 颜色全部通过 CSS 变量取值（见 src/styles/main.css 的 :root / html.dark）：
+// 亮色是米色纸张 + 铅笔灰，暗色是暖黑纸张 + 粉笔白，组件里只写语义 token，
+// 不需要到处堆 dark: 变体，切换主题时整站一次性换色。
+const token = (name) => `rgb(var(${name}) / <alpha-value>)`
+
 export default {
   content: ['./index.html', './src/**/*.{vue,js}'],
   theme: {
     extend: {
       colors: {
         paper: {
-          DEFAULT: '#f5f0e8',
-          soft: '#faf6ee',
-          deep: '#efe7d8',
-          edge: '#e4dac8'
+          DEFAULT: token('--paper'),
+          soft: token('--paper-soft'),
+          deep: token('--paper-deep'),
+          edge: token('--paper-edge')
         },
         pencil: {
-          DEFAULT: '#2c2c2c',
-          soft: '#4a463f',
-          faint: '#6f685c',
-          line: '#d8d0c0'
+          DEFAULT: token('--pencil'),
+          soft: token('--pencil-soft'),
+          faint: token('--pencil-faint'),
+          line: token('--pencil-line')
         },
         ink: {
-          900: '#2c2c2c',
-          700: '#3f3a33',
-          500: '#5c564c',
-          300: '#6f685c',
-          100: '#e4dac8'
+          900: token('--ink-900'),
+          700: token('--ink-700'),
+          500: token('--ink-500'),
+          300: token('--ink-300'),
+          100: token('--ink-100')
         },
-        sketchred: '#b23b2e',
-        sketchblue: '#2b6e96',
-        sketchgreen: '#1f7a4d',
-        sketchyellow: '#9a6a00'
+        sketchred: token('--sketch-red'),
+        sketchblue: token('--sketch-blue'),
+        sketchgreen: token('--sketch-green'),
+        sketchyellow: {
+          DEFAULT: token('--sketch-yellow'),
+          deep: token('--sketch-yellow-deep')
+        },
+        // 弹窗遮罩：亮色是半透明铅笔灰，暗色是纯黑
+        overlay: token('--overlay')
       },
       boxShadow: {
-        sketch: '3px 3px 0 rgba(44,44,44,0.15)',
-        'sketch-lg': '5px 5px 0 rgba(44,44,44,0.15)',
-        sketchsm: '2px 2px 0 rgba(44,44,44,0.12)',
-        press: '1px 1px 0 rgba(44,44,44,0.15)'
+        sketch: '3px 3px 0 var(--sketch-shadow)',
+        'sketch-lg': '5px 5px 0 var(--sketch-shadow)',
+        sketchsm: '2px 2px 0 var(--sketch-shadow-sm)',
+        press: '1px 1px 0 var(--sketch-shadow)'
       },
       ringOffsetColor: {
-        DEFAULT: '#f5f0e8'
+        DEFAULT: 'rgb(var(--paper))'
       },
       rotate: {
         '-sketch': '-0.5deg',

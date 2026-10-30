@@ -40,6 +40,10 @@ docker compose -f docker-compose.infra.yml up -d
 
 - **不需要 `.env`**：端口、密码都带开发默认值，虚拟机里直接能跑
 - 首次启动自动执行 `sql/init.sql`（建表 + 初始化分类/标签）；`blog` bucket 由后端首次启动时创建并设置公共读
+- **已有数据库升级**：
+  - 回收站：执行一次 `sql/upgrade-2026-10-p0-8-recycle.sql`（新增 `article.deleted_time` 与索引）
+  - 内容看板：执行一次 `sql/upgrade-2026-11-p1-8-dashboard.sql`（新增 `site_daily_stat` / `article_daily_stat`）
+  - 新的 `init.sql` 已包含上述变更，全新库无需执行
 - 对象存储默认用 **RustFS**（S3 兼容，带 Web 控制台）：MinIO 社区版已停止发布镜像，
   2026-09-11 Docker Hub 上的 `minio/minio` / `minio/mc` 全部下架；后端只用标准 S3 API，不感知存储实现。
   若你有可用的 MinIO 镜像仓库，按 `docker-compose.infra.yml` 里的注释替换 `objectstore` 即可。

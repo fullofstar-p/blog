@@ -148,7 +148,7 @@ onMounted(() => {
     </section>
     <p
       v-else-if="topError"
-      class="mb-12 border-l-2 border-dashed border-[#b23b2e] pl-3 font-serif text-sm italic text-[#b23b2e]"
+      class="mb-12 border-l-2 border-dashed border-sketchred pl-3 font-serif text-sm italic text-sketchred"
     >
       {{ topError }}
     </p>
@@ -194,9 +194,9 @@ onMounted(() => {
 
         <div
           v-else-if="error"
-          class="flex flex-col items-start gap-3 border-2 border-dashed border-[#b23b2e]/60 bg-paper-soft/70 p-5"
+          class="flex flex-col items-start gap-3 border-2 border-dashed border-sketchred/60 bg-paper-soft/70 p-5"
         >
-          <p class="font-serif text-sm italic text-[#b23b2e]" role="alert">{{ error }}</p>
+          <p class="font-serif text-sm italic text-sketchred" role="alert">{{ error }}</p>
           <button type="button" class="sketch-btn min-h-[44px] px-4" @click="retryAll">
             重新加载
           </button>
@@ -241,7 +241,7 @@ onMounted(() => {
           </div>
           <p
             v-else-if="metaError"
-            class="mt-3 font-serif text-xs italic text-[#b23b2e]"
+            class="mt-3 font-serif text-xs italic text-sketchred"
           >
             {{ metaError }}
           </p>

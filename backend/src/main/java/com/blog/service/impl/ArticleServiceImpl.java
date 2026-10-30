@@ -1,6 +1,7 @@
 package com.blog.service.impl;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.blog.common.BusinessException;
@@ -11,15 +12,18 @@ import com.blog.dto.ArchiveRowDTO;
 import com.blog.entity.Article;
 import com.blog.entity.ArticleTag;
 import com.blog.entity.Category;
+import com.blog.entity.Comment;
 import com.blog.entity.Tag;
 import com.blog.mapper.ArticleMapper;
 import com.blog.mapper.ArticleTagMapper;
 import com.blog.mapper.CategoryMapper;
+import com.blog.mapper.CommentMapper;
 import com.blog.mapper.TagMapper;
 import com.blog.security.LoginUser;
 import com.blog.security.SecurityUtils;
 import com.blog.service.ArticleService;
 import com.blog.service.ArticleTagAssembler;
+import com.blog.service.StatsService;
 import com.blog.vo.ArchiveVO;
 import com.blog.vo.ArticleDetailVO;
 import com.blog.vo.ArticleSummaryVO;
@@ -61,7 +65,9 @@ public class ArticleServiceImpl implements ArticleService {
     private final ArticleTagMapper articleTagMapper;
     private final TagMapper tagMapper;
     private final CategoryMapper categoryMapper;
+    private final CommentMapper commentMapper;
     private final ArticleTagAssembler articleTagAssembler;
+    private final StatsService statsService;
     private final StringRedisTemplate stringRedisTemplate;
     private final ObjectMapper objectMapper;
 
@@ -89,7 +95,7 @@ public class ArticleServiceImpl implements ArticleService {
     }
 
     @Override
-    public ArticleDetailVO detail(Long id) {
+    public ArticleDetailVO detail(Long id, String visitorKey) {
         String cacheKey = DETAIL_CACHE_PREFIX + id;
         ArticleDetailVO detail = readDetailCache(cacheKey);
         boolean published;
@@ -127,6 +133,7 @@ public class ArticleServiceImpl implements ArticleService {
             stringRedisTemplate.opsForSet().add(VIEW_PENDING_KEY, String.valueOf(id));
             int base = dbViewCount == null ? 0 : dbViewCount;
             detail.setViewCount(base + (delta == null ? 0 : delta.intValue()));
+            statsService.recordView(id, visitorKey);
         }
         return detail;
     }
@@ -230,8 +237,8 @@ public class ArticleServiceImpl implements ArticleService {
         if (!loginUser.isAdmin() && !loginUser.getId().equals(article.getAuthorId())) {
             throw new BusinessException(ResultCode.FORBIDDEN, "无权删除该文章");
         }
-        articleMapper.deleteById(id);
-        articleTagMapper.delete(new LambdaQueryWrapper<ArticleTag>().eq(ArticleTag::getArticleId, id));
+        // 逻辑删除进回收站：保留 article_tag，恢复后标签仍在
+        articleMapper.markDeleted(id);
         evictDetailCache(id);
     }
 
@@ -270,9 +277,115 @@ public class ArticleServiceImpl implements ArticleService {
         if (article == null) {
             throw new BusinessException(ResultCode.NOT_FOUND, "文章不存在");
         }
-        articleMapper.deleteById(id);
-        articleTagMapper.delete(new LambdaQueryWrapper<ArticleTag>().eq(ArticleTag::getArticleId, id));
+        articleMapper.markDeleted(id);
         evictDetailCache(id);
+    }
+
+    @Override
+    public PageResult<ArticleSummaryVO> recyclePage(int pageNum, int pageSize, String keyword) {
+        int current = Math.max(1, pageNum);
+        int size = Math.min(Math.max(1, pageSize), 50);
+        String kw = trimToNull(keyword);
+        long total = articleMapper.selectRecycleCount(kw);
+        Page<ArticleSummaryVO> page = countSkippedPage(current, size, total);
+        IPage<ArticleSummaryVO> result = articleMapper.selectRecyclePage(page, kw);
+        articleTagAssembler.fill(result.getRecords());
+        return PageResult.of(result);
+    }
+
+    @Override
+    @Transactional
+    public ArticleSummaryVO restore(Long id) {
+        int updated = articleMapper.restore(id);
+        if (updated == 0) {
+            throw new BusinessException(ResultCode.NOT_FOUND, "文章不存在或未在回收站");
+        }
+        evictDetailCache(id);
+        return toSummary(articleMapper.selectSummaryById(id));
+    }
+
+    @Override
+    @Transactional
+    public void purge(Long id) {
+        int deleted = articleMapper.purge(id);
+        if (deleted == 0) {
+            throw new BusinessException(ResultCode.NOT_FOUND, "文章不存在或未在回收站");
+        }
+        articleTagMapper.delete(new LambdaQueryWrapper<ArticleTag>().eq(ArticleTag::getArticleId, id));
+        commentMapper.delete(new LambdaQueryWrapper<Comment>().eq(Comment::getArticleId, id));
+        statsService.purgeArticleStats(id);
+        evictDetailCache(id);
+    }
+
+    @Override
+    @Transactional
+    public int batchUpdateTop(List<Long> ids, Integer isTop) {
+        if (isTop == null || (isTop != 0 && isTop != 1)) {
+            throw new BusinessException(ResultCode.BAD_REQUEST, "置顶标记不合法");
+        }
+        List<Long> safeIds = normalizeBatchIds(ids);
+        if (safeIds.isEmpty()) {
+            return 0;
+        }
+        int updated = articleMapper.update(null, new LambdaUpdateWrapper<Article>()
+                .in(Article::getId, safeIds)
+                .set(Article::getIsTop, isTop));
+        safeIds.forEach(this::evictDetailCache);
+        return updated;
+    }
+
+    @Override
+    @Transactional
+    public int batchDelete(List<Long> ids) {
+        List<Long> safeIds = normalizeBatchIds(ids);
+        if (safeIds.isEmpty()) {
+            return 0;
+        }
+        int updated = articleMapper.markDeletedBatch(safeIds);
+        safeIds.forEach(this::evictDetailCache);
+        return updated;
+    }
+
+    @Override
+    @Transactional
+    public int batchRestore(List<Long> ids) {
+        List<Long> safeIds = normalizeBatchIds(ids);
+        if (safeIds.isEmpty()) {
+            return 0;
+        }
+        int updated = articleMapper.restoreBatch(safeIds);
+        safeIds.forEach(this::evictDetailCache);
+        return updated;
+    }
+
+    @Override
+    @Transactional
+    public int batchPurge(List<Long> ids) {
+        List<Long> safeIds = normalizeBatchIds(ids);
+        if (safeIds.isEmpty()) {
+            return 0;
+        }
+        int deleted = articleMapper.purgeBatch(safeIds);
+        if (deleted == 0) {
+            return 0;
+        }
+        articleTagMapper.delete(new LambdaQueryWrapper<ArticleTag>().in(ArticleTag::getArticleId, safeIds));
+        commentMapper.delete(new LambdaQueryWrapper<Comment>().in(Comment::getArticleId, safeIds));
+        statsService.purgeArticleStats(safeIds);
+        safeIds.forEach(this::evictDetailCache);
+        return deleted;
+    }
+
+    /** 批量操作前的 id 清洗：去空、去重、最多 100 条 */
+    private List<Long> normalizeBatchIds(List<Long> ids) {
+        if (ids == null || ids.isEmpty()) {
+            return List.of();
+        }
+        return ids.stream()
+                .filter(Objects::nonNull)
+                .distinct()
+                .limit(100)
+                .toList();
     }
 
     /** 发布状态下正文必填 */

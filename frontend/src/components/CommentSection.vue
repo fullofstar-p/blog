@@ -157,7 +157,7 @@ function countComments(list) {
       </div>
       <p
         v-if="submitted"
-        class="mt-2 border-l-2 border-dashed border-[#1f7a4d] pl-2 font-serif text-sm italic text-[#1f7a4d]"
+        class="mt-2 border-l-2 border-dashed border-sketchgreen pl-2 font-serif text-sm italic text-sketchgreen"
       >
         评论已提交，管理员审核通过后会出现在下方。
       </p>
@@ -174,9 +174,9 @@ function countComments(list) {
 
       <div
         v-else-if="loadError"
-        class="flex flex-col items-start gap-3 border-2 border-dashed border-[#b23b2e]/60 bg-paper-soft/70 p-5"
+        class="flex flex-col items-start gap-3 border-2 border-dashed border-sketchred/60 bg-paper-soft/70 p-5"
       >
-        <p class="font-serif text-sm italic text-[#b23b2e]" role="alert">{{ loadError }}</p>
+        <p class="font-serif text-sm italic text-sketchred" role="alert">{{ loadError }}</p>
         <button type="button" class="sketch-btn min-h-[44px] px-4" @click="load">重新加载</button>
       </div>
 

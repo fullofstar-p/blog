@@ -2,6 +2,11 @@ import request from './request'
 
 /** 管理端 /api/admin：文章、评论审核、分类、标签、用户 */
 
+// ---------- 内容看板 ----------
+export function getAdminDashboard(params) {
+  return request.get('/admin/stats/dashboard', { params })
+}
+
 // ---------- 文章 ----------
 export function listAdminArticles(params) {
   return request.get('/admin/articles', { params })
@@ -13,6 +18,34 @@ export function updateArticleTop(id, isTop) {
 
 export function deleteAdminArticle(id) {
   return request.delete(`/admin/articles/${id}`)
+}
+
+export function batchUpdateArticleTop(ids, isTop) {
+  return request.put('/admin/articles/batch/top', { ids, isTop })
+}
+
+export function batchDeleteAdminArticles(ids) {
+  return request.post('/admin/articles/batch/delete', { ids })
+}
+
+export function batchRestoreAdminArticles(ids) {
+  return request.post('/admin/articles/batch/restore', { ids })
+}
+
+export function batchPurgeAdminArticles(ids) {
+  return request.post('/admin/articles/batch/purge', { ids })
+}
+
+export function listRecycleArticles(params) {
+  return request.get('/admin/articles/recycle', { params })
+}
+
+export function restoreAdminArticle(id) {
+  return request.put(`/admin/articles/${id}/restore`)
+}
+
+export function purgeAdminArticle(id) {
+  return request.delete(`/admin/articles/${id}/purge`)
 }
 
 // ---------- 评论审核 ----------
