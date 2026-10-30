@@ -206,6 +206,12 @@ FileVO      { url, objectKey, originalName, size, contentType }
 | GET | `/api/admin/articles/recycle` | ADMIN | `pageNum, pageSize, keyword?` | `PageResult<ArticleSummaryVO>`（含 `deletedTime`） |
 | PUT | `/api/admin/articles/{id}/restore` | ADMIN | - | `ArticleSummaryVO` |
 | DELETE | `/api/admin/articles/{id}/purge` | ADMIN | - | `null`（彻底删除，不可恢复） |
+| PUT | `/api/admin/articles/batch/top` | ADMIN | `{ ids: number[], isTop: 0 \| 1 }` | 受影响文章数 |
+| POST | `/api/admin/articles/batch/delete` | ADMIN | `{ ids: number[] }` | 进入回收站的文章数 |
+| POST | `/api/admin/articles/batch/restore` | ADMIN | `{ ids: number[] }` | 恢复的文章数 |
+| POST | `/api/admin/articles/batch/purge` | ADMIN | `{ ids: number[] }` | 彻底删除的文章数（仅回收站中的文章） |
+
+批量接口单次最多 100 篇；`ids` 会去空、去重。批量彻底删除同时清理标签关联、评论与每日统计。
 
 ## 10.1 管理端内容看板
 

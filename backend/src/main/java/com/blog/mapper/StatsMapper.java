@@ -44,4 +44,7 @@ public interface StatsMapper {
 
     /** 彻底删除文章时清理其每日统计 */
     int deleteArticleDaily(@Param("articleId") Long articleId);
+
+    /** 批量彻底删除时清理每日统计 */
+    int deleteArticleDailyBatch(@Param("ids") List<Long> ids);
 }

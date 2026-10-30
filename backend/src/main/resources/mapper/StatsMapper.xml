@@ -91,4 +91,13 @@
         FROM article_daily_stat
         WHERE article_id = #{articleId}
     </delete>
+
+    <delete id="deleteArticleDailyBatch">
+        DELETE
+        FROM article_daily_stat
+        WHERE article_id IN
+        <foreach collection="ids" item="id" open="(" separator="," close=")">
+            #{id}
+        </foreach>
+    </delete>
 </mapper>

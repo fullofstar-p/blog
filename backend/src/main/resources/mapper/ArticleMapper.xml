@@ -317,6 +317,38 @@
           AND deleted = 1
     </delete>
 
+    <update id="markDeletedBatch">
+        UPDATE article
+        SET deleted = 1,
+            deleted_time = NOW()
+        WHERE deleted = 0
+          AND id IN
+        <foreach collection="ids" item="id" open="(" separator="," close=")">
+            #{id}
+        </foreach>
+    </update>
+
+    <update id="restoreBatch">
+        UPDATE article
+        SET deleted = 0,
+            deleted_time = NULL
+        WHERE deleted = 1
+          AND id IN
+        <foreach collection="ids" item="id" open="(" separator="," close=")">
+            #{id}
+        </foreach>
+    </update>
+
+    <delete id="purgeBatch">
+        DELETE
+        FROM article
+        WHERE deleted = 1
+          AND id IN
+        <foreach collection="ids" item="id" open="(" separator="," close=")">
+            #{id}
+        </foreach>
+    </delete>
+
     <!-- 按当前页文章 ID 批量取标签（含标签的已发布文章数），替代原先逐行相关子查询。
          一次请求只跑这一条，且只扫当前页涉及的标签，列表不再随总文章数变慢。 -->
     <select id="selectTagsByArticleIds" resultType="com.blog.dto.ArticleTagRowDTO">

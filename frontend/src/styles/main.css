@@ -240,6 +240,55 @@
     @apply animate-pulse rounded-sketch border border-dashed border-pencil/20 bg-pencil-line/60;
   }
 
+  /* ---------- 批量管理复选框（手绘虚线方框） ---------- */
+  .sketch-checkbox {
+    display: inline-flex;
+    width: 18px;
+    height: 18px;
+    flex: none;
+    align-items: center;
+    justify-content: center;
+    appearance: none;
+    border: 2px dashed rgb(var(--pencil) / 0.7);
+    border-radius: 2px;
+    background-color: transparent;
+    cursor: pointer;
+    vertical-align: middle;
+  }
+
+  .sketch-checkbox:checked {
+    border-style: solid;
+    border-color: rgb(var(--pencil));
+    background-color: rgb(var(--pencil));
+  }
+
+  .sketch-checkbox:checked::after {
+    content: '✓';
+    color: rgb(var(--paper));
+    font-family: var(--font-segoe, sans-serif);
+    font-size: 12px;
+    font-style: normal;
+    line-height: 1;
+  }
+
+  .sketch-checkbox:indeterminate {
+    border-style: solid;
+    border-color: rgb(var(--pencil));
+    background-color: rgb(var(--pencil) / 0.25);
+  }
+
+  .sketch-checkbox:indeterminate::after {
+    content: '';
+    width: 8px;
+    height: 2px;
+    background-color: rgb(var(--pencil));
+  }
+
+  .sketch-checkbox:focus-visible {
+    outline: 2px dashed rgb(var(--pencil));
+    outline-offset: 2px;
+  }
+
   /* 暗色下的波浪下划线换成粉笔白（SVG 里的 stroke 是固定色） */
   html.dark .sketch-wavy {
     background-image: url("data:image/svg+xml,%3Csvg%20xmlns='http://www.w3.org/2000/svg'%20width='16'%20height='6'%20viewBox='0%200%2016%206'%3E%3Cpath%20d='M0%204%20Q%204%201%208%204%20T%2016%204'%20fill='none'%20stroke='%23e7e1d5'%20stroke-width='1.2'%20stroke-linecap='round'/%3E%3C/svg%3E");

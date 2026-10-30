@@ -1,6 +1,7 @@
 package com.blog.service.impl;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.blog.common.BusinessException;
@@ -314,6 +315,77 @@ public class ArticleServiceImpl implements ArticleService {
         commentMapper.delete(new LambdaQueryWrapper<Comment>().eq(Comment::getArticleId, id));
         statsService.purgeArticleStats(id);
         evictDetailCache(id);
+    }
+
+    @Override
+    @Transactional
+    public int batchUpdateTop(List<Long> ids, Integer isTop) {
+        if (isTop == null || (isTop != 0 && isTop != 1)) {
+            throw new BusinessException(ResultCode.BAD_REQUEST, "置顶标记不合法");
+        }
+        List<Long> safeIds = normalizeBatchIds(ids);
+        if (safeIds.isEmpty()) {
+            return 0;
+        }
+        int updated = articleMapper.update(null, new LambdaUpdateWrapper<Article>()
+                .in(Article::getId, safeIds)
+                .set(Article::getIsTop, isTop));
+        safeIds.forEach(this::evictDetailCache);
+        return updated;
+    }
+
+    @Override
+    @Transactional
+    public int batchDelete(List<Long> ids) {
+        List<Long> safeIds = normalizeBatchIds(ids);
+        if (safeIds.isEmpty()) {
+            return 0;
+        }
+        int updated = articleMapper.markDeletedBatch(safeIds);
+        safeIds.forEach(this::evictDetailCache);
+        return updated;
+    }
+
+    @Override
+    @Transactional
+    public int batchRestore(List<Long> ids) {
+        List<Long> safeIds = normalizeBatchIds(ids);
+        if (safeIds.isEmpty()) {
+            return 0;
+        }
+        int updated = articleMapper.restoreBatch(safeIds);
+        safeIds.forEach(this::evictDetailCache);
+        return updated;
+    }
+
+    @Override
+    @Transactional
+    public int batchPurge(List<Long> ids) {
+        List<Long> safeIds = normalizeBatchIds(ids);
+        if (safeIds.isEmpty()) {
+            return 0;
+        }
+        int deleted = articleMapper.purgeBatch(safeIds);
+        if (deleted == 0) {
+            return 0;
+        }
+        articleTagMapper.delete(new LambdaQueryWrapper<ArticleTag>().in(ArticleTag::getArticleId, safeIds));
+        commentMapper.delete(new LambdaQueryWrapper<Comment>().in(Comment::getArticleId, safeIds));
+        statsService.purgeArticleStats(safeIds);
+        safeIds.forEach(this::evictDetailCache);
+        return deleted;
+    }
+
+    /** 批量操作前的 id 清洗：去空、去重、最多 100 条 */
+    private List<Long> normalizeBatchIds(List<Long> ids) {
+        if (ids == null || ids.isEmpty()) {
+            return List.of();
+        }
+        return ids.stream()
+                .filter(Objects::nonNull)
+                .distinct()
+                .limit(100)
+                .toList();
     }
 
     /** 发布状态下正文必填 */

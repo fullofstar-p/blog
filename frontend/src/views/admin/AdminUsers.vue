@@ -18,6 +18,8 @@ const total = ref(0)
 const pageNum = ref(1)
 const pageSize = 10
 const loading = ref(false)
+const refreshing = ref(false)
+const loadedOnce = ref(false)
 const error = ref('')
 const processingId = ref(null)
 const confirmTarget = ref(null)
@@ -39,7 +41,10 @@ const confirmMessage = computed(() => {
 })
 
 async function load() {
-  loading.value = true
+  // 首次才显示骨架屏，筛选/重置/翻页时保留列表刷新，避免闪烁
+  const showSkeleton = !loadedOnce.value || Boolean(error.value)
+  if (showSkeleton) loading.value = true
+  else refreshing.value = true
   error.value = ''
   try {
     const params = { pageNum: pageNum.value, pageSize }
@@ -54,6 +59,8 @@ async function load() {
     users.value = []
   } finally {
     loading.value = false
+    refreshing.value = false
+    loadedOnce.value = true
   }
 }
 
@@ -120,7 +127,10 @@ onMounted(load)
     <div class="flex flex-wrap items-end justify-between gap-3">
       <div>
         <h2 class="font-serif text-2xl italic text-pencil md:text-3xl">用户管理</h2>
-        <p class="mt-1 font-serif text-sm italic text-ink-500">共 {{ total }} 位注册用户</p>
+        <p class="mt-1 font-serif text-sm italic text-ink-500">
+          共 {{ total }} 位注册用户
+          <span v-if="refreshing" class="ml-1 text-ink-300" role="status">· 更新中…</span>
+        </p>
       </div>
     </div>
 
@@ -177,7 +187,12 @@ onMounted(load)
       icon="☺"
     />
 
-    <div v-else class="mt-5 overflow-x-auto border-2 border-dashed border-pencil/50 bg-paper-soft/40 p-2">
+    <div
+      v-else
+      class="mt-5 overflow-x-auto border-2 border-dashed border-pencil/50 bg-paper-soft/40 p-2 transition-opacity duration-150"
+      :class="{ 'pointer-events-none opacity-60': refreshing }"
+      :aria-busy="refreshing ? 'true' : 'false'"
+    >
       <table class="w-full min-w-[760px] border-collapse text-left">
         <caption class="sr-only">用户列表</caption>
         <thead>

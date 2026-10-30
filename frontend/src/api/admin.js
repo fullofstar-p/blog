@@ -20,6 +20,22 @@ export function deleteAdminArticle(id) {
   return request.delete(`/admin/articles/${id}`)
 }
 
+export function batchUpdateArticleTop(ids, isTop) {
+  return request.put('/admin/articles/batch/top', { ids, isTop })
+}
+
+export function batchDeleteAdminArticles(ids) {
+  return request.post('/admin/articles/batch/delete', { ids })
+}
+
+export function batchRestoreAdminArticles(ids) {
+  return request.post('/admin/articles/batch/restore', { ids })
+}
+
+export function batchPurgeAdminArticles(ids) {
+  return request.post('/admin/articles/batch/purge', { ids })
+}
+
 export function listRecycleArticles(params) {
   return request.get('/admin/articles/recycle', { params })
 }

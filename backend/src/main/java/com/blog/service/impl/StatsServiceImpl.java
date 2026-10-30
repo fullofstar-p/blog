@@ -191,6 +191,13 @@ public class StatsServiceImpl implements StatsService {
         }
     }
 
+    @Override
+    public void purgeArticleStats(List<Long> articleIds) {
+        if (articleIds != null && !articleIds.isEmpty()) {
+            statsMapper.deleteArticleDailyBatch(articleIds);
+        }
+    }
+
     private void flushDate(LocalDate date, LocalDate today) {
         String dateText = date.format(DATE);
         String pvKey = PV_PREFIX + dateText;

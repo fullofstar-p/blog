@@ -86,6 +86,17 @@ src/
 数据来自 `GET /api/admin/stats/dashboard?days=30`；PV/UV 统计说明见 [README.md](../README.md)
 与 [ROADMAP.md](../docs/ROADMAP.md) 第 8 节。
 
+## 批量管理与列表刷新
+
+- 文章管理：当前页全选/半选（`sketch-checkbox`）、批量置顶/取消置顶、批量删除；删除确认后进入回收站，
+  可在回收站批量恢复。
+- 回收站：批量恢复、批量彻底删除（同时清理标签关联、评论与每日统计）。
+- 批量接口单次最多 100 篇，后端会去空、去重；批量置顶/删除/恢复/彻底删除分别走
+  `batch/top`、`batch/delete`、`batch/restore`、`batch/purge`。
+- **列表不闪烁**：首次加载才显示骨架屏，之后筛选/重置/翻页/操作后刷新时保留现有表格并加
+  `opacity-60` + `aria-busy`，表头显示「更新中…」，不会再出现「表格 → 骨架屏 → 表格」的闪烁。
+  文章管理、回收站、评论审核、用户管理都已改为该模式。
+
 ## Markdown / 代码高亮
 
 后台编辑器的「内核」仍是 **Vditor 即时渲染（IR）**，交互与 UI 外壳按 **Typora** 重做：

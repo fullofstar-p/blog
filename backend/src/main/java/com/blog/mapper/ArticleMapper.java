@@ -122,6 +122,15 @@ public interface ArticleMapper extends BaseMapper<Article> {
      */
     int restore(@Param("id") Long id);
 
+    /** 批量逻辑删除，仅处理未删除的文章 */
+    int markDeletedBatch(@Param("ids") List<Long> ids);
+
+    /** 批量从回收站恢复 */
+    int restoreBatch(@Param("ids") List<Long> ids);
+
+    /** 批量物理删除（仅删除回收站中的文章） */
+    int purgeBatch(@Param("ids") List<Long> ids);
+
     /**
      * 彻底删除（物理删除），仅允许删除回收站中的文章。
      *

@@ -2,6 +2,8 @@ package com.blog.service;
 
 import com.blog.vo.DashboardVO;
 
+import java.util.List;
+
 /**
  * 内容看板与访问统计。
  */
@@ -18,4 +20,7 @@ public interface StatsService {
 
     /** 彻底删除文章时清理其每日统计 */
     void purgeArticleStats(Long articleId);
+
+    /** 批量彻底删除时清理每日统计 */
+    void purgeArticleStats(List<Long> articleIds);
 }
