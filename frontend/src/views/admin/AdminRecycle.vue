@@ -134,9 +134,9 @@ onMounted(load)
 
     <div
       v-else-if="error"
-      class="mt-5 flex flex-col items-start gap-3 border-2 border-dashed border-[#b23b2e]/60 bg-paper-soft/70 p-5"
+      class="mt-5 flex flex-col items-start gap-3 border-2 border-dashed border-sketchred/60 bg-paper-soft/70 p-5"
     >
-      <p class="font-serif text-sm italic text-[#b23b2e]" role="alert">{{ error }}</p>
+      <p class="font-serif text-sm italic text-sketchred" role="alert">{{ error }}</p>
       <button type="button" class="sketch-btn min-h-[44px] px-4" @click="load">重新加载</button>
     </div>
 
@@ -174,15 +174,15 @@ onMounted(load)
               <span class="font-serif text-base italic text-pencil line-through decoration-dashed">
                 {{ article.title }}
               </span>
-              <span v-if="article.isTop === 1" class="ml-1 text-[#b23b2e]" title="已置顶">★</span>
+              <span v-if="article.isTop === 1" class="ml-1 text-sketchred" title="已置顶">★</span>
             </td>
             <td class="px-3 py-3">
               <span
                 class="sketch-badge"
                 :class="
                   article.status === 1
-                    ? 'border-[#1f7a4d]/60 text-[#1f7a4d]'
-                    : 'border-[#9a6a00]/60 text-[#7a5300]'
+                    ? 'border-sketchgreen/60 text-sketchgreen'
+                    : 'border-sketchyellow/60 text-sketchyellow-deep'
                 "
               >
                 {{ article.status === 1 ? '已发布' : '草稿' }}
@@ -203,7 +203,7 @@ onMounted(load)
                 </button>
                 <button
                   type="button"
-                  class="inline-flex min-h-[44px] items-center border-2 border-dashed border-[#b23b2e]/70 px-2 font-serif text-xs italic text-[#b23b2e] transition-colors hover:bg-[#b23b2e] hover:text-paper"
+                  class="inline-flex min-h-[44px] items-center border-2 border-dashed border-sketchred/70 px-2 font-serif text-xs italic text-sketchred transition-colors hover:bg-sketchred hover:text-paper"
                   @click="askPurge(article)"
                 >
                   彻底删除
@@ -232,7 +232,7 @@ onMounted(load)
       <p class="font-serif text-sm leading-relaxed text-ink-700">
         确定要彻底删除《{{ purgeTarget ? purgeTarget.title : '' }}》吗？
       </p>
-      <p class="mt-2 border-l-2 border-dashed border-[#b23b2e] pl-3 font-serif text-sm italic text-[#b23b2e]">
+      <p class="mt-2 border-l-2 border-dashed border-sketchred pl-3 font-serif text-sm italic text-sketchred">
         此操作会同时删除文章标签关联与评论，且无法恢复。
       </p>
       <template #footer>

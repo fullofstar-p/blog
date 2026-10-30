@@ -28,9 +28,9 @@ npm run format     # Prettier 格式化
 ```
 src/
 ├── api/         # 按 docs/API.md 封装的接口模块 + Axios 实例
-├── components/  # Sketch 通用组件、上传、Markdown、评论、管理布局
+├── components/  # Sketch 通用组件、上传、Markdown、评论、管理布局、主题切换
 ├── router/      # 路由与登录/管理员守卫
-├── store/       # auth（token 持久化）、meta（分类/标签缓存）
+├── store/       # auth（token 持久化）、meta（分类/标签缓存）、theme（暗色模式）
 ├── styles/      # Tailwind 入口、纸张纹理、手绘组件类、编辑器覆盖、阅读页纸张
 ├── utils/       # 格式化、Toast
 └── views/       # 前台页面 + admin/ 管理后台
@@ -38,20 +38,36 @@ src/
 
 ## Sketch Style 设计令牌
 
-| 令牌 | 值 | 用途 |
-| ---- | -- | ---- |
-| `paper` | `#f5f0e8` | 纸张底色（禁止纯白） |
-| `paper.deep` | `#efe7d8` | 加深纸色（代码块、侧栏） |
-| `pencil` | `#2c2c2c` | 铅笔灰主色 |
-| 强调色 | `#b23b2e` / `#2b6e96` / `#1f7a4d` / `#7a5300` | 低饱和红蓝绿黄（已按 AA 对比度加深） |
-| `shadow-sketch` | `3px 3px 0 rgba(44,44,44,.15)` | 手绘硬阴影 |
+| 令牌（Tailwind 类） | 亮色 | 暗色 | 用途 |
+| ---- | ---- | ---- | ---- |
+| `paper` | `#f5f0e8` | `#1b1a17` | 纸张底色（禁止纯白） |
+| `paper-soft` / `paper-deep` | `#faf6ee` / `#efe7d8` | `#24221e` / `#161513` | 卡片/代码块/侧栏的纸张层次 |
+| `pencil` | `#2c2c2c` | `#e7e1d5` | 铅笔灰主色（暗色为粉笔白） |
+| `ink-700/500/300` | 深灰阶 | 浅灰阶 | 正文/次要文字 |
+| 强调色 | `#b23b2e` / `#2b6e96` / `#1f7a4d` / `#9a6a00` | `#e07a6e` / `#7cb3d6` / `#6fc79a` / `#d6ad5c` | 低饱和红蓝绿黄（已按 AA 对比度调整） |
+| `shadow-sketch` | `3px 3px 0 rgba(44,44,44,.15)` | 纯黑投影 | 手绘硬阴影 |
 
+- 颜色全部绑定 CSS 变量（`src/styles/main.css` 的 `:root` / `html.dark`），Tailwind 只写语义 token；
+  强调色用 `text-sketchred` / `border-sketchgreen` 等类，不再出现 `text-[#...]` 固定色。
 - 边框统一 `border-2 border-dashed`（全局默认 `border-style: dashed`）。
 - 标题使用 `font-serif italic`；卡片/元素交替 `rotate-[-0.5deg]` / `rotate-[0.5deg]`。
 - 手绘组件类：`sketch-card`、`sketch-btn`、`sketch-input`、`sketch-badge`、`sketch-wavy`、
   `sketch-skeleton`、`sketch-tape`。
 - 交互三态：`hover` 铅笔涂黑反白、`active` 压纸（位移 + 阴影减小）、`focus-visible` 虚线描边。
 - 所有动画在 `prefers-reduced-motion: reduce` 下降级；可交互元素最小 44px。
+
+## 暗色模式
+
+- 顶栏主题按钮（◐/☀/☾）打开三选一菜单：**跟随系统 / 浅色 / 深色**；选择写入 `localStorage`
+  （`blog.theme`），刷新与重开浏览器保持，多标签页通过 `storage` 事件同步。
+- `system` 模式监听 `prefers-color-scheme`，系统切换深浅色时页面实时跟随；`index.html` 在首屏
+  渲染前先应用 `<html class="dark">` 与 `color-scheme`，避免暗色用户先看到一帧白纸。
+- 主题实现：`src/store/theme.js`（模式状态 / 系统监听 / DOM class 切换）、
+  `src/components/ThemeToggle.vue`（菜单与无障碍属性）；配色由 `main.css` 的 CSS 变量驱动。
+- 编辑器与阅读页单独处理：`markdown.css` 覆盖 `--md-*` 排版变量与 Typora 外壳（菜单、大纲、源码、
+  对话框、代码块语言列表、表格工具条），`markdown-reading.css` 覆盖纸张页面、目录、进度条、
+  复制按钮；代码高亮使用 GitHub Dark 色系。
+- 导出的 Markdown / HTML / PDF 保持浅色纸张排版，不跟随界面暗色。
 
 ## Markdown / 代码高亮
 

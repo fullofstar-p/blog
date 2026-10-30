@@ -1,6 +1,7 @@
 <script setup>
 import { onMounted, onUnmounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
+import ThemeToggle from '@/components/ThemeToggle.vue'
 import { useAuthStore } from '@/store/auth'
 import { toastSuccess } from '@/utils/toast'
 
@@ -103,6 +104,8 @@ onUnmounted(() => document.removeEventListener('click', onDocumentClick))
       </form>
 
       <div class="flex items-center gap-2">
+        <ThemeToggle />
+
         <template v-if="auth.isLoggedIn">
           <div ref="userMenuRef" class="relative">
             <button
@@ -152,7 +155,7 @@ onUnmounted(() => document.removeEventListener('click', onDocumentClick))
               <button
                 type="button"
                 role="menuitem"
-                class="flex min-h-[44px] w-full items-center px-3 text-left font-serif text-sm italic text-[#b23b2e] transition-colors hover:bg-[#b23b2e] hover:text-paper"
+                class="flex min-h-[44px] w-full items-center px-3 text-left font-serif text-sm italic text-sketchred transition-colors hover:bg-sketchred hover:text-paper"
                 @click="onLogout"
               >
                 退出登录

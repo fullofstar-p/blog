@@ -31,7 +31,7 @@ function onInput(event) {
   <div class="w-full">
     <label v-if="label" :for="uid" class="sketch-label">
       {{ label }}
-      <span v-if="required" class="ml-0.5 text-[#b23b2e]" aria-hidden="true">*</span>
+      <span v-if="required" class="ml-0.5 text-sketchred" aria-hidden="true">*</span>
     </label>
 
     <textarea
@@ -49,7 +49,7 @@ function onInput(event) {
       @input="onInput"
     />
 
-    <p v-if="error" :id="`${uid}-error`" class="mt-1.5 font-serif text-sm italic text-[#b23b2e]">
+    <p v-if="error" :id="`${uid}-error`" class="mt-1.5 font-serif text-sm italic text-sketchred">
       {{ error }}
     </p>
     <p v-else-if="hint" :id="`${uid}-hint`" class="mt-1.5 font-serif text-xs italic text-ink-300">

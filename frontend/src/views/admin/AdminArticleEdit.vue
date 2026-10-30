@@ -83,8 +83,8 @@ const autosaveLabel = computed(() => {
 })
 
 const autosaveTone = computed(() => {
-  if (autosaveState.value === 'error') return 'text-[#b23b2e]'
-  if (autosaveState.value === 'saved') return 'text-[#1f7a4d]'
+  if (autosaveState.value === 'error') return 'text-sketchred'
+  if (autosaveState.value === 'saved') return 'text-sketchgreen'
   return 'text-ink-500'
 })
 
@@ -438,8 +438,8 @@ onBeforeUnmount(() => {
           class="sketch-badge"
           :class="
             form.status === 1
-              ? 'border-[#1f7a4d]/60 text-[#1f7a4d]'
-              : 'border-[#9a6a00]/60 text-[#7a5300]'
+              ? 'border-sketchgreen/60 text-sketchgreen'
+              : 'border-sketchyellow/60 text-sketchyellow-deep'
           "
         >
           {{ form.status === 1 ? '当前：已发布' : '当前：草稿' }}
@@ -460,9 +460,9 @@ onBeforeUnmount(() => {
 
     <div
       v-else-if="loadError"
-      class="mt-5 flex flex-col items-start gap-3 border-2 border-dashed border-[#b23b2e]/60 bg-paper-soft/70 p-5"
+      class="mt-5 flex flex-col items-start gap-3 border-2 border-dashed border-sketchred/60 bg-paper-soft/70 p-5"
     >
-      <p class="font-serif text-sm italic text-[#b23b2e]" role="alert">{{ loadError }}</p>
+      <p class="font-serif text-sm italic text-sketchred" role="alert">{{ loadError }}</p>
       <div class="flex flex-wrap gap-2">
         <button type="button" class="sketch-btn min-h-[44px] px-4" @click="loadArticle">重新加载</button>
         <RouterLink :to="{ name: 'admin-articles' }" class="sketch-btn min-h-[44px] px-4">
@@ -560,7 +560,7 @@ onBeforeUnmount(() => {
 
       <section class="sketch-card rotate-[0.2deg] p-5 md:p-6">
         <h3 class="font-serif text-xl italic text-pencil">正文</h3>
-        <p v-if="errors.content" class="mt-2 font-serif text-sm italic text-[#b23b2e]" role="alert">
+        <p v-if="errors.content" class="mt-2 font-serif text-sm italic text-sketchred" role="alert">
           {{ errors.content }}
         </p>
         <div class="mt-4">
@@ -576,7 +576,7 @@ onBeforeUnmount(() => {
 
       <p
         v-if="saveError"
-        class="border-l-2 border-dashed border-[#b23b2e] pl-3 font-serif text-sm italic text-[#b23b2e]"
+        class="border-l-2 border-dashed border-sketchred pl-3 font-serif text-sm italic text-sketchred"
         role="alert"
       >
         {{ saveError }}

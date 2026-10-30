@@ -3,8 +3,8 @@ import { toastState, dismissToast } from '@/utils/toast'
 
 const toneClass = {
   info: 'border-pencil text-pencil',
-  success: 'border-[#1f7a4d] text-[#1f7a4d]',
-  error: 'border-[#b23b2e] text-[#b23b2e]'
+  success: 'border-sketchgreen text-sketchgreen',
+  error: 'border-sketchred text-sketchred'
 }
 
 const iconOf = {

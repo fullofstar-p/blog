@@ -4,6 +4,25 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta name="theme-color" content="#f5f0e8" />
+    <!-- 首屏前先决定主题，避免暗色用户看到一闪而过的白纸 -->
+    <script>
+      ;(function () {
+        try {
+          var stored = localStorage.getItem('blog.theme')
+          var mode = stored === 'light' || stored === 'dark' ? stored : 'system'
+          var dark =
+            mode === 'dark' ||
+            (mode === 'system' && window.matchMedia('(prefers-color-scheme: dark)').matches)
+          var root = document.documentElement
+          root.classList.toggle('dark', dark)
+          root.style.colorScheme = dark ? 'dark' : 'light'
+          var meta = document.querySelector('meta[name="theme-color"]')
+          if (meta) meta.setAttribute('content', dark ? '#1b1a17' : '#f5f0e8')
+        } catch (error) {
+          /* localStorage 被禁用时退回浅色 */
+        }
+      })()
+    </script>
     <meta
       name="description"
       content="技术分享博客 · 记录后端、前端、数据库与运维的工程实践（手绘素描本风格）"

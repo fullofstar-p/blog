@@ -116,9 +116,9 @@ onMounted(load)
 
     <div
       v-else-if="error"
-      class="mt-5 flex flex-col items-start gap-3 border-2 border-dashed border-[#b23b2e]/60 bg-paper-soft/70 p-5"
+      class="mt-5 flex flex-col items-start gap-3 border-2 border-dashed border-sketchred/60 bg-paper-soft/70 p-5"
     >
-      <p class="font-serif text-sm italic text-[#b23b2e]" role="alert">{{ error }}</p>
+      <p class="font-serif text-sm italic text-sketchred" role="alert">{{ error }}</p>
       <button type="button" class="sketch-btn min-h-[44px] px-4" @click="load">重新加载</button>
     </div>
 
@@ -176,7 +176,7 @@ onMounted(load)
       </div>
       <p
         v-if="formError"
-        class="mt-3 border-l-2 border-dashed border-[#b23b2e] pl-3 font-serif text-sm italic text-[#b23b2e]"
+        class="mt-3 border-l-2 border-dashed border-sketchred pl-3 font-serif text-sm italic text-sketchred"
         role="alert"
       >
         {{ formError }}

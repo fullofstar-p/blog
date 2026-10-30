@@ -168,9 +168,9 @@ onMounted(() => {
 
     <div
       v-else-if="error"
-      class="mt-5 flex flex-col items-start gap-3 border-2 border-dashed border-[#b23b2e]/60 bg-paper-soft/70 p-5"
+      class="mt-5 flex flex-col items-start gap-3 border-2 border-dashed border-sketchred/60 bg-paper-soft/70 p-5"
     >
-      <p class="font-serif text-sm italic text-[#b23b2e]" role="alert">{{ error }}</p>
+      <p class="font-serif text-sm italic text-sketchred" role="alert">{{ error }}</p>
       <button type="button" class="sketch-btn min-h-[44px] px-4" @click="load">重新加载</button>
     </div>
 
@@ -212,7 +212,7 @@ onMounted(() => {
               >
                 {{ article.title }}
               </RouterLink>
-              <span v-if="article.isTop === 1" class="ml-1 text-[#b23b2e]" title="已置顶">★</span>
+              <span v-if="article.isTop === 1" class="ml-1 text-sketchred" title="已置顶">★</span>
             </td>
             <td class="px-3 py-3">{{ article.categoryName || '未分类' }}</td>
             <td class="px-3 py-3">{{ article.authorName || '—' }}</td>
@@ -221,8 +221,8 @@ onMounted(() => {
                 class="sketch-badge"
                 :class="
                   article.status === 1
-                    ? 'border-[#1f7a4d]/60 text-[#1f7a4d]'
-                    : 'border-[#9a6a00]/60 text-[#7a5300]'
+                    ? 'border-sketchgreen/60 text-sketchgreen'
+                    : 'border-sketchyellow/60 text-sketchyellow-deep'
                 "
               >
                 {{ article.status === 1 ? '已发布' : '草稿' }}
@@ -248,7 +248,7 @@ onMounted(() => {
                 </RouterLink>
                 <button
                   type="button"
-                  class="inline-flex min-h-[44px] items-center border-2 border-dashed border-[#b23b2e]/70 px-2 font-serif text-xs italic text-[#b23b2e] transition-colors hover:bg-[#b23b2e] hover:text-paper"
+                  class="inline-flex min-h-[44px] items-center border-2 border-dashed border-sketchred/70 px-2 font-serif text-xs italic text-sketchred transition-colors hover:bg-sketchred hover:text-paper"
                   @click="askDelete(article)"
                 >
                   删除
