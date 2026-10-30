@@ -20,8 +20,8 @@ public interface ArticleService {
     /** 置顶文章列表 */
     List<ArticleSummaryVO> top(int limit);
 
-    /** 文章详情（阅读量 +1，10 分钟缓存） */
-    ArticleDetailVO detail(Long id);
+    /** 文章详情（阅读量 +1、PV/UV 统计，10 分钟缓存） */
+    ArticleDetailVO detail(Long id, String visitorKey);
 
     /** 按年月归档 */
     List<ArchiveVO> archive();

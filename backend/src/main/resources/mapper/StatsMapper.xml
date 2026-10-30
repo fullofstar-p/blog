@@ -1,0 +1,94 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<!--
+  内容看板统计：站点每日 PV/UV、文章每日阅读、发布热力图。
+  数据由 StatsSyncTask 从 Redis 增量落库；热力图直接按 article.create_time 聚合。
+-->
+<mapper namespace="com.blog.mapper.StatsMapper">
+
+    <select id="selectTotalViews" resultType="long">
+        SELECT COALESCE(SUM(a.view_count), 0)
+        FROM article a
+        WHERE a.deleted = 0
+    </select>
+
+    <select id="selectSiteDaily" resultType="com.blog.dto.DailyStatRowDTO">
+        SELECT stat_date, pv, uv
+        FROM site_daily_stat
+        WHERE stat_date BETWEEN #{start} AND #{end}
+        ORDER BY stat_date ASC
+    </select>
+
+    <select id="selectArticleDailyPv" resultType="com.blog.dto.ArticlePvRowDTO">
+        SELECT article_id, SUM(pv) AS pv
+        FROM article_daily_stat
+        WHERE stat_date BETWEEN #{start} AND #{end}
+        GROUP BY article_id
+    </select>
+
+    <select id="selectTopArticles" resultType="com.blog.vo.TopArticleVO">
+        SELECT a.id,
+               a.title,
+               a.status,
+               a.view_count AS viewCount,
+               a.create_time AS createTime,
+               c.name AS categoryName,
+               COALESCE(u.nickname, u.username) AS authorName
+        FROM article a
+        LEFT JOIN category c ON c.id = a.category_id
+        LEFT JOIN `user` u ON u.id = a.author_id
+        WHERE a.deleted = 0
+        ORDER BY a.view_count DESC, a.id DESC
+        LIMIT #{limit}
+    </select>
+
+    <select id="selectTopArticlesByRange" resultType="com.blog.vo.TopArticleVO">
+        SELECT a.id,
+               a.title,
+               a.status,
+               a.view_count AS viewCount,
+               SUM(d.pv) AS rangePv,
+               a.create_time AS createTime,
+               c.name AS categoryName,
+               COALESCE(u.nickname, u.username) AS authorName
+        FROM article_daily_stat d
+        INNER JOIN article a ON a.id = d.article_id
+        LEFT JOIN category c ON c.id = a.category_id
+        LEFT JOIN `user` u ON u.id = a.author_id
+        WHERE d.stat_date BETWEEN #{start} AND #{end}
+          AND a.deleted = 0
+        GROUP BY a.id, a.title, a.status, a.view_count, a.create_time, c.name, u.nickname, u.username
+        ORDER BY SUM(d.pv) DESC, a.view_count DESC, a.id DESC
+        LIMIT #{limit}
+    </select>
+
+    <select id="selectPublishHeatmap" resultType="com.blog.dto.HeatmapRowDTO">
+        SELECT DATE_FORMAT(a.create_time, '%Y-%m-%d') AS stat_date,
+               COUNT(*) AS `count`
+        FROM article a
+        WHERE a.deleted = 0
+          AND a.status = 1
+          AND a.create_time &gt;= #{start}
+        GROUP BY DATE_FORMAT(a.create_time, '%Y-%m-%d')
+        ORDER BY stat_date ASC
+    </select>
+
+    <insert id="upsertSiteDaily">
+        INSERT INTO site_daily_stat (stat_date, pv, uv)
+        VALUES (#{date}, #{pv}, #{uv})
+        ON DUPLICATE KEY UPDATE pv = pv + VALUES(pv),
+                                uv = GREATEST(uv, VALUES(uv))
+    </insert>
+
+    <insert id="upsertArticleDaily">
+        INSERT INTO article_daily_stat (article_id, stat_date, pv)
+        VALUES (#{articleId}, #{date}, #{pv})
+        ON DUPLICATE KEY UPDATE pv = pv + VALUES(pv)
+    </insert>
+
+    <delete id="deleteArticleDaily">
+        DELETE
+        FROM article_daily_stat
+        WHERE article_id = #{articleId}
+    </delete>
+</mapper>

@@ -70,7 +70,13 @@ const routes = [
     component: () => import('@/components/AdminLayout.vue'),
     meta: { requiresAuth: true, requiresAdmin: true },
     children: [
-      { path: '', redirect: { name: 'admin-articles' } },
+      { path: '', redirect: { name: 'admin-dashboard' } },
+      {
+        path: 'dashboard',
+        name: 'admin-dashboard',
+        component: () => import('@/views/admin/AdminDashboard.vue'),
+        meta: { title: '内容看板' }
+      },
       {
         path: 'articles',
         name: 'admin-articles',

@@ -22,6 +22,7 @@ import com.blog.security.LoginUser;
 import com.blog.security.SecurityUtils;
 import com.blog.service.ArticleService;
 import com.blog.service.ArticleTagAssembler;
+import com.blog.service.StatsService;
 import com.blog.vo.ArchiveVO;
 import com.blog.vo.ArticleDetailVO;
 import com.blog.vo.ArticleSummaryVO;
@@ -65,6 +66,7 @@ public class ArticleServiceImpl implements ArticleService {
     private final CategoryMapper categoryMapper;
     private final CommentMapper commentMapper;
     private final ArticleTagAssembler articleTagAssembler;
+    private final StatsService statsService;
     private final StringRedisTemplate stringRedisTemplate;
     private final ObjectMapper objectMapper;
 
@@ -92,7 +94,7 @@ public class ArticleServiceImpl implements ArticleService {
     }
 
     @Override
-    public ArticleDetailVO detail(Long id) {
+    public ArticleDetailVO detail(Long id, String visitorKey) {
         String cacheKey = DETAIL_CACHE_PREFIX + id;
         ArticleDetailVO detail = readDetailCache(cacheKey);
         boolean published;
@@ -130,6 +132,7 @@ public class ArticleServiceImpl implements ArticleService {
             stringRedisTemplate.opsForSet().add(VIEW_PENDING_KEY, String.valueOf(id));
             int base = dbViewCount == null ? 0 : dbViewCount;
             detail.setViewCount(base + (delta == null ? 0 : delta.intValue()));
+            statsService.recordView(id, visitorKey);
         }
         return detail;
     }
@@ -309,6 +312,7 @@ public class ArticleServiceImpl implements ArticleService {
         }
         articleTagMapper.delete(new LambdaQueryWrapper<ArticleTag>().eq(ArticleTag::getArticleId, id));
         commentMapper.delete(new LambdaQueryWrapper<Comment>().eq(Comment::getArticleId, id));
+        statsService.purgeArticleStats(id);
         evictDetailCache(id);
     }
 

@@ -3,10 +3,12 @@ package com.blog.controller;
 import com.blog.common.PageResult;
 import com.blog.common.Result;
 import com.blog.dto.ArticleSaveDTO;
+import com.blog.security.VisitorKeys;
 import com.blog.service.ArticleService;
 import com.blog.vo.ArchiveVO;
 import com.blog.vo.ArticleDetailVO;
 import com.blog.vo.ArticleSummaryVO;
+import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.DeleteMapping;
@@ -53,10 +55,10 @@ public class ArticleController {
         return Result.success(articleService.top(limit));
     }
 
-    /** 文章详情（阅读量 +1） */
+    /** 文章详情（阅读量 +1，并记录 PV/UV） */
     @GetMapping("/{id}")
-    public Result<ArticleDetailVO> detail(@PathVariable Long id) {
-        return Result.success(articleService.detail(id));
+    public Result<ArticleDetailVO> detail(@PathVariable Long id, HttpServletRequest request) {
+        return Result.success(articleService.detail(id, VisitorKeys.of(request)));
     }
 
     /** 按年月归档 */

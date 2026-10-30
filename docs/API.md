@@ -207,6 +207,15 @@ FileVO      { url, objectKey, originalName, size, contentType }
 | PUT | `/api/admin/articles/{id}/restore` | ADMIN | - | `ArticleSummaryVO` |
 | DELETE | `/api/admin/articles/{id}/purge` | ADMIN | - | `null`（彻底删除，不可恢复） |
 
+## 10.1 管理端内容看板
+
+| 方法 | 路径 | 权限 | 入参 | 出参 data |
+| ---- | ---- | ---- | ---- | --------- |
+| GET | `/api/admin/stats/dashboard` | ADMIN | `days?`（7–90，默认 30） | `DashboardVO`：totals / today / range / trend / topArticles / publish（365 天热力图 + 连续天数） |
+
+统计说明：访问已发布文章详情时记录 PV 与 UV（HyperLogLog，按日去重），Redis 每 60 秒落库到
+`site_daily_stat` / `article_daily_stat`；发布热力图按已发布文章的 `create_time` 聚合。
+
 ## 11. 健康检查
 
 | 方法 | 路径 | 权限 | 出参 |
@@ -226,7 +235,8 @@ FileVO      { url, objectKey, originalName, size, contentType }
 | `/about` | AboutPage | 关于 |
 | `/login`、`/register` | Login / Register | 认证 |
 | `/profile` | Profile | 个人资料、头像上传 |
-| `/admin` | AdminLayout | 需 ADMIN |
+| `/admin` | AdminLayout | 需 ADMIN，默认跳转内容看板 |
+| `/admin/dashboard` | AdminDashboard | 内容看板（PV/UV、趋势、热门、发布热力图） |
 | `/admin/articles`、`/admin/articles/new`、`/admin/articles/:id/edit` | 文章管理/编辑（编辑器内含自动保存草稿） |
 | `/admin/recycle` | 回收站（恢复 / 彻底删除） |
 | `/admin/comments` | 评论审核 |

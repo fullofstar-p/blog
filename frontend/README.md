@@ -69,6 +69,23 @@ src/
   复制按钮；代码高亮使用 GitHub Dark 色系。
 - 导出的 Markdown / HTML / PDF 保持浅色纸张排版，不跟随界面暗色。
 
+## 内容看板
+
+后台默认首页（`/admin/dashboard`，`views/admin/AdminDashboard.vue`）：
+
+- 概览卡片：今日 PV/UV、所选区间 PV/UV、总阅读量、文章/草稿/评论/用户。
+- **阅读趋势**：纯 SVG 折线图（不引入图表库），PV 实线 + 面积、UV 虚线，近 7 / 30 / 90 天切换；
+  鼠标悬停显示当天日期与 PV/UV；没有数据时显示采集提示。
+- **热门文章**：区间内有每日阅读数据时按区间 PV 排名，否则按总阅读量；显示排名、分类、作者、
+  总阅读与创建时间。
+- **发布热力图**：GitHub 贡献图布局，过去一年 53 周 × 7 天，按当日发布文章数分 5 级着色
+  （`.dashboard-heatmap` / `.heat-0..4`，颜色沿用主题变量，亮/暗色自动适配）；月份与星期标签、
+  每个格子带日期/发布数 tooltip，并展示当前连续、最长连续与全年发布总数。
+- 看板数据每 60 秒自动刷新（也可手动刷新）；移动端热力图横向滚动，不撑破页面。
+
+数据来自 `GET /api/admin/stats/dashboard?days=30`；PV/UV 统计说明见 [README.md](../README.md)
+与 [ROADMAP.md](../docs/ROADMAP.md) 第 8 节。
+
 ## Markdown / 代码高亮
 
 后台编辑器的「内核」仍是 **Vditor 即时渲染（IR）**，交互与 UI 外壳按 **Typora** 重做：

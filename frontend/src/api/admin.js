@@ -2,6 +2,11 @@ import request from './request'
 
 /** 管理端 /api/admin：文章、评论审核、分类、标签、用户 */
 
+// ---------- 内容看板 ----------
+export function getAdminDashboard(params) {
+  return request.get('/admin/stats/dashboard', { params })
+}
+
 // ---------- 文章 ----------
 export function listAdminArticles(params) {
   return request.get('/admin/articles', { params })

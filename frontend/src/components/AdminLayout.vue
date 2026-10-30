@@ -11,6 +11,7 @@ const router = useRouter()
 const menuOpen = ref(false)
 
 const navItems = [
+  { name: 'admin-dashboard', label: '内容看板', icon: '▤' },
   { name: 'admin-articles', label: '文章管理', icon: '✎' },
   { name: 'admin-recycle', label: '回收站', icon: '♻' },
   { name: 'admin-comments', label: '评论审核', icon: '✉' },

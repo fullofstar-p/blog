@@ -246,6 +246,100 @@
   }
 }
 
+/* ==========================================================================
+   P1-8 内容看板：GitHub 风格发布热力图
+   ========================================================================== */
+.dashboard-heatmap {
+  min-width: 790px;
+}
+
+.dashboard-heatmap-months {
+  position: relative;
+  height: 14px;
+  margin-bottom: 4px;
+}
+
+.dashboard-heatmap-month {
+  position: absolute;
+  top: 0;
+  overflow: visible;
+  color: rgb(var(--ink-300));
+  font-family: var(--font-serif, 'Noto Serif SC', Georgia, serif);
+  font-size: 10px;
+  font-style: italic;
+  line-height: 1;
+  white-space: nowrap;
+}
+
+.dashboard-heatmap-body {
+  display: flex;
+  gap: 4px;
+}
+
+.dashboard-heatmap-weekdays {
+  display: flex;
+  flex: none;
+  width: 17px;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.dashboard-heatmap-weekday {
+  height: 11px;
+  padding-right: 2px;
+  color: rgb(var(--ink-300));
+  font-size: 9px;
+  line-height: 11px;
+  text-align: right;
+}
+
+.dashboard-heatmap-weeks {
+  display: flex;
+  gap: 3px;
+}
+
+.dashboard-heatmap-week {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.dashboard-heatmap-cell {
+  display: block;
+  flex: none;
+  width: 11px;
+  height: 11px;
+  border: 1px solid rgb(var(--paper-edge));
+  border-radius: 2px;
+  background-color: rgb(var(--paper-deep));
+  transition: outline-color 0.12s ease;
+}
+
+.dashboard-heatmap-cell.heat-1 {
+  border-color: rgb(var(--sketch-blue) / 0.28);
+  background-color: rgb(var(--sketch-blue) / 0.18);
+}
+
+.dashboard-heatmap-cell.heat-2 {
+  border-color: rgb(var(--sketch-blue) / 0.4);
+  background-color: rgb(var(--sketch-blue) / 0.38);
+}
+
+.dashboard-heatmap-cell.heat-3 {
+  border-color: rgb(var(--sketch-blue) / 0.55);
+  background-color: rgb(var(--sketch-blue) / 0.62);
+}
+
+.dashboard-heatmap-cell.heat-4 {
+  border-color: rgb(var(--sketch-blue) / 0.75);
+  background-color: rgb(var(--sketch-blue));
+}
+
+.dashboard-heatmap-cell:hover {
+  outline: 1px solid rgb(var(--pencil) / 0.55);
+  outline-offset: 1px;
+}
+
 @layer utilities {
   .text-balance {
     text-wrap: balance;

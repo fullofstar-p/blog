@@ -103,6 +103,31 @@ CREATE TABLE `article_tag` (
 ) ENGINE = InnoDB DEFAULT CHARSET = utf8mb4 COLLATE = utf8mb4_unicode_ci COMMENT = '文章标签关联表';
 
 -- ----------------------------------------------------------------------------
+-- 站点每日统计（PV / UV）：由 Redis 增量定时落库
+-- ----------------------------------------------------------------------------
+DROP TABLE IF EXISTS `site_daily_stat`;
+CREATE TABLE `site_daily_stat` (
+  `stat_date`   DATE     NOT NULL COMMENT '统计日期',
+  `pv`          BIGINT   NOT NULL DEFAULT 0 COMMENT '页面浏览量（PV）',
+  `uv`          BIGINT   NOT NULL DEFAULT 0 COMMENT '独立访客（UV，按日去重）',
+  `update_time` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+  PRIMARY KEY (`stat_date`)
+) ENGINE = InnoDB DEFAULT CHARSET = utf8mb4 COLLATE = utf8mb4_unicode_ci COMMENT = '站点每日访问统计';
+
+-- ----------------------------------------------------------------------------
+-- 文章每日阅读统计：用于区间热门文章
+-- ----------------------------------------------------------------------------
+DROP TABLE IF EXISTS `article_daily_stat`;
+CREATE TABLE `article_daily_stat` (
+  `article_id`  BIGINT   NOT NULL COMMENT '文章 ID',
+  `stat_date`   DATE     NOT NULL COMMENT '统计日期',
+  `pv`          BIGINT   NOT NULL DEFAULT 0 COMMENT '当日阅读量',
+  `update_time` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+  PRIMARY KEY (`article_id`, `stat_date`),
+  KEY `idx_article_daily_date` (`stat_date`)
+) ENGINE = InnoDB DEFAULT CHARSET = utf8mb4 COLLATE = utf8mb4_unicode_ci COMMENT = '文章每日阅读统计';
+
+-- ----------------------------------------------------------------------------
 -- 评论表（两级：parent_id 为 NULL 表示一级评论，否则为回复）
 -- 状态：0 待审核 / 1 已通过 / 2 已拒绝
 -- ----------------------------------------------------------------------------
