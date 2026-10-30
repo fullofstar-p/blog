@@ -34,6 +34,8 @@ const saving = ref(false)
 const autosaving = ref(false)
 const saveError = ref('')
 
+const editorRef = ref(null)
+
 const form = reactive({
   title: '',
   summary: '',
@@ -360,8 +362,17 @@ function buildPayload(status) {
   }
 }
 
+/** Vditor 的 input 回调有延迟，提交前强制同步一次最新正文，避免误判正文为空 */
+function syncEditorContent() {
+  const value = editorRef.value?.getMarkdown?.()
+  if (typeof value === 'string' && value !== form.content) {
+    form.content = value
+  }
+}
+
 async function submit(status) {
   saveError.value = ''
+  syncEditorContent()
   if (!validate(status === 1)) return
   saving.value = true
   try {
@@ -565,6 +576,7 @@ onBeforeUnmount(() => {
         </p>
         <div class="mt-4">
           <MarkdownEditor
+            ref="editorRef"
             v-model="form.content"
             :file-name="form.title"
             placeholder="用 Markdown 写正文；图片可直接粘贴或拖入编辑器…"
