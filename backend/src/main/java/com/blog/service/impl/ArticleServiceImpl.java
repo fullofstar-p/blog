@@ -11,10 +11,12 @@ import com.blog.dto.ArchiveRowDTO;
 import com.blog.entity.Article;
 import com.blog.entity.ArticleTag;
 import com.blog.entity.Category;
+import com.blog.entity.Comment;
 import com.blog.entity.Tag;
 import com.blog.mapper.ArticleMapper;
 import com.blog.mapper.ArticleTagMapper;
 import com.blog.mapper.CategoryMapper;
+import com.blog.mapper.CommentMapper;
 import com.blog.mapper.TagMapper;
 import com.blog.security.LoginUser;
 import com.blog.security.SecurityUtils;
@@ -61,6 +63,7 @@ public class ArticleServiceImpl implements ArticleService {
     private final ArticleTagMapper articleTagMapper;
     private final TagMapper tagMapper;
     private final CategoryMapper categoryMapper;
+    private final CommentMapper commentMapper;
     private final ArticleTagAssembler articleTagAssembler;
     private final StringRedisTemplate stringRedisTemplate;
     private final ObjectMapper objectMapper;
@@ -230,8 +233,8 @@ public class ArticleServiceImpl implements ArticleService {
         if (!loginUser.isAdmin() && !loginUser.getId().equals(article.getAuthorId())) {
             throw new BusinessException(ResultCode.FORBIDDEN, "无权删除该文章");
         }
-        articleMapper.deleteById(id);
-        articleTagMapper.delete(new LambdaQueryWrapper<ArticleTag>().eq(ArticleTag::getArticleId, id));
+        // 逻辑删除进回收站：保留 article_tag，恢复后标签仍在
+        articleMapper.markDeleted(id);
         evictDetailCache(id);
     }
 
@@ -270,8 +273,42 @@ public class ArticleServiceImpl implements ArticleService {
         if (article == null) {
             throw new BusinessException(ResultCode.NOT_FOUND, "文章不存在");
         }
-        articleMapper.deleteById(id);
+        articleMapper.markDeleted(id);
+        evictDetailCache(id);
+    }
+
+    @Override
+    public PageResult<ArticleSummaryVO> recyclePage(int pageNum, int pageSize, String keyword) {
+        int current = Math.max(1, pageNum);
+        int size = Math.min(Math.max(1, pageSize), 50);
+        String kw = trimToNull(keyword);
+        long total = articleMapper.selectRecycleCount(kw);
+        Page<ArticleSummaryVO> page = countSkippedPage(current, size, total);
+        IPage<ArticleSummaryVO> result = articleMapper.selectRecyclePage(page, kw);
+        articleTagAssembler.fill(result.getRecords());
+        return PageResult.of(result);
+    }
+
+    @Override
+    @Transactional
+    public ArticleSummaryVO restore(Long id) {
+        int updated = articleMapper.restore(id);
+        if (updated == 0) {
+            throw new BusinessException(ResultCode.NOT_FOUND, "文章不存在或未在回收站");
+        }
+        evictDetailCache(id);
+        return toSummary(articleMapper.selectSummaryById(id));
+    }
+
+    @Override
+    @Transactional
+    public void purge(Long id) {
+        int deleted = articleMapper.purge(id);
+        if (deleted == 0) {
+            throw new BusinessException(ResultCode.NOT_FOUND, "文章不存在或未在回收站");
+        }
         articleTagMapper.delete(new LambdaQueryWrapper<ArticleTag>().eq(ArticleTag::getArticleId, id));
+        commentMapper.delete(new LambdaQueryWrapper<Comment>().eq(Comment::getArticleId, id));
         evictDetailCache(id);
     }
 

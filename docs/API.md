@@ -202,7 +202,10 @@ FileVO      { url, objectKey, originalName, size, contentType }
 | ---- | ---- | ---- | ---- | --------- |
 | GET | `/api/admin/articles` | ADMIN | `pageNum, pageSize, status?, keyword?, categoryId?` | `PageResult<ArticleSummaryVO>` |
 | PUT | `/api/admin/articles/{id}/top` | ADMIN | `{ isTop: 0 \| 1 }` | `null` |
-| DELETE | `/api/admin/articles/{id}` | ADMIN | - | `null` |
+| DELETE | `/api/admin/articles/{id}` | ADMIN | - | `null`（逻辑删除，进入回收站） |
+| GET | `/api/admin/articles/recycle` | ADMIN | `pageNum, pageSize, keyword?` | `PageResult<ArticleSummaryVO>`（含 `deletedTime`） |
+| PUT | `/api/admin/articles/{id}/restore` | ADMIN | - | `ArticleSummaryVO` |
+| DELETE | `/api/admin/articles/{id}/purge` | ADMIN | - | `null`（彻底删除，不可恢复） |
 
 ## 11. 健康检查
 
@@ -224,6 +227,7 @@ FileVO      { url, objectKey, originalName, size, contentType }
 | `/login`、`/register` | Login / Register | 认证 |
 | `/profile` | Profile | 个人资料、头像上传 |
 | `/admin` | AdminLayout | 需 ADMIN |
-| `/admin/articles`、`/admin/articles/new`、`/admin/articles/:id/edit` | 文章管理/编辑 |
+| `/admin/articles`、`/admin/articles/new`、`/admin/articles/:id/edit` | 文章管理/编辑（编辑器内含自动保存草稿） |
+| `/admin/recycle` | 回收站（恢复 / 彻底删除） |
 | `/admin/comments` | 评论审核 |
 | `/admin/categories`、`/admin/tags`、`/admin/users` | 分类/标签/用户管理 |

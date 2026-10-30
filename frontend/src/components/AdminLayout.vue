@@ -12,6 +12,7 @@ const menuOpen = ref(false)
 
 const navItems = [
   { name: 'admin-articles', label: '文章管理', icon: '✎' },
+  { name: 'admin-recycle', label: '回收站', icon: '♻' },
   { name: 'admin-comments', label: '评论审核', icon: '✉' },
   { name: 'admin-categories', label: '分类管理', icon: '◈' },
   { name: 'admin-tags', label: '标签管理', icon: '#' },
@@ -80,7 +81,7 @@ async function onLogout() {
             :key="item.name"
             :to="{ name: item.name }"
             class="flex min-h-[44px] items-center gap-2 border-2 border-dashed border-pencil/60 px-3 font-serif text-base italic text-pencil transition-all duration-150 hover:-rotate-1 hover:bg-pencil hover:text-paper active:translate-y-[1px]"
-            active-class="border-pencil bg-pencil text-paper"
+            active-class="border-pencil bg-pencil !text-paper"
           >
             <span aria-hidden="true">{{ item.icon }}</span>
             {{ item.label }}

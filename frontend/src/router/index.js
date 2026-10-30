@@ -91,6 +91,12 @@ const routes = [
         meta: { title: '编辑文章' }
       },
       {
+        path: 'recycle',
+        name: 'admin-recycle',
+        component: () => import('@/views/admin/AdminRecycle.vue'),
+        meta: { title: '回收站' }
+      },
+      {
         path: 'comments',
         name: 'admin-comments',
         component: () => import('@/views/admin/AdminComments.vue'),

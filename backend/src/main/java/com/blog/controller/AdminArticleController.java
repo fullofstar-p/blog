@@ -49,4 +49,26 @@ public class AdminArticleController {
         articleService.adminDelete(id);
         return Result.success();
     }
+
+    /** 回收站分页 */
+    @GetMapping("/recycle")
+    public Result<PageResult<ArticleSummaryVO>> recycle(
+            @RequestParam(defaultValue = "1") int pageNum,
+            @RequestParam(defaultValue = "10") int pageSize,
+            @RequestParam(required = false) String keyword) {
+        return Result.success(articleService.recyclePage(pageNum, pageSize, keyword));
+    }
+
+    /** 从回收站恢复文章 */
+    @PutMapping("/{id}/restore")
+    public Result<ArticleSummaryVO> restore(@PathVariable Long id) {
+        return Result.success(articleService.restore(id));
+    }
+
+    /** 彻底删除回收站中的文章（不可恢复） */
+    @DeleteMapping("/{id}/purge")
+    public Result<Void> purge(@PathVariable Long id) {
+        articleService.purge(id);
+        return Result.success();
+    }
 }

@@ -81,11 +81,13 @@ CREATE TABLE `article` (
   `create_time` DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
   `update_time` DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
   `deleted`     TINYINT      NOT NULL DEFAULT 0 COMMENT '逻辑删除：0 正常 / 1 已删除',
+  `deleted_time` DATETIME    DEFAULT NULL COMMENT '删除时间（回收站；NULL 表示未删除）',
   PRIMARY KEY (`id`),
   KEY `idx_article_category` (`category_id`),
   KEY `idx_article_author` (`author_id`),
   KEY `idx_article_status_time` (`status`, `create_time`),
   KEY `idx_article_top` (`is_top`),
+  KEY `idx_article_deleted_time` (`deleted`, `deleted_time`),
   FULLTEXT KEY `ft_article_ngram` (`title`, `summary`, `content`) WITH PARSER ngram
 ) ENGINE = InnoDB DEFAULT CHARSET = utf8mb4 COLLATE = utf8mb4_unicode_ci COMMENT = '文章表';
 

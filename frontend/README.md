@@ -138,6 +138,19 @@ src/
   Vditor 的 lute / 中文语言包 / 图标 / 高亮样式在 `predev`、`prebuild` 时由
   `scripts/copy-vditor.mjs` 拷到 `public/vditor`（已 gitignore），不依赖外网 CDN。
 
+**自动保存草稿（P0-2）**：`AdminArticleEdit.vue` 在内容变化 700ms 防抖后写 localStorage
+（`utils/articleDraft.js`，新文章存 `new` 键、编辑页存文章 ID），同时每 15 秒把草稿
+（`status=0`，含标题/摘要/正文/封面/分类/标签）写回服务端；新文章第一次自动保存会创建草稿并记住
+ID，之后只更新不重复建稿。已发布文章只写本地草稿，不会自动改线上内容。编辑器右上角显示
+「本地草稿已保存 / 正在自动保存 / 已自动保存 HH:mm:ss / 自动保存失败」；刷新或重新进入时若本地草稿
+比服务端新，会弹「发现未保存的草稿」供恢复/丢弃；有未保存修改时关闭页面或站内跳转会先提示，
+离开前再落一次本地草稿。
+
+**回收站（P0-8）**：后台「回收站」（`/admin/recycle`，`AdminRecycle.vue`）列出已删除文章
+（标题/原状态/分类/作者/删除时间），支持按标题摘要搜索、分页、恢复和彻底删除；
+恢复后文章回到文章列表（标签保留），彻底删除会物理删除文章、标签关联与评论，不可恢复。
+管理后台「文章管理」的删除文案同步改为「进入回收站，可以恢复」，侧边导航新增「回收站」入口。
+
 **阅读页**用 `MarkdownViewer`（md-editor-v3 预览）与后台编辑器共用同一套 Typora 排版：
 
 - 正文是一张 **Typora 式纸张页面**（`.typora-page`，样式在 `src/styles/markdown-reading.css`）：

@@ -117,9 +117,14 @@ onMounted(() => {
         <h2 class="font-serif text-2xl italic text-pencil md:text-3xl">文章管理</h2>
         <p class="mt-1 font-serif text-sm italic text-ink-500">共 {{ total }} 篇文章</p>
       </div>
-      <RouterLink :to="{ name: 'admin-article-new' }" class="sketch-btn sketch-btn-primary min-h-[44px] px-5">
-        ✎ 写新文章
-      </RouterLink>
+      <div class="flex flex-wrap gap-2">
+        <RouterLink :to="{ name: 'admin-recycle' }" class="sketch-btn min-h-[44px] px-5">
+          ♻ 回收站
+        </RouterLink>
+        <RouterLink :to="{ name: 'admin-article-new' }" class="sketch-btn sketch-btn-primary min-h-[44px] px-5">
+          ✎ 写新文章
+        </RouterLink>
+      </div>
     </div>
 
     <form
@@ -270,7 +275,7 @@ onMounted(() => {
       @update:model-value="deleteTarget = null"
     >
       <p class="font-serif text-sm leading-relaxed text-ink-700">
-        确定要删除《{{ deleteTarget ? deleteTarget.title : '' }}》吗？删除为逻辑删除。
+        确定要删除《{{ deleteTarget ? deleteTarget.title : '' }}》吗？删除后文章会进入回收站，可以恢复。
       </p>
       <template #footer>
         <SketchButton variant="ghost" @click="deleteTarget = null">取消</SketchButton>

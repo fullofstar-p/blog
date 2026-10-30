@@ -45,6 +45,15 @@ public interface ArticleService {
     /** 管理端置顶/取消置顶 */
     void updateTop(Long id, Integer isTop);
 
-    /** 管理端删除文章 */
+    /** 管理端删除文章（逻辑删除，进入回收站） */
     void adminDelete(Long id);
+
+    /** 回收站分页 */
+    PageResult<ArticleSummaryVO> recyclePage(int pageNum, int pageSize, String keyword);
+
+    /** 从回收站恢复文章 */
+    ArticleSummaryVO restore(Long id);
+
+    /** 彻底删除回收站中的文章（不可恢复） */
+    void purge(Long id);
 }

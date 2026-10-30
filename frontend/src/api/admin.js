@@ -15,6 +15,18 @@ export function deleteAdminArticle(id) {
   return request.delete(`/admin/articles/${id}`)
 }
 
+export function listRecycleArticles(params) {
+  return request.get('/admin/articles/recycle', { params })
+}
+
+export function restoreAdminArticle(id) {
+  return request.put(`/admin/articles/${id}/restore`)
+}
+
+export function purgeAdminArticle(id) {
+  return request.delete(`/admin/articles/${id}/purge`)
+}
+
 // ---------- 评论审核 ----------
 export function listAdminComments(params) {
   return request.get('/admin/comments', { params })
