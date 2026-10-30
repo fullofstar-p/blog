@@ -165,7 +165,10 @@ const heat = computed(() => {
 
 function heatLevel(day) {
   if (!day || !day.count) return 0
-  const ratio = day.count / heat.value.maxCount
+  // 至少按 4 篇的跨度分档：只有 1 篇的日子是最浅一档，不会因为当天最大值是 1
+  // 就直接变成最深色。发文量更大的站点再按 maxCount 等比压缩到 4 档。
+  const scale = Math.max(4, heat.value.maxCount)
+  const ratio = day.count / scale
   if (ratio <= 0.25) return 1
   if (ratio <= 0.5) return 2
   if (ratio <= 0.75) return 3
@@ -391,7 +394,7 @@ onBeforeUnmount(() => {
       </section>
 
       <!-- 发布热力图 + 热门文章 -->
-      <section class="grid gap-6 lg:grid-cols-[minmax(0,1.55fr)_minmax(0,1fr)]">
+      <section class="space-y-6">
         <div class="sketch-card min-w-0 p-4 md:p-6" aria-label="发布热力图">
           <div class="flex flex-wrap items-start justify-between gap-3">
             <div>
@@ -477,11 +480,11 @@ onBeforeUnmount(() => {
           <div v-if="topArticles.length === 0" class="mt-6 border-2 border-dashed border-pencil/40 p-5 font-serif text-sm italic text-ink-300">
             还没有可排名的文章。
           </div>
-          <ol v-else class="mt-3 divide-y divide-dashed divide-pencil/20">
+          <ol v-else class="mt-3 grid gap-x-8 md:grid-cols-2">
             <li
               v-for="(article, index) in topArticles"
               :key="article.id"
-              class="flex items-start gap-3 py-3"
+              class="flex items-start gap-3 border-b border-dashed border-pencil/20 py-3"
             >
               <span
                 class="mt-0.5 inline-flex h-6 w-6 shrink-0 items-center justify-center border border-dashed font-serif text-xs italic"
