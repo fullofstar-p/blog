@@ -141,6 +141,15 @@
     @apply transition-transform duration-150 ease-out hover:-translate-y-1 hover:rotate-[-0.3deg] hover:shadow-sketch-lg;
   }
 
+  /* 卡片 hover 采用 transform 动效时，提前提升为合成层。
+     否则 Chromium 会在过渡的第一帧按旧分辨率栅格化文字，看起来像先虚化一下。 */
+  .sketch-card-hover,
+  .sketch-card.transition-transform {
+    will-change: transform;
+    -webkit-backface-visibility: hidden;
+    backface-visibility: hidden;
+  }
+
   /* 手绘胶带装饰 */
   .sketch-tape {
     position: relative;

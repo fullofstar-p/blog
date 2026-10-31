@@ -8,7 +8,7 @@ const props = defineProps({
 })
 
 const classList = computed(() => [
-  'inline-flex min-h-[44px] items-center gap-1.5 border-2 border-dashed px-3 py-2 font-serif text-sm italic shadow-sketchsm transition-colors duration-150',
+  'inline-flex min-h-[44px] items-center gap-1.5 border-2 border-dashed px-3 py-2 font-serif text-sm italic shadow-sketchsm transition-[background-color,border-color,box-shadow] duration-150',
   props.active
     ? 'border-pencil bg-pencil text-paper'
     : 'border-pencil/60 bg-paper text-pencil hover:bg-pencil hover:text-paper',

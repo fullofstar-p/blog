@@ -10,7 +10,7 @@ const props = defineProps({
 
 const classList = computed(() => {
   const base = [
-    'inline-flex items-center gap-1 border-2 border-dashed font-serif italic shadow-sketchsm transition-colors duration-150',
+    'inline-flex items-center gap-1 border-2 border-dashed font-serif italic shadow-sketchsm transition-[background-color,border-color,box-shadow] duration-150',
     props.active ? 'bg-pencil text-paper border-pencil' : 'border-pencil/60 bg-paper text-pencil'
   ]
   if (props.clickable) {
