@@ -5,6 +5,9 @@ import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.blog.common.BusinessException;
 import com.blog.common.PageResult;
 import com.blog.common.ResultCode;
+import com.blog.constant.PageConstants;
+import com.blog.constant.SecurityConstants;
+import com.blog.constant.UserConstants;
 import com.blog.dto.ChangePasswordDTO;
 import com.blog.dto.UpdateProfileDTO;
 import com.blog.entity.User;
@@ -20,6 +23,7 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
 
 import java.util.List;
+import java.util.Objects;
 
 /**
  * 用户服务实现。
@@ -71,8 +75,8 @@ public class UserServiceImpl implements UserService {
 
     @Override
     public PageResult<UserVO> adminPage(int pageNum, int pageSize, String keyword, String role, Integer status) {
-        int current = Math.max(1, pageNum);
-        int size = Math.min(Math.max(1, pageSize), 50);
+        int current = Math.max(PageConstants.MIN_PAGE_NUM, pageNum);
+        int size = Math.min(Math.max(PageConstants.MIN_PAGE_SIZE, pageSize), PageConstants.MAX_PAGE_SIZE);
         LambdaQueryWrapper<User> wrapper = new LambdaQueryWrapper<>();
         if (StringUtils.hasText(keyword)) {
             String kw = keyword.trim();
@@ -100,7 +104,7 @@ public class UserServiceImpl implements UserService {
             throw new BusinessException(ResultCode.NOT_FOUND, "用户不存在");
         }
         LoginUser loginUser = SecurityUtils.getLoginUser();
-        if (loginUser.getId().equals(id) && Integer.valueOf(0).equals(status)) {
+        if (loginUser.getId().equals(id) && Objects.equals(status, UserConstants.STATUS_DISABLED)) {
             throw new BusinessException(ResultCode.BAD_REQUEST, "不能禁用当前登录账号");
         }
         User update = new User();
@@ -117,7 +121,7 @@ public class UserServiceImpl implements UserService {
             throw new BusinessException(ResultCode.NOT_FOUND, "用户不存在");
         }
         LoginUser loginUser = SecurityUtils.getLoginUser();
-        if (loginUser.getId().equals(id) && "USER".equalsIgnoreCase(role)) {
+        if (loginUser.getId().equals(id) && SecurityConstants.ROLE_USER.equalsIgnoreCase(role)) {
             throw new BusinessException(ResultCode.BAD_REQUEST, "不能修改当前登录账号的角色");
         }
         User update = new User();

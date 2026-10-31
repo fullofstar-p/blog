@@ -33,6 +33,7 @@
 │   └── src/main/
 │       ├── java/com/blog/
 │       │   ├── common/       # Result / PageResult / 异常 / 全局处理
+│       │   ├── constant/     # 领域常量（Redis key、分页、状态、角色、文件限制）
 │       │   ├── config/       # MyBatis-Plus / Redis / Security / S3 / MinIO 初始化 / Knife4j
 │       │   ├── security/     # JWT 工具、过滤器、UserDetails、SecurityUtils
 │       │   ├── entity/       # 实体（10 个类，对应 12 张表）

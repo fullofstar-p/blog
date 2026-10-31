@@ -1,6 +1,7 @@
 package com.blog.controller;
 
 import com.blog.common.Result;
+import com.blog.constant.SecurityConstants;
 import com.blog.dto.CategorySaveDTO;
 import com.blog.service.CategoryService;
 import com.blog.vo.CategoryVO;
@@ -20,7 +21,7 @@ import org.springframework.web.bind.annotation.RestController;
  */
 @RestController
 @RequestMapping("/api/admin/categories")
-@PreAuthorize("hasRole('ADMIN')")
+@PreAuthorize(SecurityConstants.HAS_ROLE_ADMIN)
 @RequiredArgsConstructor
 public class AdminCategoryController {
 

@@ -1,6 +1,10 @@
 package com.blog.service.impl;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.blog.constant.ArticleConstants;
+import com.blog.constant.RedisKeys;
+import com.blog.constant.StatsConstants;
+import com.blog.constant.TimeConstants;
 import com.blog.dto.ArticlePvRowDTO;
 import com.blog.dto.DailyStatRowDTO;
 import com.blog.dto.HeatmapRowDTO;
@@ -21,8 +25,6 @@ import org.springframework.stereotype.Service;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
-import java.time.ZoneId;
-import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
@@ -43,20 +45,6 @@ import java.util.UUID;
 @RequiredArgsConstructor
 public class StatsServiceImpl implements StatsService {
 
-    private static final ZoneId ZONE = ZoneId.of("Asia/Shanghai");
-    private static final DateTimeFormatter DATE = DateTimeFormatter.ISO_LOCAL_DATE;
-
-    private static final String PV_PREFIX = "stats:pv:";
-    private static final String UV_PREFIX = "stats:uv:";
-    private static final String ARTICLE_PV_PREFIX = "stats:article:pv:";
-    private static final String PENDING_DATES_KEY = "stats:pending:dates";
-
-    private static final int DEFAULT_DAYS = 30;
-    private static final int MIN_DAYS = 7;
-    private static final int MAX_DAYS = 90;
-    private static final int HEATMAP_DAYS = 365;
-    private static final int TOP_LIMIT = 8;
-
     private final StringRedisTemplate stringRedisTemplate;
     private final StatsMapper statsMapper;
     private final ArticleMapper articleMapper;
@@ -70,12 +58,12 @@ public class StatsServiceImpl implements StatsService {
         if (articleId == null || visitorKey == null || visitorKey.isBlank()) {
             return;
         }
-        String date = LocalDate.now(ZONE).format(DATE);
+        String date = LocalDate.now(TimeConstants.ZONE_ID).format(TimeConstants.DATE_FORMATTER);
         try {
-            stringRedisTemplate.opsForValue().increment(PV_PREFIX + date);
-            stringRedisTemplate.opsForHyperLogLog().add(UV_PREFIX + date, visitorKey);
-            stringRedisTemplate.opsForHash().increment(ARTICLE_PV_PREFIX + date, String.valueOf(articleId), 1);
-            stringRedisTemplate.opsForSet().add(PENDING_DATES_KEY, date);
+            stringRedisTemplate.opsForValue().increment(RedisKeys.STATS_PV_PREFIX + date);
+            stringRedisTemplate.opsForHyperLogLog().add(RedisKeys.STATS_UV_PREFIX + date, visitorKey);
+            stringRedisTemplate.opsForHash().increment(RedisKeys.STATS_ARTICLE_PV_PREFIX + date, String.valueOf(articleId), 1);
+            stringRedisTemplate.opsForSet().add(RedisKeys.STATS_PENDING_DATES_KEY, date);
         } catch (Exception e) {
             // 统计数据不能影响正常阅读
             log.warn("记录访问统计失败：articleId={}，原因：{}", articleId, e.getMessage());
@@ -84,30 +72,30 @@ public class StatsServiceImpl implements StatsService {
 
     @Override
     public DashboardVO dashboard(int days) {
-        int rangeDays = Math.min(Math.max(days <= 0 ? DEFAULT_DAYS : days, MIN_DAYS), MAX_DAYS);
-        LocalDate today = LocalDate.now(ZONE);
+        int rangeDays = Math.min(Math.max(days <= 0 ? StatsConstants.DEFAULT_DAYS : days, StatsConstants.MIN_DAYS), StatsConstants.MAX_DAYS);
+        LocalDate today = LocalDate.now(TimeConstants.ZONE_ID);
         LocalDate start = today.minusDays(rangeDays - 1L);
 
         List<DailyStatRowDTO> rows = statsMapper.selectSiteDaily(start, today);
         Map<String, DailyStatRowDTO> dailyMap = new HashMap<>();
         for (DailyStatRowDTO row : rows) {
             if (row.getStatDate() != null) {
-                dailyMap.put(row.getStatDate().format(DATE), row);
+                dailyMap.put(row.getStatDate().format(TimeConstants.DATE_FORMATTER), row);
             }
         }
 
-        long redisPv = readLong(PV_PREFIX + today.format(DATE));
+        long redisPv = readLong(RedisKeys.STATS_PV_PREFIX + today.format(TimeConstants.DATE_FORMATTER));
         long redisUv = readUv(today);
 
         DashboardVO vo = new DashboardVO();
-        vo.setGeneratedAt(LocalDateTime.now(ZONE));
+        vo.setGeneratedAt(LocalDateTime.now(TimeConstants.ZONE_ID));
 
         DashboardVO.Totals totals = new DashboardVO.Totals();
         totals.setArticles(count(articleMapper.selectCount(null)));
         totals.setPublished(count(articleMapper.selectCount(
-                new LambdaQueryWrapper<Article>().eq(Article::getStatus, 1))));
+                new LambdaQueryWrapper<Article>().eq(Article::getStatus, ArticleConstants.STATUS_PUBLISHED))));
         totals.setDrafts(count(articleMapper.selectCount(
-                new LambdaQueryWrapper<Article>().eq(Article::getStatus, 0))));
+                new LambdaQueryWrapper<Article>().eq(Article::getStatus, ArticleConstants.STATUS_DRAFT))));
         totals.setViews(statsMapper.selectTotalViews());
         totals.setUsers(count(userMapper.selectCount(null)));
         totals.setComments(count(commentMapper.selectCount(null)));
@@ -120,7 +108,7 @@ public class StatsServiceImpl implements StatsService {
         long rangeUv = 0;
         for (int i = 0; i < rangeDays; i++) {
             LocalDate date = start.plusDays(i);
-            String key = date.format(DATE);
+            String key = date.format(TimeConstants.DATE_FORMATTER);
             DailyStatRowDTO row = dailyMap.get(key);
             long pv = row == null || row.getPv() == null ? 0L : row.getPv();
             long uv = row == null || row.getUv() == null ? 0L : row.getUv();
@@ -138,18 +126,18 @@ public class StatsServiceImpl implements StatsService {
         }
         vo.setTrend(trend);
 
-        DailyStatRowDTO todayRow = dailyMap.get(today.format(DATE));
+        DailyStatRowDTO todayRow = dailyMap.get(today.format(TimeConstants.DATE_FORMATTER));
         long todayPv = (todayRow == null || todayRow.getPv() == null ? 0L : todayRow.getPv()) + redisPv;
         long todayUv = Math.max(todayRow == null || todayRow.getUv() == null ? 0L : todayRow.getUv(), redisUv);
         DashboardVO.Today todayVo = new DashboardVO.Today();
-        todayVo.setDate(today.format(DATE));
+        todayVo.setDate(today.format(TimeConstants.DATE_FORMATTER));
         todayVo.setPv(todayPv);
         todayVo.setUv(todayUv);
         vo.setToday(todayVo);
 
         DashboardVO.Range rangeVo = new DashboardVO.Range();
-        rangeVo.setStartDate(start.format(DATE));
-        rangeVo.setEndDate(today.format(DATE));
+        rangeVo.setStartDate(start.format(TimeConstants.DATE_FORMATTER));
+        rangeVo.setEndDate(today.format(TimeConstants.DATE_FORMATTER));
         rangeVo.setDays(rangeDays);
         rangeVo.setPv(rangePv);
         rangeVo.setUv(rangeUv);
@@ -162,17 +150,17 @@ public class StatsServiceImpl implements StatsService {
 
     @Override
     public void flush() {
-        Set<String> dates = stringRedisTemplate.opsForSet().members(PENDING_DATES_KEY);
+        Set<String> dates = stringRedisTemplate.opsForSet().members(RedisKeys.STATS_PENDING_DATES_KEY);
         if (dates == null || dates.isEmpty()) {
             return;
         }
-        LocalDate today = LocalDate.now(ZONE);
+        LocalDate today = LocalDate.now(TimeConstants.ZONE_ID);
         for (String dateText : dates) {
             LocalDate date;
             try {
-                date = LocalDate.parse(dateText, DATE);
+                date = LocalDate.parse(dateText, TimeConstants.DATE_FORMATTER);
             } catch (Exception e) {
-                stringRedisTemplate.opsForSet().remove(PENDING_DATES_KEY, dateText);
+                stringRedisTemplate.opsForSet().remove(RedisKeys.STATS_PENDING_DATES_KEY, dateText);
                 continue;
             }
             try {
@@ -199,10 +187,10 @@ public class StatsServiceImpl implements StatsService {
     }
 
     private void flushDate(LocalDate date, LocalDate today) {
-        String dateText = date.format(DATE);
-        String pvKey = PV_PREFIX + dateText;
-        String uvKey = UV_PREFIX + dateText;
-        String hashKey = ARTICLE_PV_PREFIX + dateText;
+        String dateText = date.format(TimeConstants.DATE_FORMATTER);
+        String pvKey = RedisKeys.STATS_PV_PREFIX + dateText;
+        String uvKey = RedisKeys.STATS_UV_PREFIX + dateText;
+        String hashKey = RedisKeys.STATS_ARTICLE_PV_PREFIX + dateText;
 
         long pvDelta = 0L;
         try {
@@ -244,7 +232,7 @@ public class StatsServiceImpl implements StatsService {
         // 历史日期的 UV HyperLogLog 已不会再变化，落库后清理；pending 也一并移除
         if (date.isBefore(today)) {
             stringRedisTemplate.delete(uvKey);
-            stringRedisTemplate.opsForSet().remove(PENDING_DATES_KEY, dateText);
+            stringRedisTemplate.opsForSet().remove(RedisKeys.STATS_PENDING_DATES_KEY, dateText);
         }
     }
 
@@ -254,14 +242,14 @@ public class StatsServiceImpl implements StatsService {
                 .anyMatch(row -> row.getPv() != null && row.getPv() > 0);
         if (hasRangeData) {
             // 区间内有新增阅读：按区间 PV 排名，没有历史阅读的文章也能上榜
-            return statsMapper.selectTopArticlesByRange(start, today, TOP_LIMIT);
+            return statsMapper.selectTopArticlesByRange(start, today, StatsConstants.TOP_LIMIT);
         }
         // 还没有每日阅读数据时退回总阅读量，避免看板一开始就是空的
-        return statsMapper.selectTopArticles(TOP_LIMIT);
+        return statsMapper.selectTopArticles(StatsConstants.TOP_LIMIT);
     }
 
     private DashboardVO.PublishHeatmap buildPublishHeatmap(LocalDate today) {
-        LocalDate start = today.minusDays(HEATMAP_DAYS - 1L);
+        LocalDate start = today.minusDays(StatsConstants.HEATMAP_DAYS - 1L);
         List<HeatmapRowDTO> rows = statsMapper.selectPublishHeatmap(start);
         Map<String, Long> counts = new HashMap<>();
         for (HeatmapRowDTO row : rows) {
@@ -270,11 +258,11 @@ public class StatsServiceImpl implements StatsService {
             }
         }
 
-        List<DashboardVO.HeatmapDay> days = new ArrayList<>(HEATMAP_DAYS);
+        List<DashboardVO.HeatmapDay> days = new ArrayList<>(StatsConstants.HEATMAP_DAYS);
         long total = 0L;
         long maxCount = 0L;
-        for (int i = 0; i < HEATMAP_DAYS; i++) {
-            String key = start.plusDays(i).format(DATE);
+        for (int i = 0; i < StatsConstants.HEATMAP_DAYS; i++) {
+            String key = start.plusDays(i).format(TimeConstants.DATE_FORMATTER);
             long count = counts.getOrDefault(key, 0L);
             DashboardVO.HeatmapDay day = new DashboardVO.HeatmapDay();
             day.setDate(key);
@@ -287,10 +275,10 @@ public class StatsServiceImpl implements StatsService {
         // 当前连续：今天还没发布时从昨天开始算，避免早上打开看板连续天数归零
         int currentStreak = 0;
         LocalDate cursor = today;
-        if (counts.getOrDefault(today.format(DATE), 0L) == 0L) {
+        if (counts.getOrDefault(today.format(TimeConstants.DATE_FORMATTER), 0L) == 0L) {
             cursor = today.minusDays(1);
         }
-        while (!cursor.isBefore(start) && counts.getOrDefault(cursor.format(DATE), 0L) > 0L) {
+        while (!cursor.isBefore(start) && counts.getOrDefault(cursor.format(TimeConstants.DATE_FORMATTER), 0L) > 0L) {
             currentStreak++;
             cursor = cursor.minusDays(1);
         }
@@ -317,10 +305,10 @@ public class StatsServiceImpl implements StatsService {
 
     private long readUv(LocalDate date) {
         try {
-            Long size = stringRedisTemplate.opsForHyperLogLog().size(UV_PREFIX + date.format(DATE));
+            Long size = stringRedisTemplate.opsForHyperLogLog().size(RedisKeys.STATS_UV_PREFIX + date.format(TimeConstants.DATE_FORMATTER));
             return size == null ? 0L : size;
         } catch (Exception e) {
-            log.warn("读取 UV 失败：date={}，原因：{}", date.format(DATE), e.getMessage());
+            log.warn("读取 UV 失败：date={}，原因：{}", date.format(TimeConstants.DATE_FORMATTER), e.getMessage());
             return 0L;
         }
     }

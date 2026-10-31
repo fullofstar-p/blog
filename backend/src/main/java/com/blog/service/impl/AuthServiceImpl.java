@@ -3,6 +3,9 @@ package com.blog.service.impl;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.blog.common.BusinessException;
 import com.blog.common.ResultCode;
+import com.blog.constant.RedisKeys;
+import com.blog.constant.SecurityConstants;
+import com.blog.constant.UserConstants;
 import com.blog.dto.LoginDTO;
 import com.blog.dto.RefreshTokenDTO;
 import com.blog.dto.RegisterDTO;
@@ -39,9 +42,6 @@ import java.util.UUID;
 @RequiredArgsConstructor
 public class AuthServiceImpl implements AuthService {
 
-    private static final String REFRESH_KEY_PREFIX = "refresh:";
-    private static final String BLACKLIST_KEY_PREFIX = "jwt:blacklist:";
-
     private final UserMapper userMapper;
     private final PasswordEncoder passwordEncoder;
     private final AuthenticationManager authenticationManager;
@@ -62,8 +62,8 @@ public class AuthServiceImpl implements AuthService {
         user.setNickname(StringUtils.hasText(dto.getNickname())
                 ? dto.getNickname().trim() : dto.getUsername());
         user.setEmail(StringUtils.hasText(dto.getEmail()) ? dto.getEmail().trim() : null);
-        user.setRole("USER");
-        user.setStatus(1);
+        user.setRole(SecurityConstants.ROLE_USER);
+        user.setStatus(UserConstants.STATUS_ENABLED);
         try {
             userMapper.insert(user);
         } catch (DuplicateKeyException e) {
@@ -101,12 +101,12 @@ public class AuthServiceImpl implements AuthService {
         } catch (Exception e) {
             throw new BusinessException(ResultCode.UNAUTHORIZED, "刷新令牌无效或已过期");
         }
-        if (!JwtUtils.TYPE_REFRESH.equals(jwtUtils.getTokenType(claims))) {
+        if (!SecurityConstants.TOKEN_TYPE_REFRESH.equals(jwtUtils.getTokenType(claims))) {
             throw new BusinessException(ResultCode.UNAUTHORIZED, "刷新令牌无效");
         }
         Long userId = Long.valueOf(claims.getSubject());
         String jti = claims.getId();
-        String refreshKey = REFRESH_KEY_PREFIX + userId + ":" + jti;
+        String refreshKey = RedisKeys.REFRESH_TOKEN_PREFIX + userId + ":" + jti;
         // 白名单不存在说明已登出或已轮换过
         if (!Boolean.TRUE.equals(stringRedisTemplate.hasKey(refreshKey))) {
             throw new BusinessException(ResultCode.UNAUTHORIZED, "刷新令牌已失效，请重新登录");
@@ -115,7 +115,7 @@ public class AuthServiceImpl implements AuthService {
         if (user == null) {
             throw new BusinessException(ResultCode.UNAUTHORIZED, "用户不存在");
         }
-        if (user.getStatus() == null || user.getStatus() != 1) {
+        if (user.getStatus() == null || user.getStatus() != UserConstants.STATUS_ENABLED) {
             throw new BusinessException(ResultCode.FORBIDDEN, "账号已被禁用");
         }
         // refresh token 单次使用：轮换前删除旧白名单
@@ -129,12 +129,12 @@ public class AuthServiceImpl implements AuthService {
         if (StringUtils.hasText(accessToken)) {
             try {
                 Claims claims = jwtUtils.parseToken(accessToken);
-                if (JwtUtils.TYPE_ACCESS.equals(jwtUtils.getTokenType(claims))
+                if (SecurityConstants.TOKEN_TYPE_ACCESS.equals(jwtUtils.getTokenType(claims))
                         && claims.getId() != null) {
                     long ttl = jwtUtils.getRemainingSeconds(claims);
                     if (ttl > 0) {
                         stringRedisTemplate.opsForValue().set(
-                                BLACKLIST_KEY_PREFIX + claims.getId(), "1", Duration.ofSeconds(ttl));
+                                RedisKeys.JWT_BLACKLIST_PREFIX + claims.getId(), "1", Duration.ofSeconds(ttl));
                     }
                 }
             } catch (Exception e) {
@@ -145,9 +145,9 @@ public class AuthServiceImpl implements AuthService {
         if (StringUtils.hasText(refreshToken)) {
             try {
                 Claims claims = jwtUtils.parseToken(refreshToken);
-                if (JwtUtils.TYPE_REFRESH.equals(jwtUtils.getTokenType(claims))) {
+                if (SecurityConstants.TOKEN_TYPE_REFRESH.equals(jwtUtils.getTokenType(claims))) {
                     stringRedisTemplate.delete(
-                            REFRESH_KEY_PREFIX + claims.getSubject() + ":" + claims.getId());
+                            RedisKeys.REFRESH_TOKEN_PREFIX + claims.getSubject() + ":" + claims.getId());
                 }
             } catch (Exception e) {
                 log.debug("登出时 refresh token 已无效：{}", e.getMessage());
@@ -162,7 +162,7 @@ public class AuthServiceImpl implements AuthService {
         String accessToken = jwtUtils.generateAccessToken(user, accessJti);
         String refreshToken = jwtUtils.generateRefreshToken(user, refreshJti);
         stringRedisTemplate.opsForValue().set(
-                REFRESH_KEY_PREFIX + user.getId() + ":" + refreshJti,
+                RedisKeys.REFRESH_TOKEN_PREFIX + user.getId() + ":" + refreshJti,
                 "1", Duration.ofSeconds(jwtUtils.getRefreshExpire()));
 
         TokenVO tokenVO = new TokenVO();

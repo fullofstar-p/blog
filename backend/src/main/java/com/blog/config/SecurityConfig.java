@@ -2,6 +2,7 @@ package com.blog.config;
 
 import com.blog.common.Result;
 import com.blog.common.ResultCode;
+import com.blog.constant.SecurityConstants;
 import com.blog.security.JwtAuthenticationFilter;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import jakarta.servlet.http.HttpServletResponse;
@@ -57,7 +58,7 @@ public class SecurityConfig {
                                 "/api/tags", "/api/tags/**",
                                 "/api/search", "/api/search/**").permitAll()
                         // 管理端接口需 ADMIN
-                        .requestMatchers("/api/admin/**").hasRole("ADMIN")
+                        .requestMatchers("/api/admin/**").hasRole(SecurityConstants.ROLE_ADMIN)
                         .anyRequest().authenticated())
                 .exceptionHandling(ex -> ex
                         .authenticationEntryPoint((request, response, authException) ->

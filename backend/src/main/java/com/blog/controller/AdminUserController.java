@@ -2,6 +2,7 @@ package com.blog.controller;
 
 import com.blog.common.PageResult;
 import com.blog.common.Result;
+import com.blog.constant.SecurityConstants;
 import com.blog.dto.UserRoleDTO;
 import com.blog.dto.UserStatusDTO;
 import com.blog.service.UserService;
@@ -22,7 +23,7 @@ import org.springframework.web.bind.annotation.RestController;
  */
 @RestController
 @RequestMapping("/api/admin/users")
-@PreAuthorize("hasRole('ADMIN')")
+@PreAuthorize(SecurityConstants.HAS_ROLE_ADMIN)
 @RequiredArgsConstructor
 public class AdminUserController {
 

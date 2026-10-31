@@ -1,5 +1,6 @@
 package com.blog.config;
 
+import com.blog.constant.TimeConstants;
 import com.fasterxml.jackson.datatype.jsr310.deser.LocalDateDeserializer;
 import com.fasterxml.jackson.datatype.jsr310.deser.LocalDateTimeDeserializer;
 import com.fasterxml.jackson.datatype.jsr310.deser.LocalTimeDeserializer;
@@ -23,11 +24,11 @@ import java.util.TimeZone;
 public class JacksonConfig {
 
     private static final DateTimeFormatter DATE_TIME_FORMATTER =
-            DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
+            DateTimeFormatter.ofPattern(TimeConstants.DATE_TIME_PATTERN);
     private static final DateTimeFormatter DATE_FORMATTER =
-            DateTimeFormatter.ofPattern("yyyy-MM-dd");
+            DateTimeFormatter.ofPattern(TimeConstants.DATE_PATTERN);
     private static final DateTimeFormatter TIME_FORMATTER =
-            DateTimeFormatter.ofPattern("HH:mm:ss");
+            DateTimeFormatter.ofPattern(TimeConstants.TIME_PATTERN);
 
     @Bean
     public Jackson2ObjectMapperBuilderCustomizer jacksonCustomizer() {
@@ -38,8 +39,8 @@ public class JacksonConfig {
             builder.deserializerByType(LocalDate.class, new LocalDateDeserializer(DATE_FORMATTER));
             builder.serializerByType(LocalTime.class, new LocalTimeSerializer(TIME_FORMATTER));
             builder.deserializerByType(LocalTime.class, new LocalTimeDeserializer(TIME_FORMATTER));
-            builder.simpleDateFormat("yyyy-MM-dd HH:mm:ss");
-            builder.timeZone(TimeZone.getTimeZone("Asia/Shanghai"));
+            builder.simpleDateFormat(TimeConstants.DATE_TIME_PATTERN);
+            builder.timeZone(TimeZone.getTimeZone(TimeConstants.ZONE_NAME));
         };
     }
 }

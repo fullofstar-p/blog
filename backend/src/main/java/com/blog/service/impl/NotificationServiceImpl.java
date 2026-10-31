@@ -7,6 +7,8 @@ import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.blog.common.BusinessException;
 import com.blog.common.PageResult;
 import com.blog.common.ResultCode;
+import com.blog.constant.NotificationConstants;
+import com.blog.constant.PageConstants;
 import com.blog.entity.Notification;
 import com.blog.mapper.NotificationMapper;
 import com.blog.security.SecurityUtils;
@@ -34,8 +36,8 @@ public class NotificationServiceImpl implements NotificationService {
     @Override
     public PageResult<NotificationVO> page(int pageNum, int pageSize, boolean unreadOnly) {
         Long userId = SecurityUtils.getUserId();
-        int current = Math.max(1, pageNum);
-        int size = Math.min(Math.max(1, pageSize), 50);
+        int current = Math.max(PageConstants.MIN_PAGE_NUM, pageNum);
+        int size = Math.min(Math.max(PageConstants.MIN_PAGE_SIZE, pageSize), PageConstants.MAX_PAGE_SIZE);
         long total = notificationMapper.selectNotificationCount(userId, unreadOnly);
         Page<NotificationVO> page = new Page<>(current, size);
         page.setSearchCount(false);
@@ -49,7 +51,7 @@ public class NotificationServiceImpl implements NotificationService {
         Long userId = SecurityUtils.getUserId();
         Long count = notificationMapper.selectCount(new LambdaQueryWrapper<Notification>()
                 .eq(Notification::getUserId, userId)
-                .eq(Notification::getIsRead, 0));
+                .eq(Notification::getIsRead, NotificationConstants.UNREAD));
         return count == null ? 0L : count;
     }
 
@@ -63,13 +65,13 @@ public class NotificationServiceImpl implements NotificationService {
         if (!userId.equals(notification.getUserId())) {
             throw new BusinessException(ResultCode.FORBIDDEN, "无权操作他人的通知");
         }
-        if (Integer.valueOf(1).equals(notification.getIsRead())) {
+        if (Integer.valueOf(NotificationConstants.READ).equals(notification.getIsRead())) {
             return;
         }
         notificationMapper.update(null, new LambdaUpdateWrapper<Notification>()
                 .eq(Notification::getId, id)
                 .eq(Notification::getUserId, userId)
-                .set(Notification::getIsRead, 1));
+                .set(Notification::getIsRead, NotificationConstants.READ));
     }
 
     @Override
@@ -77,8 +79,8 @@ public class NotificationServiceImpl implements NotificationService {
         Long userId = SecurityUtils.getUserId();
         return notificationMapper.update(null, new LambdaUpdateWrapper<Notification>()
                 .eq(Notification::getUserId, userId)
-                .eq(Notification::getIsRead, 0)
-                .set(Notification::getIsRead, 1));
+                .eq(Notification::getIsRead, NotificationConstants.UNREAD)
+                .set(Notification::getIsRead, NotificationConstants.READ));
     }
 
     @Override
@@ -96,7 +98,7 @@ public class NotificationServiceImpl implements NotificationService {
         notification.setArticleId(articleId);
         notification.setCommentId(commentId);
         notification.setSenderId(senderId);
-        notification.setIsRead(0);
+        notification.setIsRead(NotificationConstants.UNREAD);
         notificationMapper.insert(notification);
     }
 }

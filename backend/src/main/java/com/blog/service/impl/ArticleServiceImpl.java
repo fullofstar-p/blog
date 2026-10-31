@@ -7,6 +7,9 @@ import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.blog.common.BusinessException;
 import com.blog.common.PageResult;
 import com.blog.common.ResultCode;
+import com.blog.constant.ArticleConstants;
+import com.blog.constant.PageConstants;
+import com.blog.constant.RedisKeys;
 import com.blog.dto.ArticleSaveDTO;
 import com.blog.dto.ArchiveRowDTO;
 import com.blog.entity.Article;
@@ -40,7 +43,6 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
 
-import java.time.Duration;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -60,12 +62,6 @@ import java.util.stream.Collectors;
 @RequiredArgsConstructor
 public class ArticleServiceImpl implements ArticleService {
 
-    private static final String DETAIL_CACHE_PREFIX = "article:detail:";
-    private static final Duration DETAIL_CACHE_TTL = Duration.ofMinutes(10);
-    private static final String VIEW_COUNT_PREFIX = "article:views:";
-    private static final String VIEW_PENDING_KEY = "article:views:pending";
-    private static final int SUMMARY_MAX_LENGTH = 120;
-
     private final ArticleMapper articleMapper;
     private final ArticleTagMapper articleTagMapper;
     private final ArticleLikeMapper articleLikeMapper;
@@ -81,21 +77,21 @@ public class ArticleServiceImpl implements ArticleService {
     @Override
     public PageResult<ArticleSummaryVO> list(int pageNum, int pageSize, Long categoryId, Long tagId,
                                              String keyword, Integer year, Integer month, String sort) {
-        int current = Math.max(1, pageNum);
-        int size = Math.min(Math.max(1, pageSize), 50);
+        int current = Math.max(PageConstants.MIN_PAGE_NUM, pageNum);
+        int size = Math.min(Math.max(PageConstants.MIN_PAGE_SIZE, pageSize), PageConstants.MAX_PAGE_SIZE);
         String sortKey = "views".equalsIgnoreCase(sort) ? "views" : "time";
         String kw = trimToNull(keyword);
-        long total = articleMapper.selectSummaryCount(kw, categoryId, tagId, null, 1, year, month);
+        long total = articleMapper.selectSummaryCount(kw, categoryId, tagId, null, ArticleConstants.STATUS_PUBLISHED, year, month);
         Page<ArticleSummaryVO> page = countSkippedPage(current, size, total);
         IPage<ArticleSummaryVO> result = articleMapper.selectSummaryPage(page, kw,
-                categoryId, tagId, null, 1, year, month, sortKey, true);
+                categoryId, tagId, null, ArticleConstants.STATUS_PUBLISHED, year, month, sortKey, true);
         articleTagAssembler.fill(result.getRecords());
         return PageResult.of(result);
     }
 
     @Override
     public List<ArticleSummaryVO> top(int limit) {
-        int limitValue = Math.min(Math.max(1, limit), 10);
+        int limitValue = Math.min(Math.max(PageConstants.MIN_PAGE_SIZE, limit), ArticleConstants.TOP_MAX_LIMIT);
         List<ArticleSummaryVO> list = articleMapper.selectTop(limitValue);
         articleTagAssembler.fill(list);
         return list;
@@ -103,7 +99,7 @@ public class ArticleServiceImpl implements ArticleService {
 
     @Override
     public ArticleDetailVO detail(Long id, String visitorKey) {
-        String cacheKey = DETAIL_CACHE_PREFIX + id;
+        String cacheKey = RedisKeys.ARTICLE_DETAIL_PREFIX + id;
         ArticleDetailVO detail = readDetailCache(cacheKey);
         boolean published;
         if (detail != null) {
@@ -113,7 +109,7 @@ public class ArticleServiceImpl implements ArticleService {
             if (detail == null) {
                 throw new BusinessException(ResultCode.NOT_FOUND, "文章不存在");
             }
-            published = Integer.valueOf(1).equals(detail.getStatus());
+            published = Objects.equals(detail.getStatus(), ArticleConstants.STATUS_PUBLISHED);
             // 草稿仅作者本人与 ADMIN 可见
             if (!published) {
                 LoginUser loginUser = SecurityUtils.getLoginUserOrNull();
@@ -135,9 +131,9 @@ public class ArticleServiceImpl implements ArticleService {
         // 若直接用缓存里的旧值合并会导致阅读量回跳，因此这里始终以数据库当前值为基数。
         if (published) {
             Integer dbViewCount = articleMapper.selectViewCountById(id);
-            String viewKey = VIEW_COUNT_PREFIX + id;
+            String viewKey = RedisKeys.ARTICLE_VIEW_COUNT_PREFIX + id;
             Long delta = stringRedisTemplate.opsForValue().increment(viewKey);
-            stringRedisTemplate.opsForSet().add(VIEW_PENDING_KEY, String.valueOf(id));
+            stringRedisTemplate.opsForSet().add(RedisKeys.ARTICLE_VIEW_PENDING_KEY, String.valueOf(id));
             int base = dbViewCount == null ? 0 : dbViewCount;
             detail.setViewCount(base + (delta == null ? 0 : delta.intValue()));
             statsService.recordView(id, visitorKey);
@@ -260,8 +256,8 @@ public class ArticleServiceImpl implements ArticleService {
     @Override
     public PageResult<ArticleSummaryVO> myFavorites(int pageNum, int pageSize) {
         Long userId = SecurityUtils.getUserId();
-        int current = Math.max(1, pageNum);
-        int size = Math.min(Math.max(1, pageSize), 50);
+        int current = Math.max(PageConstants.MIN_PAGE_NUM, pageNum);
+        int size = Math.min(Math.max(PageConstants.MIN_PAGE_SIZE, pageSize), PageConstants.MAX_PAGE_SIZE);
         long total = articleMapper.selectFavoriteCount(userId);
         Page<ArticleSummaryVO> page = countSkippedPage(current, size, total);
         IPage<ArticleSummaryVO> result = articleMapper.selectFavoritePage(page, userId);
@@ -271,7 +267,7 @@ public class ArticleServiceImpl implements ArticleService {
 
     @Override
     public List<ArticleSummaryVO> related(Long id, int limit) {
-        int limitValue = Math.min(Math.max(1, limit), 12);
+        int limitValue = Math.min(Math.max(PageConstants.MIN_PAGE_SIZE, limit), ArticleConstants.RELATED_MAX_LIMIT);
         requirePublishedArticle(id);
         List<ArticleSummaryVO> list = articleMapper.selectRelated(id, limitValue);
         articleTagAssembler.fill(list);
@@ -281,8 +277,8 @@ public class ArticleServiceImpl implements ArticleService {
     @Override
     public PageResult<ArticleSummaryVO> mine(int pageNum, int pageSize, Integer status) {
         Long userId = SecurityUtils.getUserId();
-        int current = Math.max(1, pageNum);
-        int size = Math.min(Math.max(1, pageSize), 50);
+        int current = Math.max(PageConstants.MIN_PAGE_NUM, pageNum);
+        int size = Math.min(Math.max(PageConstants.MIN_PAGE_SIZE, pageSize), PageConstants.MAX_PAGE_SIZE);
         long total = articleMapper.selectSummaryCount(null, null, null, userId, status, null, null);
         Page<ArticleSummaryVO> page = countSkippedPage(current, size, total);
         IPage<ArticleSummaryVO> result = articleMapper.selectSummaryPage(page, null, null, null,
@@ -295,7 +291,7 @@ public class ArticleServiceImpl implements ArticleService {
     @Transactional
     public ArticleSummaryVO create(ArticleSaveDTO dto) {
         LoginUser loginUser = SecurityUtils.getLoginUser();
-        int status = dto.getStatus() == null ? 0 : dto.getStatus();
+        int status = dto.getStatus() == null ? ArticleConstants.STATUS_DRAFT : dto.getStatus();
         checkContent(dto, status);
         checkCategory(dto.getCategoryId());
 
@@ -308,7 +304,8 @@ public class ArticleServiceImpl implements ArticleService {
         article.setAuthorId(loginUser.getId());
         article.setStatus(status);
         // isTop 仅 ADMIN 可设置，普通用户强制为 0
-        article.setIsTop(loginUser.isAdmin() && Integer.valueOf(1).equals(dto.getIsTop()) ? 1 : 0);
+        article.setIsTop(loginUser.isAdmin() && Integer.valueOf(ArticleConstants.TOP).equals(dto.getIsTop())
+                ? ArticleConstants.TOP : ArticleConstants.NOT_TOP);
         article.setViewCount(0);
         articleMapper.insert(article);
         saveTags(article.getId(), dto.getTagIds());
@@ -366,8 +363,8 @@ public class ArticleServiceImpl implements ArticleService {
     @Override
     public PageResult<ArticleSummaryVO> adminPage(int pageNum, int pageSize, Integer status,
                                                   String keyword, Long categoryId) {
-        int current = Math.max(1, pageNum);
-        int size = Math.min(Math.max(1, pageSize), 50);
+        int current = Math.max(PageConstants.MIN_PAGE_NUM, pageNum);
+        int size = Math.min(Math.max(PageConstants.MIN_PAGE_SIZE, pageSize), PageConstants.MAX_PAGE_SIZE);
         String kw = trimToNull(keyword);
         long total = articleMapper.selectSummaryCount(kw, categoryId, null, null, status, null, null);
         Page<ArticleSummaryVO> page = countSkippedPage(current, size, total);
@@ -404,8 +401,8 @@ public class ArticleServiceImpl implements ArticleService {
 
     @Override
     public PageResult<ArticleSummaryVO> recyclePage(int pageNum, int pageSize, String keyword) {
-        int current = Math.max(1, pageNum);
-        int size = Math.min(Math.max(1, pageSize), 50);
+        int current = Math.max(PageConstants.MIN_PAGE_NUM, pageNum);
+        int size = Math.min(Math.max(PageConstants.MIN_PAGE_SIZE, pageSize), PageConstants.MAX_PAGE_SIZE);
         String kw = trimToNull(keyword);
         long total = articleMapper.selectRecycleCount(kw);
         Page<ArticleSummaryVO> page = countSkippedPage(current, size, total);
@@ -444,7 +441,7 @@ public class ArticleServiceImpl implements ArticleService {
     @Override
     @Transactional
     public int batchUpdateTop(List<Long> ids, Integer isTop) {
-        if (isTop == null || (isTop != 0 && isTop != 1)) {
+        if (isTop == null || (isTop != ArticleConstants.NOT_TOP && isTop != ArticleConstants.TOP)) {
             throw new BusinessException(ResultCode.BAD_REQUEST, "置顶标记不合法");
         }
         List<Long> safeIds = normalizeBatchIds(ids);
@@ -502,7 +499,7 @@ public class ArticleServiceImpl implements ArticleService {
         return deleted;
     }
 
-    /** 批量操作前的 id 清洗：去空、去重、最多 100 条 */
+    /** 批量操作前的 id 清洗：去空、去重，最多 {@link PageConstants#BATCH_MAX_SIZE} 条 */
     private List<Long> normalizeBatchIds(List<Long> ids) {
         if (ids == null || ids.isEmpty()) {
             return List.of();
@@ -510,14 +507,14 @@ public class ArticleServiceImpl implements ArticleService {
         return ids.stream()
                 .filter(Objects::nonNull)
                 .distinct()
-                .limit(100)
+                .limit(PageConstants.BATCH_MAX_SIZE)
                 .toList();
     }
 
     /** 校验并返回已发布文章；草稿/不存在统一 404 */
     private Article requirePublishedArticle(Long id) {
         Article article = articleMapper.selectById(id);
-        if (article == null || !Integer.valueOf(1).equals(article.getStatus())) {
+        if (article == null || !Objects.equals(article.getStatus(), ArticleConstants.STATUS_PUBLISHED)) {
             throw new BusinessException(ResultCode.NOT_FOUND, "文章不存在或未发布");
         }
         return article;
@@ -529,7 +526,7 @@ public class ArticleServiceImpl implements ArticleService {
 
     /** 发布状态下正文必填 */
     private void checkContent(ArticleSaveDTO dto, int status) {
-        if (status == 1 && !StringUtils.hasText(dto.getContent())) {
+        if (status == ArticleConstants.STATUS_PUBLISHED && !StringUtils.hasText(dto.getContent())) {
             throw new BusinessException(ResultCode.BAD_REQUEST, "发布文章时正文不能为空");
         }
     }
@@ -567,7 +564,7 @@ public class ArticleServiceImpl implements ArticleService {
         }
     }
 
-    /** 摘要为空时从正文前 120 字自动生成 */
+    /** 摘要为空时从正文前 {@link ArticleConstants#SUMMARY_MAX_LENGTH} 字自动生成 */
     private String resolveSummary(ArticleSaveDTO dto) {
         if (StringUtils.hasText(dto.getSummary())) {
             return dto.getSummary().trim();
@@ -586,7 +583,7 @@ public class ArticleServiceImpl implements ArticleService {
         if (plain.isEmpty()) {
             return null;
         }
-        return plain.length() <= SUMMARY_MAX_LENGTH ? plain : plain.substring(0, SUMMARY_MAX_LENGTH);
+        return plain.length() <= ArticleConstants.SUMMARY_MAX_LENGTH ? plain : plain.substring(0, ArticleConstants.SUMMARY_MAX_LENGTH);
     }
 
     private ArticleSummaryVO toSummary(ArticleSummaryVO summary) {
@@ -622,14 +619,14 @@ public class ArticleServiceImpl implements ArticleService {
 
     private void writeDetailCache(String cacheKey, ArticleDetailVO detail) {
         try {
-            stringRedisTemplate.opsForValue().set(cacheKey, objectMapper.writeValueAsString(detail), DETAIL_CACHE_TTL);
+            stringRedisTemplate.opsForValue().set(cacheKey, objectMapper.writeValueAsString(detail), RedisKeys.ARTICLE_DETAIL_TTL);
         } catch (Exception e) {
             log.warn("写入文章详情缓存失败：{}", e.getMessage());
         }
     }
 
     private void evictDetailCache(Long id) {
-        stringRedisTemplate.delete(DETAIL_CACHE_PREFIX + id);
+        stringRedisTemplate.delete(RedisKeys.ARTICLE_DETAIL_PREFIX + id);
     }
 
     private String trimToNull(String value) {

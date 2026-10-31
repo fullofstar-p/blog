@@ -2,6 +2,8 @@ package com.blog.service.impl;
 
 import com.blog.common.BusinessException;
 import com.blog.common.ResultCode;
+import com.blog.constant.ArticleConstants;
+import com.blog.constant.TimeConstants;
 import com.blog.mapper.ArticleMapper;
 import com.blog.service.ArticleTagAssembler;
 import com.blog.service.ShareCardService;
@@ -27,11 +29,11 @@ import java.awt.geom.Path2D;
 import java.awt.image.BufferedImage;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
-import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Objects;
 import java.util.Random;
 import java.util.Set;
 import java.util.stream.Collectors;
@@ -64,7 +66,6 @@ public class ShareCardServiceImpl implements ShareCardService {
     /** 纸张纹理线 */
     private static final Color PAPER_LINE = new Color(0xD8, 0xD0, 0xC2);
 
-    private static final DateTimeFormatter DATE_FORMATTER = DateTimeFormatter.ofPattern("yyyy-MM-dd");
     private static final String FONT_FAMILY = resolveFontFamily();
 
     private final ArticleMapper articleMapper;
@@ -84,7 +85,7 @@ public class ShareCardServiceImpl implements ShareCardService {
     @Override
     public byte[] render(Long articleId) {
         ArticleDetailVO article = articleMapper.selectDetailById(articleId);
-        if (article == null || !Integer.valueOf(1).equals(article.getStatus())) {
+        if (article == null || !Objects.equals(article.getStatus(), ArticleConstants.STATUS_PUBLISHED)) {
             throw new BusinessException(ResultCode.NOT_FOUND, "文章不存在或未发布");
         }
         articleTagAssembler.fill(List.of(article));
@@ -206,7 +207,7 @@ public class ShareCardServiceImpl implements ShareCardService {
         g.setColor(MUTED);
         String author = StringUtils.hasText(article.getAuthorName()) ? article.getAuthorName() : "匿名";
         String date = article.getCreateTime() == null
-                ? "" : article.getCreateTime().format(DATE_FORMATTER);
+                ? "" : article.getCreateTime().format(TimeConstants.DATE_FORMATTER);
         g.drawString("文 / " + author + (date.isEmpty() ? "" : "      " + date), left, 560);
         g.setColor(ACCENT_RED);
         String hint = "阅读全文 ->";

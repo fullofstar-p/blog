@@ -7,6 +7,10 @@ import com.blog.common.BusinessException;
 import com.blog.common.NotificationType;
 import com.blog.common.PageResult;
 import com.blog.common.ResultCode;
+import com.blog.constant.ArticleConstants;
+import com.blog.constant.CommentConstants;
+import com.blog.constant.PageConstants;
+import com.blog.constant.RedisKeys;
 import com.blog.dto.CommentCreateDTO;
 import com.blog.entity.Article;
 import com.blog.entity.Comment;
@@ -44,10 +48,6 @@ import java.util.stream.Collectors;
 @Service
 @RequiredArgsConstructor
 public class CommentServiceImpl implements CommentService {
-
-    private static final String COMMENT_LIKE_KEY_PREFIX = "comment:like:";
-    /** 最大嵌套层级：0 为一级，4 为第五层 */
-    private static final int MAX_DEPTH = 4;
 
     private final CommentMapper commentMapper;
     private final ArticleMapper articleMapper;
@@ -102,7 +102,7 @@ public class CommentServiceImpl implements CommentService {
     @Transactional
     public CommentVO create(CommentCreateDTO dto) {
         Article article = articleMapper.selectById(dto.getArticleId());
-        if (article == null || !Integer.valueOf(1).equals(article.getStatus())) {
+        if (article == null || !Objects.equals(article.getStatus(), ArticleConstants.STATUS_PUBLISHED)) {
             throw new BusinessException(ResultCode.NOT_FOUND, "文章不存在或未发布");
         }
         Comment parent = null;
@@ -111,12 +111,12 @@ public class CommentServiceImpl implements CommentService {
             if (parent == null || !dto.getArticleId().equals(parent.getArticleId())) {
                 throw new BusinessException(ResultCode.BAD_REQUEST, "父评论不存在");
             }
-            if (!Integer.valueOf(1).equals(parent.getStatus())) {
+            if (!Objects.equals(parent.getStatus(), CommentConstants.STATUS_APPROVED)) {
                 throw new BusinessException(ResultCode.BAD_REQUEST, "只能回复已通过的评论");
             }
         }
         int depth = parent == null ? 0 : (parent.getDepth() == null ? 0 : parent.getDepth()) + 1;
-        if (depth > MAX_DEPTH) {
+        if (depth > CommentConstants.MAX_DEPTH) {
             throw new BusinessException(ResultCode.BAD_REQUEST, "回复层级过深");
         }
 
@@ -130,7 +130,7 @@ public class CommentServiceImpl implements CommentService {
         comment.setReplyToUserId(parent == null ? null : parent.getUserId());
         comment.setDepth(depth);
         comment.setContent(dto.getContent().trim());
-        comment.setStatus(0);
+        comment.setStatus(CommentConstants.STATUS_PENDING);
         comment.setLikeCount(0);
         commentMapper.insert(comment);
 
@@ -191,8 +191,8 @@ public class CommentServiceImpl implements CommentService {
 
     @Override
     public PageResult<CommentAdminVO> adminPage(int pageNum, int pageSize, Integer status) {
-        int current = Math.max(1, pageNum);
-        int size = Math.min(Math.max(1, pageSize), 50);
+        int current = Math.max(PageConstants.MIN_PAGE_NUM, pageNum);
+        int size = Math.min(Math.max(PageConstants.MIN_PAGE_SIZE, pageSize), PageConstants.MAX_PAGE_SIZE);
         Page<CommentAdminVO> page = new Page<>(current, size);
         Page<CommentAdminVO> result = (Page<CommentAdminVO>) commentMapper.selectAdminPage(page, status);
         result.getRecords().forEach(vo -> vo.setReplies(new ArrayList<>()));
@@ -202,7 +202,7 @@ public class CommentServiceImpl implements CommentService {
     @Override
     @Transactional
     public void audit(Long id, Integer status) {
-        if (status == null || (status != 1 && status != 2)) {
+        if (status == null || (status != CommentConstants.STATUS_APPROVED && status != CommentConstants.STATUS_REJECTED)) {
             throw new BusinessException(ResultCode.BAD_REQUEST, "审核状态不合法");
         }
         Comment comment = requireComment(id);
@@ -216,7 +216,7 @@ public class CommentServiceImpl implements CommentService {
             return;
         }
         // 通知失败不能影响审核事务：每个通知单独 try/catch 记 warn
-        if (Integer.valueOf(1).equals(status)) {
+        if (Objects.equals(status, CommentConstants.STATUS_APPROVED)) {
             safeNotify(() -> notifyApproved(comment), comment, "通过");
         }
         safeNotify(() -> notifyAuditResult(comment, status), comment, "审核结果");
@@ -267,7 +267,7 @@ public class CommentServiceImpl implements CommentService {
         }
         Article article = articleMapper.selectById(comment.getArticleId());
         String articleTitle = article == null || article.getTitle() == null ? "" : article.getTitle();
-        boolean approved = Integer.valueOf(1).equals(status);
+        boolean approved = Objects.equals(status, CommentConstants.STATUS_APPROVED);
         String title = approved ? "评论已通过审核" : "评论未通过审核";
         String content = "你在《" + articleTitle + "》下的评论"
                 + (approved ? "已通过审核：" : "未通过审核：") + excerpt(comment.getContent());
@@ -294,19 +294,19 @@ public class CommentServiceImpl implements CommentService {
 
     private Comment requireApproved(Long id) {
         Comment comment = commentMapper.selectById(id);
-        if (comment == null || !Integer.valueOf(1).equals(comment.getStatus())) {
+        if (comment == null || !Objects.equals(comment.getStatus(), CommentConstants.STATUS_APPROVED)) {
             throw new BusinessException(ResultCode.NOT_FOUND, "评论不存在或未通过审核");
         }
         return comment;
     }
 
-    /** 收集整棵子树（含自身）的评论 ID，最多下探 MAX_DEPTH 层 */
+    /** 收集整棵子树（含自身）的评论 ID，最多 5 层 */
     private List<Long> collectSubtree(Long rootId) {
         List<Long> ids = new ArrayList<>();
         ids.add(rootId);
         List<Long> frontier = new ArrayList<>();
         frontier.add(rootId);
-        for (int level = 0; level <= MAX_DEPTH && !frontier.isEmpty(); level++) {
+        for (int level = 0; level <= CommentConstants.MAX_DEPTH && !frontier.isEmpty(); level++) {
             List<Comment> children = commentMapper.selectList(new LambdaQueryWrapper<Comment>()
                     .select(Comment::getId)
                     .in(Comment::getParentId, frontier));
@@ -338,7 +338,7 @@ public class CommentServiceImpl implements CommentService {
     }
 
     private String likeKey(Long commentId) {
-        return COMMENT_LIKE_KEY_PREFIX + commentId;
+        return RedisKeys.COMMENT_LIKE_PREFIX + commentId;
     }
 
     /** 返回最新的点赞状态与点赞数 */
@@ -364,7 +364,8 @@ public class CommentServiceImpl implements CommentService {
             return "";
         }
         String text = content.replaceAll("\\s+", " ").trim();
-        return text.length() <= 60 ? text : text.substring(0, 60) + "…";
+        return text.length() <= CommentConstants.EXCERPT_MAX_LENGTH
+                ? text : text.substring(0, CommentConstants.EXCERPT_MAX_LENGTH) + "…";
     }
 
     private CommentVO toVO(Comment comment, Long userId) {

@@ -3,6 +3,7 @@ package com.blog.search.impl;
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.blog.common.PageResult;
+import com.blog.constant.PageConstants;
 import com.blog.mapper.ArticleMapper;
 import com.blog.search.SearchService;
 import com.blog.service.ArticleTagAssembler;
@@ -29,8 +30,8 @@ public class MysqlSearchService implements SearchService {
 
     @Override
     public PageResult<ArticleSummaryVO> search(String keyword, int pageNum, int pageSize, String sort) {
-        int current = Math.max(1, pageNum);
-        int size = Math.min(Math.max(1, pageSize), 50);
+        int current = Math.max(PageConstants.MIN_PAGE_NUM, pageNum);
+        int size = Math.min(Math.max(PageConstants.MIN_PAGE_SIZE, pageSize), PageConstants.MAX_PAGE_SIZE);
         if (!StringUtils.hasText(keyword)) {
             return PageResult.of(new ArrayList<>(), 0, current, size);
         }

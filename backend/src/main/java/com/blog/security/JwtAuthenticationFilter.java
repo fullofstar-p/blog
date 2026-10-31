@@ -1,5 +1,8 @@
 package com.blog.security;
 
+import com.blog.constant.RedisKeys;
+import com.blog.constant.SecurityConstants;
+
 import io.jsonwebtoken.Claims;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
@@ -28,8 +31,6 @@ import java.util.List;
 @RequiredArgsConstructor
 public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
-    private static final String BLACKLIST_PREFIX = "jwt:blacklist:";
-
     private final JwtUtils jwtUtils;
     private final StringRedisTemplate stringRedisTemplate;
 
@@ -44,16 +45,16 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
                 String tokenType = jwtUtils.getTokenType(claims);
                 String jti = claims.getId();
                 boolean blacklisted = jti != null
-                        && Boolean.TRUE.equals(stringRedisTemplate.hasKey(BLACKLIST_PREFIX + jti));
+                        && Boolean.TRUE.equals(stringRedisTemplate.hasKey(RedisKeys.JWT_BLACKLIST_PREFIX + jti));
                 // 仅接受 access token，且未进入黑名单（已登出）
-                if (JwtUtils.TYPE_ACCESS.equals(tokenType) && !blacklisted) {
+                if (SecurityConstants.TOKEN_TYPE_ACCESS.equals(tokenType) && !blacklisted) {
                     LoginUser loginUser = new LoginUser(
                             Long.valueOf(claims.getSubject()),
                             jwtUtils.getUsername(claims),
                             jwtUtils.getRole(claims));
                     UsernamePasswordAuthenticationToken authentication =
                             new UsernamePasswordAuthenticationToken(loginUser, null,
-                                    List.of(new SimpleGrantedAuthority("ROLE_" + loginUser.getRole())));
+                                    List.of(new SimpleGrantedAuthority(SecurityConstants.ROLE_PREFIX + loginUser.getRole())));
                     authentication.setDetails(new WebAuthenticationDetailsSource().buildDetails(request));
                     SecurityContextHolder.getContext().setAuthentication(authentication);
                 }

@@ -1,6 +1,7 @@
 package com.blog.controller;
 
 import com.blog.common.Result;
+import com.blog.constant.SecurityConstants;
 import com.blog.dto.TagSaveDTO;
 import com.blog.service.TagService;
 import com.blog.vo.TagVO;
@@ -20,7 +21,7 @@ import org.springframework.web.bind.annotation.RestController;
  */
 @RestController
 @RequestMapping("/api/admin/tags")
-@PreAuthorize("hasRole('ADMIN')")
+@PreAuthorize(SecurityConstants.HAS_ROLE_ADMIN)
 @RequiredArgsConstructor
 public class AdminTagController {
 
