@@ -3,7 +3,7 @@ import { computed, ref, watch } from 'vue'
 import SketchButton from '@/components/SketchButton.vue'
 import SketchModal from '@/components/SketchModal.vue'
 import { getShareCardUrl } from '@/api/article'
-import { toastSuccess } from '@/utils/toast'
+import { toastError, toastSuccess } from '@/utils/toast'
 
 const props = defineProps({
   modelValue: { type: Boolean, default: false },
@@ -17,7 +17,6 @@ const imageError = ref(false)
 const retryToken = ref(0)
 const copying = ref(false)
 const downloading = ref(false)
-const actionError = ref('')
 
 const shareUrl = computed(() => (props.article ? getShareCardUrl(props.article.id) : ''))
 const previewSrc = computed(() => {
@@ -36,7 +35,6 @@ watch(
     imageLoading.value = true
     imageError.value = false
     retryToken.value = 0
-    actionError.value = ''
     copying.value = false
     downloading.value = false
   }
@@ -84,12 +82,11 @@ async function copyText(text) {
 async function copyLink() {
   if (!pageUrl.value || copying.value) return
   copying.value = true
-  actionError.value = ''
   try {
     await copyText(pageUrl.value)
     toastSuccess('文章链接已复制')
   } catch (error) {
-    actionError.value = '复制失败，请手动选中链接复制'
+    toastError('复制失败，请手动选中链接复制')
     console.warn('[share] 复制失败', error)
   } finally {
     copying.value = false
@@ -106,7 +103,6 @@ async function downloadCard() {
   if (!shareUrl.value || downloading.value) return
   // TODO(下一轮)：下载前把文章二维码合成到卡片右下角；此处只负责下载服务端 PNG。
   downloading.value = true
-  actionError.value = ''
   try {
     const response = await fetch(shareUrl.value, { cache: 'no-store' })
     if (!response.ok) {
@@ -125,7 +121,7 @@ async function downloadCard() {
     URL.revokeObjectURL(objectUrl)
     toastSuccess('分享卡片已开始下载')
   } catch (error) {
-    actionError.value = (error && error.message) || '下载失败，请稍后重试'
+    toastError((error && error.message) || '下载失败，请稍后重试')
     console.warn('[share] 下载失败', error)
   } finally {
     downloading.value = false
@@ -138,7 +134,7 @@ async function downloadCard() {
     :model-value="modelValue"
     title="分享这篇文章"
     width-class="max-w-2xl"
-    body-class="max-h-[65vh]"
+    body-class="max-h-[65vh] share-modal-body"
     @update:model-value="emit('update:modelValue', $event)"
   >
     <div class="space-y-4">
@@ -189,14 +185,6 @@ async function downloadCard() {
           {{ downloading ? '下载中…' : '下载 PNG' }}
         </SketchButton>
       </div>
-
-      <p
-        v-if="actionError"
-        class="border-l-2 border-dashed border-sketchred pl-3 font-serif text-sm italic text-sketchred"
-        role="alert"
-      >
-        {{ actionError }}
-      </p>
     </div>
 
     <template #footer>

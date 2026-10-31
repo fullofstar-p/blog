@@ -159,6 +159,19 @@
     pointer-events: none;
   }
 
+  /* 分享弹窗内容区：即使极矮窗口下内容略超，也不显示右侧滚动条（仍可滚轮滚动） */
+  .share-modal-body {
+    overflow-x: hidden;
+    scrollbar-width: none;
+    -ms-overflow-style: none;
+  }
+
+  .share-modal-body::-webkit-scrollbar {
+    display: none;
+    width: 0;
+    height: 0;
+  }
+
   /* ---------- 按钮（Pencil Shading / Paper Press）---------- */
   .sketch-btn {
     @apply inline-flex min-h-[44px] min-w-[44px] select-none items-center justify-center gap-2 rounded-sketch border-2 border-dashed border-pencil bg-paper px-5 py-2 font-serif text-base italic text-pencil shadow-sketch transition-colors duration-150 ease-out;
