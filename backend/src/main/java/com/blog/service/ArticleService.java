@@ -4,6 +4,7 @@ import com.blog.common.PageResult;
 import com.blog.dto.ArticleSaveDTO;
 import com.blog.vo.ArchiveVO;
 import com.blog.vo.ArticleDetailVO;
+import com.blog.vo.ArticleInteractionVO;
 import com.blog.vo.ArticleSummaryVO;
 
 import java.util.List;
@@ -25,6 +26,27 @@ public interface ArticleService {
 
     /** 按年月归档 */
     List<ArchiveVO> archive();
+
+    /** 文章互动状态（点赞/收藏） */
+    ArticleInteractionVO interaction(Long id);
+
+    /** 点赞（幂等），返回 { liked, likeCount } */
+    java.util.Map<String, Object> like(Long id);
+
+    /** 取消点赞（幂等），返回 { liked, likeCount } */
+    java.util.Map<String, Object> unlike(Long id);
+
+    /** 收藏（幂等），返回 { favorited, favoriteCount } */
+    java.util.Map<String, Object> favorite(Long id);
+
+    /** 取消收藏（幂等），返回 { favorited, favoriteCount } */
+    java.util.Map<String, Object> unfavorite(Long id);
+
+    /** 我的收藏分页 */
+    PageResult<ArticleSummaryVO> myFavorites(int pageNum, int pageSize);
+
+    /** 相关文章 */
+    List<ArticleSummaryVO> related(Long id, int limit);
 
     /** 我的文章（含草稿） */
     PageResult<ArticleSummaryVO> mine(int pageNum, int pageSize, Integer status);

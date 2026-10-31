@@ -23,10 +23,15 @@ public class ArticleSummaryVO {
     private Integer status;
     private Integer isTop;
     private Integer viewCount;
+    private Integer likeCount;
+    private Integer favoriteCount;
     private List<TagVO> tags;
     private LocalDateTime createTime;
     private LocalDateTime updateTime;
 
     /** 仅回收站列表返回：进入回收站的时间 */
     private LocalDateTime deletedTime;
+
+    /** 仅「我的收藏」列表返回：收藏时间 */
+    private LocalDateTime favoriteTime;
 }

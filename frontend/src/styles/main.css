@@ -72,11 +72,15 @@
   html {
     scroll-behavior: smooth;
     background-color: rgb(var(--paper));
+    /* 卡片 hover 会轻微旋转/抬起，靠近视口边缘时可能短暂撑出横向滚动条，
+       用 clip 而不是 hidden：不创建滚动容器，sticky 顶栏和目录仍然有效。 */
+    overflow-x: clip;
   }
 
   body {
     @apply bg-paper font-serif text-pencil antialiased;
     background-color: rgb(var(--paper));
+    overflow-x: clip;
     /* SVG 纸张纹理：fractalNoise 模拟纸面颗粒 */
     background-image: url("data:image/svg+xml,%3Csvg%20xmlns='http://www.w3.org/2000/svg'%20width='220'%20height='220'%20viewBox='0%200%20220%20220'%3E%3Cfilter%20id='n'%3E%3CfeTurbulence%20type='fractalNoise'%20baseFrequency='0.82'%20numOctaves='2'%20stitchTiles='stitch'/%3E%3CfeColorMatrix%20type='saturate'%20values='0'/%3E%3C/filter%3E%3Crect%20width='220'%20height='220'%20filter='url(%23n)'%20opacity='0.05'/%3E%3C/svg%3E");
     background-repeat: repeat;
@@ -137,6 +141,15 @@
     @apply transition-transform duration-150 ease-out hover:-translate-y-1 hover:rotate-[-0.3deg] hover:shadow-sketch-lg;
   }
 
+  /* 卡片 hover 采用 transform 动效时，提前提升为合成层。
+     否则 Chromium 会在过渡的第一帧按旧分辨率栅格化文字，看起来像先虚化一下。 */
+  .sketch-card-hover,
+  .sketch-card.transition-transform {
+    will-change: transform;
+    -webkit-backface-visibility: hidden;
+    backface-visibility: hidden;
+  }
+
   /* 手绘胶带装饰 */
   .sketch-tape {
     position: relative;
@@ -155,12 +168,27 @@
     pointer-events: none;
   }
 
+  /* 分享弹窗内容区：即使极矮窗口下内容略超，也不显示右侧滚动条（仍可滚轮滚动） */
+  .share-modal-body {
+    overflow-x: hidden;
+    scrollbar-width: none;
+    -ms-overflow-style: none;
+  }
+
+  .share-modal-body::-webkit-scrollbar {
+    display: none;
+    width: 0;
+    height: 0;
+  }
+
   /* ---------- 按钮（Pencil Shading / Paper Press）---------- */
   .sketch-btn {
-    @apply inline-flex min-h-[44px] min-w-[44px] select-none items-center justify-center gap-2 rounded-sketch border-2 border-dashed border-pencil bg-paper px-5 py-2 font-serif text-base italic text-pencil shadow-sketch transition-all duration-150 ease-out;
+    @apply inline-flex min-h-[44px] min-w-[44px] select-none items-center justify-center gap-2 rounded-sketch border-2 border-dashed border-pencil bg-paper px-5 py-2 font-serif text-base italic text-pencil shadow-sketch transition-colors duration-150 ease-out;
   }
   .sketch-btn:hover {
-    @apply -rotate-1 bg-pencil text-paper shadow-sketchsm;
+    /* 不在 hover 时旋转/位移：旋转会改变可点击区域，鼠标停在边缘时会反复进出，
+       表现为按钮闪烁；按下时的位移保留在手感上。 */
+    @apply bg-pencil text-paper shadow-sketchsm;
   }
   .sketch-btn:active {
     @apply rotate-1 translate-x-[1px] translate-y-[1px] shadow-press;

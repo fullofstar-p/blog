@@ -1,5 +1,7 @@
 <script setup>
-import { onMounted, reactive, ref } from 'vue'
+import { onMounted, reactive, ref, watch } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
+import ArticleCard from '@/components/ArticleCard.vue'
 import FileUploader from '@/components/FileUploader.vue'
 import SketchButton from '@/components/SketchButton.vue'
 import SketchEmpty from '@/components/SketchEmpty.vue'
@@ -7,19 +9,27 @@ import SketchInput from '@/components/SketchInput.vue'
 import SketchLoading from '@/components/SketchLoading.vue'
 import SketchModal from '@/components/SketchModal.vue'
 import SketchPagination from '@/components/SketchPagination.vue'
-import { deleteArticle, getMyArticles } from '@/api/article'
+import { deleteArticle, getMyArticles, getMyFavorites, unfavoriteArticle } from '@/api/article'
 import { useAuthStore } from '@/store/auth'
 import { formatDate, formatViews } from '@/utils/format'
 import { toastSuccess } from '@/utils/toast'
 
 const auth = useAuthStore()
+const route = useRoute()
+const router = useRouter()
 
 const tabs = [
   { key: 'profile', label: '个人资料' },
   { key: 'security', label: '账号安全' },
-  { key: 'articles', label: '我的文章' }
+  { key: 'articles', label: '我的文章' },
+  { key: 'favorites', label: '我的收藏' }
 ]
-const activeTab = ref('profile')
+const tabKeys = tabs.map((tab) => tab.key)
+const initialTab =
+  typeof route.query.tab === 'string' && tabKeys.includes(route.query.tab)
+    ? route.query.tab
+    : 'profile'
+const activeTab = ref(initialTab)
 
 // ---------- 资料 ----------
 const profileForm = reactive({ nickname: '', email: '', avatar: '' })
@@ -170,10 +180,78 @@ async function confirmDelete() {
   }
 }
 
+// ---------- 我的收藏 ----------
+const favoriteArticles = ref([])
+const favoriteTotal = ref(0)
+const favoritePage = ref(1)
+const favoritePageSize = 8
+const favoriteLoading = ref(false)
+const favoriteError = ref('')
+const cancellingId = ref(null)
+
+async function loadFavorites() {
+  favoriteLoading.value = true
+  favoriteError.value = ''
+  try {
+    const data = await getMyFavorites({
+      pageNum: favoritePage.value,
+      pageSize: favoritePageSize
+    })
+    favoriteArticles.value = (data && data.records) || []
+    favoriteTotal.value = (data && data.total) || 0
+  } catch (err) {
+    favoriteError.value = (err && err.message) || '收藏加载失败'
+    favoriteArticles.value = []
+  } finally {
+    favoriteLoading.value = false
+  }
+}
+
+function changeFavoritePage(page) {
+  if (page === favoritePage.value) return
+  favoritePage.value = page
+  loadFavorites()
+}
+
+async function cancelFavorite(article) {
+  if (cancellingId.value) return
+  cancellingId.value = article.id
+  try {
+    await unfavoriteArticle(article.id)
+    toastSuccess('已取消收藏')
+    if (favoriteArticles.value.length === 1 && favoritePage.value > 1) {
+      favoritePage.value -= 1
+    }
+    await loadFavorites()
+  } catch (err) {
+    console.warn('[profile] 取消收藏失败', err)
+  } finally {
+    cancellingId.value = null
+  }
+}
+
+function changeTab(key) {
+  if (!tabKeys.includes(key) || activeTab.value === key) return
+  activeTab.value = key
+  router.replace({ query: { ...route.query, tab: key } })
+  if (key === 'favorites') loadFavorites()
+}
+
+watch(
+  () => route.query.tab,
+  (value) => {
+    if (typeof value !== 'string' || !tabKeys.includes(value)) return
+    if (value === activeTab.value) return
+    activeTab.value = value
+    if (value === 'favorites') loadFavorites()
+  }
+)
+
 onMounted(() => {
   fillProfile()
   loadProfile()
   loadMyArticles()
+  if (activeTab.value === 'favorites') loadFavorites()
 })
 </script>
 
@@ -218,14 +296,14 @@ onMounted(() => {
           v-for="tab in tabs"
           :key="tab.key"
           type="button"
-          class="inline-flex min-h-[44px] items-center border-2 border-dashed px-4 font-serif text-base italic transition-all duration-150 active:translate-y-[1px]"
+          class="inline-flex min-h-[44px] items-center border-2 border-dashed px-4 font-serif text-base italic transition-colors duration-150 active:translate-y-[1px]"
           :class="
             activeTab === tab.key
               ? 'border-pencil bg-pencil text-paper'
               : 'border-pencil/60 text-pencil hover:bg-pencil hover:text-paper'
           "
           :aria-pressed="activeTab === tab.key ? 'true' : 'false'"
-          @click="activeTab = tab.key"
+          @click="changeTab(tab.key)"
         >
           {{ tab.label }}
         </button>
@@ -307,6 +385,69 @@ onMounted(() => {
             <SketchButton :loading="passwordSaving" @click="savePassword">
               {{ passwordSaving ? '提交中…' : '修改密码' }}
             </SketchButton>
+          </div>
+        </div>
+
+        <!-- 我的收藏 -->
+        <div v-else-if="activeTab === 'favorites'" class="sketch-card rotate-[0.2deg] p-6 md:p-8">
+          <div class="flex flex-wrap items-center justify-between gap-2">
+            <h2 class="font-serif text-2xl italic text-pencil">我的收藏</h2>
+            <span class="font-serif text-xs italic text-ink-300">共 {{ favoriteTotal }} 篇</span>
+          </div>
+
+          <div class="sketch-hr"></div>
+
+          <SketchLoading v-if="favoriteLoading" :rows="2" label="正在加载我的收藏" />
+
+          <div
+            v-else-if="favoriteError"
+            class="flex flex-col items-start gap-3 border-2 border-dashed border-sketchred/60 p-4"
+          >
+            <p class="font-serif text-sm italic text-sketchred" role="alert">{{ favoriteError }}</p>
+            <button type="button" class="sketch-btn min-h-[44px] px-4" @click="loadFavorites">
+              重新加载
+            </button>
+          </div>
+
+          <SketchEmpty
+            v-else-if="favoriteArticles.length === 0"
+            title="还没有收藏文章"
+            description="在文章详情点「收藏」，这里就会留下书签。"
+            icon="★"
+          >
+            <RouterLink :to="{ name: 'home' }" class="sketch-btn min-h-[44px] px-4">
+              去逛逛
+            </RouterLink>
+          </SketchEmpty>
+
+          <div v-else class="space-y-6">
+            <div v-for="(article, index) in favoriteArticles" :key="article.id">
+              <ArticleCard
+                :article="article"
+                :class="index % 2 === 0 ? 'rotate-[-0.2deg]' : 'rotate-[0.2deg]'"
+              />
+              <div class="mt-2 flex flex-wrap items-center justify-between gap-2">
+                <p class="font-serif text-xs italic text-ink-300">
+                  收藏于 {{ formatDate(article.favoriteTime) }}
+                </p>
+                <button
+                  type="button"
+                  class="sketch-btn sketch-btn-danger sketch-btn-sm min-h-[44px] px-3 text-sm"
+                  :disabled="cancellingId === article.id"
+                  @click="cancelFavorite(article)"
+                >
+                  {{ cancellingId === article.id ? '取消中…' : '取消收藏' }}
+                </button>
+              </div>
+            </div>
+
+            <SketchPagination
+              v-if="favoriteTotal > favoritePageSize"
+              :page-num="favoritePage"
+              :total="favoriteTotal"
+              :page-size="favoritePageSize"
+              @update:page-num="changeFavoritePage"
+            />
           </div>
         </div>
 

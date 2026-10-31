@@ -4,7 +4,8 @@ import { nextTick, onBeforeUnmount, ref, watch } from 'vue'
 const props = defineProps({
   modelValue: { type: Boolean, default: false },
   title: { type: String, default: '' },
-  widthClass: { type: String, default: 'max-w-lg' }
+  widthClass: { type: String, default: 'max-w-lg' },
+  bodyClass: { type: String, default: 'max-h-[60vh]' }
 })
 
 const emit = defineEmits(['update:modelValue'])
@@ -74,7 +75,7 @@ onBeforeUnmount(() => {
           </button>
         </div>
 
-        <div class="max-h-[60vh] overflow-y-auto pr-1">
+        <div class="overflow-y-auto pr-1" :class="bodyClass">
           <slot />
         </div>
 

@@ -1,7 +1,7 @@
 -- ============================================================================
 -- 技术分享博客 · MySQL 8.0 初始化脚本
 -- 由 docker-compose 挂载到 /docker-entrypoint-initdb.d，容器首次初始化时自动执行。
--- 表结构：用户 / 文章 / 分类 / 标签 / 文章标签 / 评论 / 文件审计
+-- 表结构：用户 / 文章 / 分类 / 标签 / 文章标签 / 评论 / 点赞 / 收藏 / 站内通知 / 文件审计
 -- 说明：初始管理员账号由后端启动时创建（BCrypt 加密），脚本中不写死密码哈希。
 -- ============================================================================
 
@@ -78,6 +78,8 @@ CREATE TABLE `article` (
   `status`      TINYINT      NOT NULL DEFAULT 0 COMMENT '状态：0 草稿 / 1 已发布',
   `is_top`      TINYINT      NOT NULL DEFAULT 0 COMMENT '是否置顶：0 否 / 1 是',
   `view_count`  INT          NOT NULL DEFAULT 0 COMMENT '阅读量（Redis 计数定时落库）',
+  `like_count`  INT          NOT NULL DEFAULT 0 COMMENT '点赞数',
+  `favorite_count` INT       NOT NULL DEFAULT 0 COMMENT '收藏数',
   `create_time` DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
   `update_time` DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
   `deleted`     TINYINT      NOT NULL DEFAULT 0 COMMENT '逻辑删除：0 正常 / 1 已删除',
@@ -128,24 +130,74 @@ CREATE TABLE `article_daily_stat` (
 ) ENGINE = InnoDB DEFAULT CHARSET = utf8mb4 COLLATE = utf8mb4_unicode_ci COMMENT = '文章每日阅读统计';
 
 -- ----------------------------------------------------------------------------
--- 评论表（两级：parent_id 为 NULL 表示一级评论，否则为回复）
--- 状态：0 待审核 / 1 已通过 / 2 已拒绝
+-- 评论表（楼中楼：parent_id 为直接父评论，root_id 为楼层根评论）
+-- 状态：0 待审核 / 1 已通过 / 2 已拒绝；depth：0 一级，最多 4（5 层）
 -- ----------------------------------------------------------------------------
 DROP TABLE IF EXISTS `comment`;
 CREATE TABLE `comment` (
   `id`          BIGINT        NOT NULL AUTO_INCREMENT COMMENT '主键',
   `article_id`  BIGINT        NOT NULL COMMENT '文章 ID',
   `user_id`     BIGINT        NOT NULL COMMENT '评论人 ID',
-  `parent_id`   BIGINT        DEFAULT NULL COMMENT '父评论 ID，NULL 表示一级评论',
+  `parent_id`   BIGINT        DEFAULT NULL COMMENT '直接父评论 ID，NULL 表示一级评论',
+  `root_id`     BIGINT        DEFAULT NULL COMMENT '楼中楼根评论 ID',
+  `reply_to_user_id` BIGINT   DEFAULT NULL COMMENT '被回复用户 ID',
+  `depth`       TINYINT       NOT NULL DEFAULT 0 COMMENT '嵌套层级：0 一级，最多 4',
   `content`     VARCHAR(1000) NOT NULL COMMENT '评论内容',
   `status`      TINYINT       NOT NULL DEFAULT 0 COMMENT '状态：0 待审核 / 1 通过 / 2 拒绝',
   `like_count`  INT           NOT NULL DEFAULT 0 COMMENT '点赞数',
   `create_time` DATETIME      NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
   PRIMARY KEY (`id`),
   KEY `idx_comment_article_status` (`article_id`, `status`),
+  KEY `idx_comment_article_status_time` (`article_id`, `status`, `create_time`),
   KEY `idx_comment_parent` (`parent_id`),
+  KEY `idx_comment_root` (`root_id`),
   KEY `idx_comment_user` (`user_id`)
 ) ENGINE = InnoDB DEFAULT CHARSET = utf8mb4 COLLATE = utf8mb4_unicode_ci COMMENT = '评论表';
+
+-- ----------------------------------------------------------------------------
+-- 文章点赞 / 收藏（Redis 计数之外的持久化关系，唯一键保证幂等）
+-- ----------------------------------------------------------------------------
+DROP TABLE IF EXISTS `article_like`;
+CREATE TABLE `article_like` (
+  `id`          BIGINT   NOT NULL AUTO_INCREMENT COMMENT '主键',
+  `article_id`  BIGINT   NOT NULL COMMENT '文章 ID',
+  `user_id`     BIGINT   NOT NULL COMMENT '用户 ID',
+  `create_time` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '点赞时间',
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uk_article_like` (`article_id`, `user_id`),
+  KEY `idx_article_like_user` (`user_id`, `create_time`)
+) ENGINE = InnoDB DEFAULT CHARSET = utf8mb4 COLLATE = utf8mb4_unicode_ci COMMENT = '文章点赞';
+
+DROP TABLE IF EXISTS `article_favorite`;
+CREATE TABLE `article_favorite` (
+  `id`          BIGINT   NOT NULL AUTO_INCREMENT COMMENT '主键',
+  `article_id`  BIGINT   NOT NULL COMMENT '文章 ID',
+  `user_id`     BIGINT   NOT NULL COMMENT '用户 ID',
+  `create_time` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '收藏时间',
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uk_article_favorite` (`article_id`, `user_id`),
+  KEY `idx_article_favorite_user` (`user_id`, `create_time`)
+) ENGINE = InnoDB DEFAULT CHARSET = utf8mb4 COLLATE = utf8mb4_unicode_ci COMMENT = '文章收藏';
+
+-- ----------------------------------------------------------------------------
+-- 站内通知：评论/回复/审核结果
+-- ----------------------------------------------------------------------------
+DROP TABLE IF EXISTS `notification`;
+CREATE TABLE `notification` (
+  `id`          BIGINT       NOT NULL AUTO_INCREMENT COMMENT '主键',
+  `user_id`     BIGINT       NOT NULL COMMENT '接收人 ID',
+  `type`        VARCHAR(20)  NOT NULL COMMENT 'COMMENT 评论 / REPLY 回复 / COMMENT_AUDIT 审核',
+  `title`       VARCHAR(120) NOT NULL COMMENT '通知标题',
+  `content`     VARCHAR(500) DEFAULT NULL COMMENT '通知内容摘要',
+  `article_id`  BIGINT       DEFAULT NULL COMMENT '关联文章 ID',
+  `comment_id`  BIGINT       DEFAULT NULL COMMENT '关联评论 ID',
+  `sender_id`   BIGINT       DEFAULT NULL COMMENT '触发人 ID',
+  `is_read`     TINYINT      NOT NULL DEFAULT 0 COMMENT '0 未读 / 1 已读',
+  `create_time` DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+  PRIMARY KEY (`id`),
+  KEY `idx_notification_user_read` (`user_id`, `is_read`, `create_time`),
+  KEY `idx_notification_article` (`article_id`)
+) ENGINE = InnoDB DEFAULT CHARSET = utf8mb4 COLLATE = utf8mb4_unicode_ci COMMENT = '站内通知';
 
 -- ----------------------------------------------------------------------------
 -- 文件对象审计表（可选，用于记录上传归属，支撑删除鉴权）

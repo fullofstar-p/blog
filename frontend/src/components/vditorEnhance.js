@@ -93,7 +93,11 @@ const LANG_META = [
   { value: 'swift', label: 'Swift', short: 'SW', color: '#fa7343' },
   { value: 'xml', label: 'XML', short: 'X', color: '#0060ac' },
   { value: 'dockerfile', label: 'Dockerfile', short: 'DK', color: '#2496ed' },
-  { value: 'diff', label: 'Diff', short: '±', color: '#6b7280' }
+  { value: 'diff', label: 'Diff', short: '±', color: '#6b7280' },
+  // P3-2 图表语言也进入语言选择器：没有这两项时 mermaid / echarts 代码块
+  // 只能显示「?」图标，用户不知道这是可渲染的图表块。
+  { value: 'mermaid', label: 'Mermaid', short: 'M', color: '#ff3670' },
+  { value: 'echarts', label: 'ECharts', short: 'EC', color: '#aa344d' }
 ]
 
 const LANG_BY_VALUE = new Map(LANG_META.map((item) => [item.value, item]))
@@ -406,6 +410,147 @@ function installTableTools(root, internal, vditor) {
     paddingObserver.disconnect()
     window.clearTimeout(hideTimer)
     panel.remove()
+  }
+}
+
+/**
+ * 代码块语言行的原生补全列表（Vditor `.vditor-hint`）默认是纯文本语言 id。
+ * 这里把它替换成和右下角语言下拉一致的列表：品牌色图标 + 完整语言名，
+ * 同时补上 Mermaid / ECharts，避免两套语言列表长得不一样。
+ */
+function installLanguageHint(internal, vditor) {
+  const element = internal.hint && internal.hint.element
+  if (!element) return () => {}
+
+  let frame = 0
+  const render = () => {
+    frame = 0
+    if (internal.currentMode !== 'ir') return
+    const buttons = Array.from(element.querySelectorAll(':scope > button[data-value]'))
+    if (!buttons.length) return
+    const isLanguageHint = buttons.some((button) => {
+      try {
+        return decodeURIComponent(button.getAttribute('data-value') || '').endsWith(' ')
+      } catch (error) {
+        return false
+      }
+    })
+    if (!isLanguageHint) {
+      // hint 元素是复用的：如果当前是 emoji 等其他补全，撤掉语言列表样式
+      element.classList.remove('vditor-lang-hint')
+      return
+    }
+    const ours =
+      buttons.length === LANG_META.length && buttons.every((button) => button.dataset.langValue)
+    if (ours) return
+
+    element.classList.add('vditor-lang-hint')
+    element.innerHTML = ''
+    const typed = (() => {
+      const selection = window.getSelection()
+      if (!selection || !selection.rangeCount) return ''
+      const range = selection.getRangeAt(0)
+      const anchor = range.startContainer
+      const anchorElement = anchor && (anchor.nodeType === 1 ? anchor : anchor.parentElement)
+      const info =
+        anchorElement && anchorElement.closest
+          ? anchorElement.closest('.vditor-ir__marker--info')
+          : null
+      if (!info) return ''
+      const before = document.createRange()
+      before.selectNodeContents(info)
+      before.setEnd(range.startContainer, range.startOffset)
+      return before.toString().replace(/\u200b/g, '').trim()
+    })()
+    const ordered = LANG_META.slice()
+    if (typed) {
+      const key = typed.toLowerCase()
+      ordered.sort((left, right) => {
+        const score = (meta) =>
+          meta.value.toLowerCase().startsWith(key) ||
+          meta.label.toLowerCase().includes(key)
+            ? 0
+            : 1
+        return score(left) - score(right)
+      })
+    }
+    ordered.forEach((meta, index) => {
+      const item = document.createElement('button')
+      item.type = 'button'
+      item.className = 'vditor-lang-hint__item'
+      if (index === 0) item.classList.add('vditor-hint--current')
+      item.dataset.value = encodeURIComponent(`${meta.value} `)
+      item.dataset.langValue = meta.value
+      item.innerHTML = `${langIconHTML(meta)}<span class="vditor-code-lang__name">${meta.label}</span>`
+      item.addEventListener('mousedown', (event) => {
+        event.preventDefault()
+        event.stopPropagation()
+      })
+      item.addEventListener('click', (event) => {
+        event.preventDefault()
+        event.stopPropagation()
+        applyHintLanguage(meta.value, item)
+      })
+      element.appendChild(item)
+    })
+  }
+
+  /** 从语言补全列表选语言：直接替换对应围栏，避免依赖 Vditor hint 的内部光标状态 */
+  const applyHintLanguage = (value, item) => {
+    element.style.display = 'none'
+    const selection = window.getSelection()
+    const anchor =
+      selection && selection.rangeCount ? selection.getRangeAt(0).startContainer : null
+    const anchorElement =
+      anchor && (anchor.nodeType === 1 ? anchor : anchor.parentElement)
+    const info =
+      anchorElement && anchorElement.closest
+        ? anchorElement.closest('.vditor-ir__marker--info')
+        : null
+    const node =
+      info && info.closest('.vditor-ir__node[data-type="code-block"]')
+        ? info.closest('.vditor-ir__node[data-type="code-block"]')
+        : null
+    if (!node) {
+      if (internal.hint && typeof internal.hint.fillEmoji === 'function') {
+        internal.hint.fillEmoji(item, vditor)
+      }
+      return
+    }
+    const blocks = Array.from(
+      internal.ir.element.querySelectorAll('.vditor-ir__node[data-type="code-block"]')
+    )
+    const index = blocks.indexOf(node)
+    if (index < 0) return
+    const markdown = vditor.getValue()
+    const next = replaceFenceLang(markdown, index, value)
+    if (next === markdown) return
+    const savedScroll = internal.ir.element.scrollTop
+    vditor.setValue(next, false)
+    if (internal.options && typeof internal.options.input === 'function') {
+      internal.options.input(next)
+    }
+    internal.ir.element.scrollTop = savedScroll
+  }
+
+  const schedule = () => {
+    if (frame) return
+    frame = window.requestAnimationFrame(render)
+  }
+
+  const observer = new MutationObserver(schedule)
+  observer.observe(element, {
+    childList: true,
+    subtree: true,
+    attributes: true,
+    attributeFilter: ['style', 'class']
+  })
+  render()
+
+  return () => {
+    observer.disconnect()
+    if (frame) window.cancelAnimationFrame(frame)
+    element.classList.remove('vditor-lang-hint')
   }
 }
 
@@ -1205,6 +1350,7 @@ export function enhanceVditor(vditor) {
   const disposers = [
     installTableTools(root, internal, vditor),
     installCodeLanguage(root, internal, vditor),
+    installLanguageHint(internal, vditor),
     installCodeBlockLangMarker(root, internal),
     installCodeBlockComposition(root, internal),
     installInlineAutoRender(root, internal),

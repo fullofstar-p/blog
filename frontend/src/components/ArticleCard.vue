@@ -57,6 +57,7 @@ defineProps({
             <span>✎ {{ article.authorName || '匿名作者' }}</span>
             <span>{{ formatDate(article.createTime) }}</span>
             <span>☕ {{ formatViews(article.viewCount) }} 阅读</span>
+            <span>♥ {{ formatViews(article.likeCount) }} 点赞</span>
           </div>
 
           <div v-if="article.tags && article.tags.length" class="mt-3 flex flex-wrap gap-2">

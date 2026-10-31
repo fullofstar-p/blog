@@ -38,7 +38,7 @@ function go(page) {
     <div class="flex flex-wrap items-center justify-center gap-2">
       <button
         type="button"
-        class="inline-flex h-11 min-w-[44px] items-center justify-center border-2 border-dashed border-pencil px-3 font-serif text-sm italic text-pencil shadow-sketchsm transition-all duration-150 hover:bg-pencil hover:text-paper active:translate-x-[1px] active:translate-y-[1px] active:shadow-press disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:bg-paper disabled:hover:text-pencil"
+        class="inline-flex h-11 min-w-[44px] items-center justify-center border-2 border-dashed border-pencil px-3 font-serif text-sm italic text-pencil shadow-sketchsm transition-colors duration-150 hover:bg-pencil hover:text-paper active:translate-x-[1px] active:translate-y-[1px] active:shadow-press disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:bg-paper disabled:hover:text-pencil"
         :disabled="pageNum <= 1"
         aria-label="上一页"
         @click="go(pageNum - 1)"
@@ -61,7 +61,7 @@ function go(page) {
         <button
           v-else
           type="button"
-          class="inline-flex h-11 min-w-[44px] items-center justify-center border-2 border-dashed px-2 font-serif text-sm italic shadow-sketchsm transition-all duration-150 hover:bg-pencil hover:text-paper active:translate-x-[1px] active:translate-y-[1px] active:shadow-press"
+          class="inline-flex h-11 min-w-[44px] items-center justify-center border-2 border-dashed px-2 font-serif text-sm italic shadow-sketchsm transition-colors duration-150 hover:bg-pencil hover:text-paper active:translate-x-[1px] active:translate-y-[1px] active:shadow-press"
           :class="page === pageNum ? 'border-pencil bg-pencil text-paper' : 'border-pencil/60 text-pencil'"
           :aria-current="page === pageNum ? 'page' : undefined"
           :aria-label="`第 ${page} 页`"
@@ -73,7 +73,7 @@ function go(page) {
 
       <button
         type="button"
-        class="inline-flex h-11 min-w-[44px] items-center justify-center border-2 border-dashed border-pencil px-3 font-serif text-sm italic text-pencil shadow-sketchsm transition-all duration-150 hover:bg-pencil hover:text-paper active:translate-x-[1px] active:translate-y-[1px] active:shadow-press disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:bg-paper disabled:hover:text-pencil"
+        class="inline-flex h-11 min-w-[44px] items-center justify-center border-2 border-dashed border-pencil px-3 font-serif text-sm italic text-pencil shadow-sketchsm transition-colors duration-150 hover:bg-pencil hover:text-paper active:translate-x-[1px] active:translate-y-[1px] active:shadow-press disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:bg-paper disabled:hover:text-pencil"
         :disabled="pageNum >= totalPages"
         aria-label="下一页"
         @click="go(pageNum + 1)"

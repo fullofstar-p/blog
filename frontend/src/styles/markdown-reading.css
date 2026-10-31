@@ -159,6 +159,66 @@
   transition: width 0.08s linear;
 }
 
+/* 阅读页右下角「回到顶部」：z-index 低于弹窗遮罩（z-40），不会盖住分享卡片 */
+.back-to-top {
+  position: fixed;
+  right: 22px;
+  bottom: 22px;
+  z-index: 30;
+  display: inline-flex;
+  height: 46px;
+  min-width: 46px;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  padding: 0 12px;
+  border: 2px dashed rgba(44, 44, 44, 0.8);
+  border-radius: 4px;
+  background-color: #faf6ee;
+  color: #2c2c2c;
+  font-family: var(--md-font, -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Microsoft YaHei', Arial, sans-serif);
+  font-size: 13px;
+  line-height: 1;
+  box-shadow: 3px 3px 0 rgba(44, 44, 44, 0.15);
+  cursor: pointer;
+  transition: background-color 0.15s ease, color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.back-to-top:hover {
+  background-color: #2c2c2c;
+  color: #f5f0e8;
+  box-shadow: 2px 2px 0 rgba(44, 44, 44, 0.12);
+}
+
+.back-to-top:active {
+  transform: translate(1px, 1px);
+  box-shadow: none;
+}
+
+.back-to-top__text {
+  font-size: 12px;
+  font-style: italic;
+}
+
+@media (max-width: 1023px) {
+  /* 移动端右下角还有目录按钮，回到顶部叠在它上面 */
+  .back-to-top {
+    bottom: 74px;
+  }
+}
+
+html.dark .back-to-top {
+  border-color: rgba(231, 225, 213, 0.8);
+  background-color: #24221e;
+  color: #e7e1d5;
+  box-shadow: 3px 3px 0 rgba(0, 0, 0, 0.5);
+}
+
+html.dark .back-to-top:hover {
+  background-color: #e7e1d5;
+  color: #1b1a17;
+}
+
 /* 桌面端：正文右侧的 sticky 目录 */
 .reading-toc {
   border-left: 2px dashed rgba(44, 44, 44, 0.22);
@@ -300,4 +360,89 @@ html.dark .reading-toc-mobile {
   background-color: #24221e;
   color: #e7e1d5;
   box-shadow: 0 12px 32px rgba(0, 0, 0, 0.55);
+}
+
+/* ---------- 5. P3-2：数学公式 / Mermaid / ECharts ---------- */
+/* 行内公式跟随正文字号与颜色（暗色由 markdown.css 的 --md-text 控制） */
+.typora-page .md-editor-preview .md-editor-katex-inline .katex {
+  font-size: 1.05em;
+}
+
+/* 块公式居中；超宽公式由公式自己横向滚动，不撑破纸张 */
+.typora-page .md-editor-preview .md-editor-katex-block {
+  margin: 1em 0;
+  overflow-x: auto;
+  overflow-y: hidden;
+  text-align: center;
+}
+
+.typora-page .md-editor-preview .md-editor-katex-block .katex-display {
+  margin: 0.3em 0;
+  overflow-x: auto;
+  overflow-y: hidden;
+}
+
+/* Mermaid：独立图表卡；超宽图由 MarkdownViewer 的 fitMermaidSvg 按自然宽度撑开，
+   外层容器横向滚动，移动端不会把页面撑宽。
+   MarkdownViewer 自定义渲染的容器同时带 .p32-mermaid 与 .md-editor-mermaid 两个类：
+   - .md-editor-mermaid 兼容既有样式与 e2e 选择器；
+   - 预览库里的 `.md-editor-preview .md-editor-mermaid{display:none}` 由这里覆盖。 */
+.typora-page .md-editor-preview .md-editor-mermaid,
+.typora-page .md-editor-preview .p32-mermaid {
+  display: block;
+  max-width: 100%;
+  margin: 1.1em 0;
+  padding: 10px 12px;
+  overflow-x: auto;
+  overflow-y: hidden;
+  border: 1px solid #e6e0d4;
+  border-radius: 6px;
+  background-color: #fbf7ef;
+}
+
+.typora-page .md-editor-preview .md-editor-mermaid svg,
+.typora-page .md-editor-preview .p32-mermaid svg {
+  display: block;
+  margin: 0 auto;
+  height: auto;
+}
+
+/* ECharts 图表容器（由 MarkdownViewer 把 ```echarts 代码块接管成图表） */
+.typora-page .p32-echarts {
+  width: 100%;
+  height: clamp(260px, 40vw, 380px);
+  margin: 1.1em 0;
+  border: 1px solid #e6e0d4;
+  border-radius: 6px;
+  background-color: #fbf7ef;
+  overflow: hidden;
+}
+
+/* 已渲染成图表的代码块隐藏；原始 Markdown 内容仍在 DOM 中，便于复制与降级 */
+.typora-page .md-editor-preview .md-editor-code.p32-chart-source {
+  display: none;
+}
+
+@media (max-width: 720px) {
+  .typora-page .md-editor-preview .md-editor-mermaid,
+  .typora-page .md-editor-preview .p32-mermaid {
+    padding: 8px 10px;
+  }
+
+  .typora-page .p32-echarts {
+    height: clamp(240px, 62vw, 340px);
+  }
+}
+
+/* 暗色：图表卡换成纸张暗色；ECharts 用 dark 主题 + 透明背景叠在卡片上 */
+html.dark .typora-page .md-editor-preview .md-editor-mermaid,
+html.dark .typora-page .md-editor-preview .p32-mermaid,
+html.dark .typora-page .p32-echarts {
+  border-color: #3a362f;
+  background-color: #1b1a17;
+}
+
+html.dark .typora-page .md-editor-preview .md-editor-katex-inline,
+html.dark .typora-page .md-editor-preview .md-editor-katex-block {
+  color: var(--md-text, #d9d3c6);
 }

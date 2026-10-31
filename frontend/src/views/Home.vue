@@ -109,9 +109,10 @@ onMounted(() => {
       <div class="mt-6 flex flex-wrap gap-3">
         <RouterLink
           :to="{ name: 'archive' }"
-          class="sketch-btn sketch-btn-primary min-h-[44px] px-5"
+          class="sketch-btn min-h-[44px] px-5"
         >
           翻阅归档
+          <span aria-hidden="true">→</span>
         </RouterLink>
         <RouterLink
           :to="{ name: 'about' }"

@@ -627,7 +627,9 @@
   position: relative;
   display: flex;
   flex-direction: column;
-  overflow: hidden;
+  /* 顶部菜单的下拉可能超出编辑器高度（段落菜单较长），不能裁掉；
+     编辑区自身滚动由 .vditor / .typora-editor__body 负责。 */
+  overflow: visible;
   border: 1px solid #d8d0c0;
   border-radius: 6px;
   background-color: #f5f0e8;
@@ -677,6 +679,9 @@
   left: 0;
   z-index: 60;
   min-width: 208px;
+  /* 段落菜单项变多后可能超过编辑器高度：限制高度并允许滚动 */
+  max-height: min(70vh, 520px);
+  overflow-y: auto;
   padding: 4px;
   border: 1px solid #d8d0c0;
   border-radius: 6px;
@@ -1458,6 +1463,68 @@
   font-weight: 600;
 }
 
+/* 代码块语言行的 Vditor 原生补全列表：改成与右下角语言菜单一致的图标列表 */
+.vditor-hint.vditor-lang-hint {
+  min-width: 208px;
+  max-height: min(300px, 60vh);
+  padding: 4px;
+  overflow-y: auto;
+  border: 1px solid #d8d0c0;
+  border-radius: 6px;
+  background-color: #faf6ee !important;
+  box-shadow: 0 8px 24px rgba(44, 44, 44, 0.18);
+}
+
+.vditor-hint.vditor-lang-hint > button.vditor-lang-hint__item {
+  display: flex !important;
+  align-items: center;
+  gap: 9px;
+  width: 100%;
+  height: 30px;
+  margin: 0;
+  padding: 0 10px 0 8px !important;
+  border: 0 !important;
+  border-radius: 4px;
+  background-color: transparent !important;
+  color: #2c2c2c;
+  font-family: var(--md-font, -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Microsoft YaHei', Arial, sans-serif);
+  font-size: 13px;
+  font-style: normal;
+  line-height: 30px;
+  text-align: left;
+  cursor: pointer;
+}
+
+.vditor-hint.vditor-lang-hint > button.vditor-lang-hint__item:hover,
+.vditor-hint.vditor-lang-hint > button.vditor-lang-hint__item.vditor-hint--current {
+  background-color: #efe7d8 !important;
+}
+
+.vditor-hint.vditor-lang-hint .vditor-code-lang__icon {
+  width: 14px;
+  height: 14px;
+  font-size: 9px;
+}
+
+.vditor-hint.vditor-lang-hint .vditor-code-lang__name {
+  max-width: none;
+}
+
+html.dark .vditor-hint.vditor-lang-hint {
+  border-color: #3a362f;
+  background-color: #24221e !important;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.55);
+}
+
+html.dark .vditor-hint.vditor-lang-hint > button.vditor-lang-hint__item {
+  color: #d9d3c6;
+}
+
+html.dark .vditor-hint.vditor-lang-hint > button.vditor-lang-hint__item:hover,
+html.dark .vditor-hint.vditor-lang-hint > button.vditor-lang-hint__item.vditor-hint--current {
+  background-color: #302c26 !important;
+}
+
 /* 双击语言按钮后的手写输入框：就长在原按钮的位置和尺寸上 */
 .vditor-code-lang__input {
   position: absolute;
@@ -1903,4 +1970,178 @@ html.dark .typora-editor .vditor-reset hr:hover {
     #7d7464 7px,
     transparent 7px
   );
+}
+
+/* ==========================================================================
+   P3-2：数学公式 / Mermaid / ECharts（编辑器即时渲染）
+   --------------------------------------------------------------------------
+   Vditor IR 的公式与图表预览都挂在 .vditor-ir__preview 里：公式跟随正文颜色，
+   Mermaid / ECharts 给一张浅色“图表卡”，暗色模式下也保持可读。
+   ========================================================================== */
+
+/* 行内公式跟随正文，别把行高撑得太夸张 */
+.vditor-ir__preview .language-math {
+  max-width: 100%;
+  overflow-x: auto;
+  overflow-y: hidden;
+  vertical-align: middle;
+}
+
+.vditor-ir__preview .language-math .katex,
+.vditor-ir__preview .katex {
+  font-size: 1.05em;
+}
+
+/* 块公式：超宽公式自己横向滚动，不撑破编辑区 */
+.vditor-ir__preview .language-math .katex-display,
+.vditor-ir__preview .katex-display {
+  margin: 0.4em 0;
+  overflow-x: auto;
+  overflow-y: hidden;
+}
+
+/* Mermaid：超宽图横向滚动 */
+.vditor-ir__preview .language-mermaid {
+  max-width: 100%;
+  overflow-x: auto;
+  overflow-y: hidden;
+  text-align: center;
+}
+
+.vditor-ir__preview .language-mermaid svg {
+  display: block;
+  max-width: 100%;
+  margin: 0 auto;
+  height: auto;
+}
+
+/* ECharts：Vditor 默认给 420px 高，这里补圆角，避免图表溢出卡片 */
+.vditor-ir__preview .language-echarts {
+  max-width: 100%;
+  overflow: hidden;
+  border-radius: 4px;
+}
+
+/* 暗色编辑器里 Mermaid / ECharts 仍是浅色主题的 SVG / canvas，
+   给它们一张纸色卡片，避免深色边框与标签糊在暗背景上 */
+html.dark .vditor-ir__preview .language-mermaid,
+html.dark .vditor-ir__preview .language-echarts {
+  padding: 8px;
+  background-color: #faf6ee;
+  border: 1px solid #d8d0c0;
+  border-radius: 6px;
+}
+
+/* --------------------------------------------------------------------------
+   P3-2：点击图表 / 块公式 → Vditor 原生展开源码
+   --------------------------------------------------------------------------
+   Vditor 默认把代码源码绝对定位盖在预览上（公式还会隐藏预览）。
+   这里改成「源码在上、渲染在下」的文档流布局，渲染区保持只读；
+   点击空白处由 MarkdownEditor 收起 `vditor-ir__node--expand`。
+   -------------------------------------------------------------------------- */
+.typora-editor .vditor-ir__node--expand[data-type='code-block']:has(code.language-mermaid) > pre.vditor-ir__marker--pre,
+.typora-editor .vditor-ir__node--expand[data-type='code-block']:has(code.language-echarts) > pre.vditor-ir__marker--pre,
+.typora-editor .vditor-ir__node--expand[data-type='math-block'] > pre.vditor-ir__marker--pre {
+  position: static !important;
+  inset: auto !important;
+  display: block !important;
+  width: auto !important;
+  height: auto !important;
+  min-height: 0 !important;
+  max-height: 45vh;
+  margin: 0 0 10px !important;
+  padding: 10px 12px !important;
+  overflow: auto;
+  border: 1px solid #d8d0c0 !important;
+  border-radius: 4px;
+  background-color: #f3efe6 !important;
+  color: #2f2f2f !important;
+  font-family: var(--md-mono, 'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, 'Courier New', monospace);
+  font-size: 12.5px !important;
+  line-height: 1.65 !important;
+  white-space: pre-wrap;
+  word-break: break-word;
+  z-index: auto !important;
+}
+
+.typora-editor .vditor-ir__node--expand[data-type='code-block']:has(code.language-mermaid) > pre.vditor-ir__marker--pre > code,
+.typora-editor .vditor-ir__node--expand[data-type='code-block']:has(code.language-echarts) > pre.vditor-ir__marker--pre > code,
+.typora-editor .vditor-ir__node--expand[data-type='math-block'] > pre.vditor-ir__marker--pre > code {
+  color: #2f2f2f !important;
+  background: transparent !important;
+}
+
+/* 块公式展开时 Vditor 会隐藏下方预览；这里强制保留，保证「源码在上、公式在下」 */
+.typora-editor .vditor-ir__node--expand[data-type='math-block'] > pre.vditor-ir__preview {
+  display: block !important;
+  width: auto !important;
+  height: auto !important;
+  margin-top: 4px;
+}
+
+html.dark .typora-editor .vditor-ir__node--expand[data-type='code-block']:has(code.language-mermaid) > pre.vditor-ir__marker--pre,
+html.dark .typora-editor .vditor-ir__node--expand[data-type='code-block']:has(code.language-echarts) > pre.vditor-ir__marker--pre,
+html.dark .typora-editor .vditor-ir__node--expand[data-type='math-block'] > pre.vditor-ir__marker--pre {
+  border-color: #4a4439 !important;
+  background-color: #2a2723 !important;
+  color: #e7e1d5 !important;
+}
+
+html.dark .typora-editor .vditor-ir__node--expand[data-type='code-block']:has(code.language-mermaid) > pre.vditor-ir__marker--pre > code,
+html.dark .typora-editor .vditor-ir__node--expand[data-type='code-block']:has(code.language-echarts) > pre.vditor-ir__marker--pre > code,
+html.dark .typora-editor .vditor-ir__node--expand[data-type='math-block'] > pre.vditor-ir__marker--pre > code {
+  color: #e7e1d5 !important;
+}
+
+/* 渲染区右上角的编辑提示：Mermaid / ECharts / LaTeX 和普通代码块一样有明确入口 */
+.typora-editor pre.vditor-ir__preview:has(> .language-mermaid),
+.typora-editor pre.vditor-ir__preview:has(> .language-echarts),
+.typora-editor pre.vditor-ir__preview:has(> div[data-type='math-block']) {
+  position: relative;
+  cursor: pointer;
+}
+
+.typora-editor pre.vditor-ir__preview:has(> .language-mermaid)::after,
+.typora-editor pre.vditor-ir__preview:has(> .language-echarts)::after,
+.typora-editor pre.vditor-ir__preview:has(> div[data-type='math-block'])::after {
+  position: absolute;
+  top: 6px;
+  right: 8px;
+  z-index: 3;
+  padding: 2px 7px;
+  border: 1px dashed rgb(var(--pencil) / 0.45);
+  border-radius: 3px;
+  background-color: rgb(var(--paper-soft) / 0.94);
+  color: rgb(var(--ink-300));
+  font-family: var(--md-font, -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Microsoft YaHei', Arial, sans-serif);
+  font-size: 11px;
+  font-style: italic;
+  line-height: 1.5;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.12s ease;
+}
+
+.typora-editor pre.vditor-ir__preview:has(> .language-mermaid)::after {
+  content: '✎ Mermaid';
+}
+
+.typora-editor pre.vditor-ir__preview:has(> .language-echarts)::after {
+  content: '✎ ECharts';
+}
+
+.typora-editor pre.vditor-ir__preview:has(> div[data-type='math-block'])::after {
+  content: '✎ LaTeX';
+}
+
+.typora-editor pre.vditor-ir__preview:has(> .language-mermaid):hover::after,
+.typora-editor pre.vditor-ir__preview:has(> .language-echarts):hover::after,
+.typora-editor pre.vditor-ir__preview:has(> div[data-type='math-block']):hover::after {
+  opacity: 1;
+}
+
+/* 代码块语言标记也加一个铅笔图标，展开源码时能看出这是图表块 */
+.typora-editor .vditor-ir__node[data-type='code-block']:has(code.language-mermaid) > .vditor-ir__marker--info::before,
+.typora-editor .vditor-ir__node[data-type='code-block']:has(code.language-echarts) > .vditor-ir__marker--info::before {
+  content: '✎ ';
 }

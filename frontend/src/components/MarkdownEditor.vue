@@ -5,6 +5,7 @@ import 'vditor/dist/index.css'
 import { uploadFile } from '@/api/file'
 import { enhanceVditor } from '@/components/vditorEnhance'
 import {
+  INSERT_SNIPPETS,
   MENUS,
   activeHeadingIndex,
   canExitSourceFast,
@@ -39,6 +40,8 @@ import { countArticle } from '@/utils/wordCount'
  * - 视图菜单可在左侧打开「大纲」、切换「源码模式」（IR ↔ SV）、全屏；
  * - 底部状态栏显示当前模式与字数；表格旁浮出插入/删除行列与删除表格的图标条；
  * - 加粗/斜体/链接等快捷键沿用 Typora（Ctrl+B / Ctrl+I / Ctrl+K / Ctrl+/）。
+ * - P3-2：「段落」菜单可插入公式（KaTeX）、Mermaid 图、ECharts 图表模板；
+ *   数学公式与图表预览全部使用本地 /vditor/dist 资源，离线也能渲染。
  *
  * 菜单命令统一委托给 typoraChrome.js，内部点击 Vditor 自己的隐藏按钮，
  * 这样 Markdown 语法处理、撤销栈、选区行为仍是 Vditor 原生实现；
@@ -272,8 +275,28 @@ function run(cmd) {
     fileInput.value && fileInput.value.click()
     return
   }
+  if (cmd === 'math' || cmd === 'mermaid' || cmd === 'echarts') {
+    insertSnippet(INSERT_SNIPPETS[cmd])
+    return
+  }
   if (!vditor) return
   runCommand(vditor, cmd)
+  vditor.focus()
+  scheduleOutline(260)
+}
+
+/**
+ * 在光标处插入块级模板（公式 / Mermaid / ECharts）。
+ * 前后各补一个换行，避免模板和当前段落黏在一起；Vditor 会把插入文本
+ * 当作输入处理，IR 里的公式预览与图表预览会随之自动渲染。
+ */
+function insertSnippet(snippet) {
+  if (!vditor || !snippet) return
+  try {
+    vditor.insertValue(`\n${snippet}\n`)
+  } catch (error) {
+    console.warn('[markdown] 插入模板失败', error)
+  }
   vditor.focus()
   scheduleOutline(260)
 }
@@ -561,6 +584,45 @@ function onSurfaceClick(event) {
   const target = event.target
   if (target && target.closest && target.closest('.typora-editor__sidebar')) return
   outlineOpen.value = false
+}
+
+/**
+ * 图表 / 块公式采用 Vditor 原生的「展开源码」模式：源码在上、渲染在下。
+ * 只处理 Mermaid / ECharts / 块公式；普通代码块保持 Vditor 原来的叠加编辑样式。
+ * Vditor 只会在编辑区失焦时收起，点击编辑区空白处并不会触发 blur，
+ * 这里在捕获阶段手动收起当前展开节点；点击展开节点内部则保持编辑。
+ */
+function isChartBlockNode(node) {
+  if (!node) return false
+  if (node.getAttribute('data-type') === 'math-block') return true
+  return Boolean(node.querySelector('code.language-mermaid, code.language-echarts'))
+}
+
+function expandedChartNodes() {
+  if (!vditor || !vditor.vditor || !vditor.vditor.ir) return []
+  return Array.from(
+    vditor.vditor.ir.element.querySelectorAll(
+      '.vditor-ir__node--expand[data-type="code-block"], .vditor-ir__node--expand[data-type="math-block"]'
+    )
+  ).filter(isChartBlockNode)
+}
+
+function collapseExpandedChart(event) {
+  if (!vditor || !vditor.vditor || vditor.vditor.currentMode !== 'ir') return
+  const target = event.target
+  if (target && target.closest && target.closest('.vditor-ir__node--expand')) return
+  const expanded = expandedChartNodes()[0]
+  if (!expanded) return
+  const clickedChart = target && target.closest && target.closest('.vditor-ir__preview')
+  expanded.classList.remove('vditor-ir__node--expand')
+  // 点在图表左侧的编辑区留白时，Vditor 会在同一次 click 里按落点重新展开；
+  // 等这一轮事件走完再收一次，保证「点空白保持收起」。点另一张图表时不拦。
+  if (!clickedChart) {
+    window.setTimeout(() => {
+      if (!vditor || !vditor.vditor || vditor.vditor.currentMode !== 'ir') return
+      expandedChartNodes().forEach((item) => item.classList.remove('vditor-ir__node--expand'))
+    }, 0)
+  }
 }
 
 function gotoHeading(index) {
@@ -859,7 +921,17 @@ onMounted(() => {
     lang: 'zh_CN',
     icon: 'ant',
     theme: 'classic',
-    preview: { mode: 'editor' },
+    // P3-2：公式用 KaTeX；图片/代码块/公式块预览打开。
+    // Mermaid 与 ECharts 的图表预览由 codeBlockPreview + 本地 /vditor/dist/js 运行时渲染。
+    preview: {
+      mode: 'editor',
+      math: { engine: 'KaTeX' },
+      markdown: {
+        inlineMath: true,
+        mathBlockPreview: true,
+        codeBlockPreview: true
+      }
+    },
     cdn: '/vditor',
     cache: { enable: false },
     counter: { enable: false },
@@ -876,6 +948,7 @@ onMounted(() => {
   document.addEventListener('click', onDocumentClick)
   document.addEventListener('keydown', onDocumentKeydown)
   document.addEventListener('fullscreenchange', onFullscreenChange)
+  document.addEventListener('pointerdown', collapseExpandedChart, true)
   // 拖放导入：捕获阶段先于 Vditor 的 drop 处理，只拦 Markdown 文件
   if (root.value) {
     root.value.addEventListener('dragover', onEditorDragOver, true)
@@ -917,6 +990,7 @@ onBeforeUnmount(() => {
   document.removeEventListener('click', onDocumentClick)
   document.removeEventListener('keydown', onDocumentKeydown)
   document.removeEventListener('fullscreenchange', onFullscreenChange)
+  document.removeEventListener('pointerdown', collapseExpandedChart, true)
   if (root.value) {
     root.value.removeEventListener('dragover', onEditorDragOver, true)
     root.value.removeEventListener('drop', onEditorDrop, true)

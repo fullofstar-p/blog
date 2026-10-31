@@ -17,6 +17,19 @@ public class CommentVO {
     private String nickname;
     private String avatar;
     private Long parentId;
+
+    /** 楼中楼根评论 ID */
+    private Long rootId;
+
+    /** 被回复的用户 ID */
+    private Long replyToUserId;
+
+    /** 被回复用户的昵称 */
+    private String replyToNickname;
+
+    /** 嵌套层级：0 为一级，最多 4 */
+    private Integer depth;
+
     private String content;
     private Integer likeCount;
 

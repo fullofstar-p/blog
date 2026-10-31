@@ -9,6 +9,10 @@
  * 主题，离线时完全没有代码高亮；这里把 highlight.js 的 GitHub 浅色主题一起拷到
  * public/highlight，配合 MarkdownViewer.vue 里的本地 highlight.js 实例使用。
  *
+ * P3-2 数学公式 / Mermaid / ECharts 同样复用 Vditor 自带运行时资源：
+ * katex（含字体）、mermaid、echarts 都拷到 public/vditor/dist/js 下，编辑器与
+ * 阅读页都通过 `/vditor/dist/js/...` 本地加载，断网/无 CDN 也能渲染。
+ *
  * 由 package.json 的 predev / prebuild 自动触发；public/vditor 与 public/highlight
  * 属于生成物，已在 .gitignore 中忽略。
  */
@@ -29,8 +33,11 @@ const items = [
   join('js', 'i18n'),
   join('js', 'icons'),
   join('js', 'highlight.js'),
-  // 数学公式按需加载；不拷贝 6MB 的 mathjax / 3MB 的 mermaid，用不到就不加载
-  join('js', 'katex')
+  // 数学公式（含 fonts，KaTeX CSS 用相对路径引字体）按需加载
+  join('js', 'katex'),
+  // P3-2：Mermaid 图与 ECharts 图表（Vditor 运行时会按 cdn 拼 /dist/js/... 路径）
+  join('js', 'mermaid'),
+  join('js', 'echarts')
 ]
 
 if (!existsSync(sourceDir)) {

@@ -41,7 +41,7 @@ onBeforeUnmount(() => {
   <div ref="root" class="relative">
     <button
       type="button"
-      class="inline-flex h-11 w-11 items-center justify-center border-2 border-dashed border-pencil text-lg text-pencil transition-all duration-150 hover:bg-pencil hover:text-paper active:translate-y-[1px]"
+      class="inline-flex h-11 w-11 items-center justify-center border-2 border-dashed border-pencil text-lg text-pencil transition-colors duration-150 hover:bg-pencil hover:text-paper active:translate-y-[1px]"
       :aria-label="`切换主题，当前${theme.label}`"
       :title="`主题：${theme.label}`"
       aria-haspopup="menu"

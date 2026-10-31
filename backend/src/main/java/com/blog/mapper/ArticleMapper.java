@@ -98,6 +98,21 @@ public interface ArticleMapper extends BaseMapper<Article> {
     List<ArchiveRowDTO> selectArchive();
 
     /**
+     * 相关文章：共同标签数 * 3 + 同分类 + 2，按发布时间倒序兜底。
+     */
+    List<ArticleSummaryVO> selectRelated(@Param("id") Long id, @Param("limit") int limit);
+
+    /**
+     * 我的收藏分页（按收藏时间倒序，仅已发布且未删除）。
+     */
+    IPage<ArticleSummaryVO> selectFavoritePage(IPage<ArticleSummaryVO> page, @Param("userId") Long userId);
+
+    /**
+     * 我的收藏总数。
+     */
+    long selectFavoriteCount(@Param("userId") Long userId);
+
+    /**
      * 回收站分页（仅 deleted = 1）。
      */
     IPage<ArticleSummaryVO> selectRecyclePage(IPage<ArticleSummaryVO> page,

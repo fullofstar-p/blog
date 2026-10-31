@@ -26,6 +26,15 @@ public class Comment {
     /** 父评论 ID，NULL 表示一级评论 */
     private Long parentId;
 
+    /** 楼中楼根评论 ID：根评论为自身 id */
+    private Long rootId;
+
+    /** 被回复的用户 ID：根评论为 NULL */
+    private Long replyToUserId;
+
+    /** 嵌套层级：0 为一级，最多 4（共 5 层） */
+    private Integer depth;
+
     private String content;
 
     /** 状态：0 待审核 / 1 通过 / 2 拒绝 */
