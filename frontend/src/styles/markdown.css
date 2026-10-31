@@ -1463,6 +1463,68 @@
   font-weight: 600;
 }
 
+/* 代码块语言行的 Vditor 原生补全列表：改成与右下角语言菜单一致的图标列表 */
+.vditor-hint.vditor-lang-hint {
+  min-width: 208px;
+  max-height: min(300px, 60vh);
+  padding: 4px;
+  overflow-y: auto;
+  border: 1px solid #d8d0c0;
+  border-radius: 6px;
+  background-color: #faf6ee !important;
+  box-shadow: 0 8px 24px rgba(44, 44, 44, 0.18);
+}
+
+.vditor-hint.vditor-lang-hint > button.vditor-lang-hint__item {
+  display: flex !important;
+  align-items: center;
+  gap: 9px;
+  width: 100%;
+  height: 30px;
+  margin: 0;
+  padding: 0 10px 0 8px !important;
+  border: 0 !important;
+  border-radius: 4px;
+  background-color: transparent !important;
+  color: #2c2c2c;
+  font-family: var(--md-font, -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Microsoft YaHei', Arial, sans-serif);
+  font-size: 13px;
+  font-style: normal;
+  line-height: 30px;
+  text-align: left;
+  cursor: pointer;
+}
+
+.vditor-hint.vditor-lang-hint > button.vditor-lang-hint__item:hover,
+.vditor-hint.vditor-lang-hint > button.vditor-lang-hint__item.vditor-hint--current {
+  background-color: #efe7d8 !important;
+}
+
+.vditor-hint.vditor-lang-hint .vditor-code-lang__icon {
+  width: 14px;
+  height: 14px;
+  font-size: 9px;
+}
+
+.vditor-hint.vditor-lang-hint .vditor-code-lang__name {
+  max-width: none;
+}
+
+html.dark .vditor-hint.vditor-lang-hint {
+  border-color: #3a362f;
+  background-color: #24221e !important;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.55);
+}
+
+html.dark .vditor-hint.vditor-lang-hint > button.vditor-lang-hint__item {
+  color: #d9d3c6;
+}
+
+html.dark .vditor-hint.vditor-lang-hint > button.vditor-lang-hint__item:hover,
+html.dark .vditor-hint.vditor-lang-hint > button.vditor-lang-hint__item.vditor-hint--current {
+  background-color: #302c26 !important;
+}
+
 /* 双击语言按钮后的手写输入框：就长在原按钮的位置和尺寸上 */
 .vditor-code-lang__input {
   position: absolute;
