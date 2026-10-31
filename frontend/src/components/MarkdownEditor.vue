@@ -588,16 +588,30 @@ function onSurfaceClick(event) {
 
 /**
  * 图表 / 块公式采用 Vditor 原生的「展开源码」模式：源码在上、渲染在下。
+ * 只处理 Mermaid / ECharts / 块公式；普通代码块保持 Vditor 原来的叠加编辑样式。
  * Vditor 只会在编辑区失焦时收起，点击编辑区空白处并不会触发 blur，
  * 这里在捕获阶段手动收起当前展开节点；点击展开节点内部则保持编辑。
  */
+function isChartBlockNode(node) {
+  if (!node) return false
+  if (node.getAttribute('data-type') === 'math-block') return true
+  return Boolean(node.querySelector('code.language-mermaid, code.language-echarts'))
+}
+
+function expandedChartNodes() {
+  if (!vditor || !vditor.vditor || !vditor.vditor.ir) return []
+  return Array.from(
+    vditor.vditor.ir.element.querySelectorAll(
+      '.vditor-ir__node--expand[data-type="code-block"], .vditor-ir__node--expand[data-type="math-block"]'
+    )
+  ).filter(isChartBlockNode)
+}
+
 function collapseExpandedChart(event) {
   if (!vditor || !vditor.vditor || vditor.vditor.currentMode !== 'ir') return
   const target = event.target
   if (target && target.closest && target.closest('.vditor-ir__node--expand')) return
-  const expanded = vditor.vditor.ir.element.querySelector(
-    '.vditor-ir__node--expand[data-type="code-block"], .vditor-ir__node--expand[data-type="math-block"]'
-  )
+  const expanded = expandedChartNodes()[0]
   if (!expanded) return
   const clickedChart = target && target.closest && target.closest('.vditor-ir__preview')
   expanded.classList.remove('vditor-ir__node--expand')
@@ -606,11 +620,7 @@ function collapseExpandedChart(event) {
   if (!clickedChart) {
     window.setTimeout(() => {
       if (!vditor || !vditor.vditor || vditor.vditor.currentMode !== 'ir') return
-      vditor.vditor.ir.element
-        .querySelectorAll(
-          '.vditor-ir__node--expand[data-type="code-block"], .vditor-ir__node--expand[data-type="math-block"]'
-        )
-        .forEach((item) => item.classList.remove('vditor-ir__node--expand'))
+      expandedChartNodes().forEach((item) => item.classList.remove('vditor-ir__node--expand'))
     }, 0)
   }
 }

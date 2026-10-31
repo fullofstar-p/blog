@@ -1977,7 +1977,8 @@ html.dark .vditor-ir__preview .language-echarts {
    这里改成「源码在上、渲染在下」的文档流布局，渲染区保持只读；
    点击空白处由 MarkdownEditor 收起 `vditor-ir__node--expand`。
    -------------------------------------------------------------------------- */
-.typora-editor .vditor-ir__node--expand[data-type='code-block'] > pre.vditor-ir__marker--pre,
+.typora-editor .vditor-ir__node--expand[data-type='code-block']:has(code.language-mermaid) > pre.vditor-ir__marker--pre,
+.typora-editor .vditor-ir__node--expand[data-type='code-block']:has(code.language-echarts) > pre.vditor-ir__marker--pre,
 .typora-editor .vditor-ir__node--expand[data-type='math-block'] > pre.vditor-ir__marker--pre {
   position: static !important;
   inset: auto !important;
@@ -2001,7 +2002,8 @@ html.dark .vditor-ir__preview .language-echarts {
   z-index: auto !important;
 }
 
-.typora-editor .vditor-ir__node--expand[data-type='code-block'] > pre.vditor-ir__marker--pre > code,
+.typora-editor .vditor-ir__node--expand[data-type='code-block']:has(code.language-mermaid) > pre.vditor-ir__marker--pre > code,
+.typora-editor .vditor-ir__node--expand[data-type='code-block']:has(code.language-echarts) > pre.vditor-ir__marker--pre > code,
 .typora-editor .vditor-ir__node--expand[data-type='math-block'] > pre.vditor-ir__marker--pre > code {
   color: #2f2f2f !important;
   background: transparent !important;
@@ -2015,14 +2017,16 @@ html.dark .vditor-ir__preview .language-echarts {
   margin-top: 4px;
 }
 
-html.dark .typora-editor .vditor-ir__node--expand[data-type='code-block'] > pre.vditor-ir__marker--pre,
+html.dark .typora-editor .vditor-ir__node--expand[data-type='code-block']:has(code.language-mermaid) > pre.vditor-ir__marker--pre,
+html.dark .typora-editor .vditor-ir__node--expand[data-type='code-block']:has(code.language-echarts) > pre.vditor-ir__marker--pre,
 html.dark .typora-editor .vditor-ir__node--expand[data-type='math-block'] > pre.vditor-ir__marker--pre {
   border-color: #4a4439 !important;
   background-color: #2a2723 !important;
   color: #e7e1d5 !important;
 }
 
-html.dark .typora-editor .vditor-ir__node--expand[data-type='code-block'] > pre.vditor-ir__marker--pre > code,
+html.dark .typora-editor .vditor-ir__node--expand[data-type='code-block']:has(code.language-mermaid) > pre.vditor-ir__marker--pre > code,
+html.dark .typora-editor .vditor-ir__node--expand[data-type='code-block']:has(code.language-echarts) > pre.vditor-ir__marker--pre > code,
 html.dark .typora-editor .vditor-ir__node--expand[data-type='math-block'] > pre.vditor-ir__marker--pre > code {
   color: #e7e1d5 !important;
 }
