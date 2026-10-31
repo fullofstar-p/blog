@@ -32,7 +32,16 @@ watch(
       activeRect.top + activeRect.height / 2 - (containerRect.top + containerRect.height / 2)
     if (Math.abs(delta) < 2) return
     const max = container.scrollHeight - container.clientHeight
-    container.scrollTop = Math.min(max, Math.max(0, container.scrollTop + delta))
+    const target = Math.min(max, Math.max(0, container.scrollTop + delta))
+    const reduceMotion =
+      typeof window.matchMedia === 'function' &&
+      window.matchMedia('(prefers-reduced-motion: reduce)').matches
+    if (reduceMotion) {
+      container.scrollTop = target
+    } else {
+      // 目录自己也要有滚动动画：页面在平滑滚动，右侧目录不能瞬间跳过去
+      container.scrollTo({ top: target, behavior: 'smooth' })
+    }
   }
 )
 </script>
