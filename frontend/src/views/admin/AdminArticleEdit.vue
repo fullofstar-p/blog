@@ -525,7 +525,7 @@ onBeforeUnmount(() => {
               <span class="sketch-label">置顶</span>
               <button
                 type="button"
-                class="inline-flex min-h-[44px] w-full items-center justify-center border-2 border-dashed px-4 font-serif text-sm italic transition-all duration-150 hover:bg-pencil hover:text-paper"
+                class="inline-flex min-h-[44px] w-full items-center justify-center border-2 border-dashed px-4 font-serif text-sm italic transition-colors duration-150 hover:bg-pencil hover:text-paper"
                 :class="form.isTop ? 'border-pencil bg-pencil text-paper' : 'border-pencil/60 text-pencil'"
                 :aria-pressed="form.isTop ? 'true' : 'false'"
                 @click="form.isTop = form.isTop ? 0 : 1"

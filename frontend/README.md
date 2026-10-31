@@ -109,7 +109,7 @@ src/
   通知页与头部共享 `api/notification.js` 里的未读 reactive 状态。
 - **点赞 / 收藏**：文章详情标题下操作条（♥ 点赞 / ☆ 收藏 / 分享），乐观更新、失败回滚、
   未登录跳登录；个人中心新增「我的收藏」tab（`?tab=favorites` 深链、分页、取消收藏、空态）。
-  首页/归档/搜索等文章卡片会在封面左下角显示 ♥ 点赞数；阅读页向下滚动后右下角出现「回到顶部」。
+  首页/归档/搜索等文章卡片的「阅读」旁会显示 ♥ 点赞数；阅读页向下滚动后右下角出现「回到顶部」。
 - **相关文章**：正文下方 3 列卡片（移动端 1 列），显示分类/日期/阅读量/标签。
 - **分享卡片**：`ShareCardModal` 预览 `/api/articles/{id}/share-card.png`（1200×630），
   支持复制链接（Clipboard API + execCommand 回退）、下载 PNG；系统分享入口已移除，后续补常见社交媒体分享与二维码；
@@ -119,8 +119,9 @@ src/
 
 - 编辑器「段落」菜单新增「公式」「Mermaid 图」「图表（ECharts）」三项，插入模板后由 Vditor 原生预览；
   Vditor 显式配置 `preview.math = { engine: 'KaTeX' }`、`mathBlockPreview` / `codeBlockPreview`。
-- 点击渲染后的 Mermaid / ECharts / 块公式不再展开正文源码，而是在**上方弹出源码编辑浮层**，
-  下方渲染区保持只读；点击空白处关闭并重新渲染，Esc 取消、`Ctrl/⌘+Enter` 应用。
+- 点击渲染后的 Mermaid / ECharts / 块公式会像 Typora 一样在原位置展开源码：
+  **源码在上、渲染在下**，渲染区保持只读；点击空白处收起，编辑结果直接写回 Vditor。
+  源码使用等宽字体、纸张底色与 45vh 上限，超长内容在源码框内滚动。
   代码块语言菜单和渲染区角标都补了 Mermaid / ECharts 图标，避免显示成 `?`。
 - 阅读页 `MarkdownViewer`：
   - KaTeX 用本地 `/vditor/dist/js/katex/katex.min.js` + CSS（含字体）；

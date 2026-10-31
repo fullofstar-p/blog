@@ -142,7 +142,7 @@ async function downloadCard() {
   >
     <div class="space-y-4">
       <div
-        class="relative aspect-[1200/630] w-full overflow-hidden border-2 border-dashed border-pencil/60 bg-paper-deep"
+        class="relative aspect-[1200/630] max-h-[36vh] w-full overflow-hidden border-2 border-dashed border-pencil/60 bg-paper-deep"
       >
         <div
           v-if="imageLoading"

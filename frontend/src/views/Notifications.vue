@@ -217,7 +217,7 @@ onMounted(() => {
         v-for="(item, index) in items"
         :key="item.id"
         type="button"
-        class="sketch-card block w-full p-5 text-left transition-shadow duration-150 hover:border-pencil hover:shadow-sketch-lg disabled:cursor-wait disabled:opacity-70 md:p-6"
+        class="sketch-card block w-full p-5 text-left transition-transform duration-150 hover:rotate-[-0.2deg] disabled:cursor-wait disabled:opacity-70 md:p-6"
         :class="[
           index % 2 === 0 ? 'rotate-[-0.2deg]' : 'rotate-[0.2deg]',
           item.isRead ? '' : 'border-pencil bg-paper-soft'

@@ -72,11 +72,15 @@
   html {
     scroll-behavior: smooth;
     background-color: rgb(var(--paper));
+    /* 卡片 hover 会轻微旋转/抬起，靠近视口边缘时可能短暂撑出横向滚动条，
+       用 clip 而不是 hidden：不创建滚动容器，sticky 顶栏和目录仍然有效。 */
+    overflow-x: clip;
   }
 
   body {
     @apply bg-paper font-serif text-pencil antialiased;
     background-color: rgb(var(--paper));
+    overflow-x: clip;
     /* SVG 纸张纹理：fractalNoise 模拟纸面颗粒 */
     background-image: url("data:image/svg+xml,%3Csvg%20xmlns='http://www.w3.org/2000/svg'%20width='220'%20height='220'%20viewBox='0%200%20220%20220'%3E%3Cfilter%20id='n'%3E%3CfeTurbulence%20type='fractalNoise'%20baseFrequency='0.82'%20numOctaves='2'%20stitchTiles='stitch'/%3E%3CfeColorMatrix%20type='saturate'%20values='0'/%3E%3C/filter%3E%3Crect%20width='220'%20height='220'%20filter='url(%23n)'%20opacity='0.05'/%3E%3C/svg%3E");
     background-repeat: repeat;
@@ -134,9 +138,7 @@
   }
 
   .sketch-card-hover {
-    /* 只改阴影与描边，不再位移/旋转：transform 会让文字在合成层里重采样，
-       鼠标扫过卡片时出现残影，靠近边缘还会反复触发 hover 造成闪烁。 */
-    @apply transition-shadow duration-150 ease-out hover:border-pencil hover:shadow-sketch-lg;
+    @apply transition-transform duration-150 ease-out hover:-translate-y-1 hover:rotate-[-0.3deg] hover:shadow-sketch-lg;
   }
 
   /* 手绘胶带装饰 */
@@ -159,7 +161,7 @@
 
   /* ---------- 按钮（Pencil Shading / Paper Press）---------- */
   .sketch-btn {
-    @apply inline-flex min-h-[44px] min-w-[44px] select-none items-center justify-center gap-2 rounded-sketch border-2 border-dashed border-pencil bg-paper px-5 py-2 font-serif text-base italic text-pencil shadow-sketch transition-all duration-150 ease-out;
+    @apply inline-flex min-h-[44px] min-w-[44px] select-none items-center justify-center gap-2 rounded-sketch border-2 border-dashed border-pencil bg-paper px-5 py-2 font-serif text-base italic text-pencil shadow-sketch transition-colors duration-150 ease-out;
   }
   .sketch-btn:hover {
     /* 不在 hover 时旋转/位移：旋转会改变可点击区域，鼠标停在边缘时会反复进出，

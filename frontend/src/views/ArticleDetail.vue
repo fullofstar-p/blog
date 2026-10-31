@@ -227,6 +227,22 @@ let scrollFrame = 0
 let readingTimer = 0
 let backTopTimer = 0
 let backTopLocked = false
+// 点击目录后，页面平滑滚动期间锁住 activeHeading，避免目录滚动条
+// 先跟着中间经过的标题上下来回跳，最后才落到点击项。
+let tocJumpIndex = -1
+let tocJumpTimer = 0
+
+function finishTocJump() {
+  if (tocJumpIndex < 0) return
+  tocJumpIndex = -1
+  window.clearTimeout(tocJumpTimer)
+  scheduleReadingState()
+}
+
+function cancelTocJumpOnUserScroll() {
+  if (tocJumpIndex < 0) return
+  finishTocJump()
+}
 
 /** 预览区里已渲染的标题，顺序与 Markdown 里的标题一一对应 */
 function previewHeadingElements() {
@@ -252,6 +268,16 @@ function updateReadingState() {
 
   const elements = previewHeadingElements()
   const line = readingOffset()
+  if (tocJumpIndex >= 0) {
+    const target = elements[tocJumpIndex]
+    // 还没滚到目标：保持点击项高亮，目录不再跟着中间标题抖动
+    if (target && target.getBoundingClientRect().top > line + 6) {
+      activeHeading.value = tocJumpIndex
+      return
+    }
+    tocJumpIndex = -1
+    window.clearTimeout(tocJumpTimer)
+  }
   let current = -1
   elements.forEach((element, index) => {
     // +6 容差：scrollTo 取整后目标标题可能落在参考线上方 0.5px，
@@ -274,8 +300,12 @@ function scrollToHeading(index) {
   const reduceMotion =
     typeof window.matchMedia === 'function' &&
     window.matchMedia('(prefers-reduced-motion: reduce)').matches
-  window.scrollTo({ top: Math.max(0, top), behavior: reduceMotion ? 'instant' : 'smooth' })
+  tocJumpIndex = index
   activeHeading.value = index
+  window.clearTimeout(tocJumpTimer)
+  // scrollend 在支持的浏览器里会提前解锁；这里再留一个兜底
+  tocJumpTimer = window.setTimeout(finishTocJump, 2500)
+  window.scrollTo({ top: Math.max(0, top), behavior: reduceMotion ? 'instant' : 'smooth' })
 }
 
 function scrollToTop() {
@@ -301,6 +331,8 @@ async function load() {
   readingProgress.value = 0
   showBackTop.value = false
   backTopLocked = false
+  tocJumpIndex = -1
+  window.clearTimeout(tocJumpTimer)
   tocOpen.value = false
   shareOpen.value = false
   related.value = []
@@ -337,13 +369,21 @@ onMounted(() => {
   load()
   window.addEventListener('scroll', scheduleReadingState, { passive: true })
   window.addEventListener('resize', scheduleReadingState)
+  // Chromium 的 scrollend 用于在平滑滚动真正结束时解锁目录项
+  window.addEventListener('scrollend', finishTocJump)
+  window.addEventListener('wheel', cancelTocJumpOnUserScroll, { passive: true })
+  window.addEventListener('touchstart', cancelTocJumpOnUserScroll, { passive: true })
 })
 
 onBeforeUnmount(() => {
   window.removeEventListener('scroll', scheduleReadingState)
   window.removeEventListener('resize', scheduleReadingState)
+  window.removeEventListener('scrollend', finishTocJump)
+  window.removeEventListener('wheel', cancelTocJumpOnUserScroll)
+  window.removeEventListener('touchstart', cancelTocJumpOnUserScroll)
   window.clearTimeout(readingTimer)
   window.clearTimeout(backTopTimer)
+  window.clearTimeout(tocJumpTimer)
   if (scrollFrame) window.cancelAnimationFrame(scrollFrame)
   restoreOgMeta()
 })
@@ -578,7 +618,7 @@ async function confirmDelete() {
               v-for="(item, index) in related"
               :key="item.id"
               :to="{ name: 'article', params: { id: item.id } }"
-              class="sketch-card p-4 transition-shadow duration-150 hover:border-pencil hover:shadow-sketch-lg"
+              class="sketch-card p-4 transition-transform duration-150 hover:rotate-[-0.3deg]"
               :class="index % 2 === 0 ? 'rotate-[-0.2deg]' : 'rotate-[0.2deg]'"
             >
               <h3 class="line-clamp-2 font-serif text-base italic text-pencil">{{ item.title }}</h3>
@@ -603,7 +643,7 @@ async function confirmDelete() {
           <RouterLink
             v-if="article.prev"
             :to="{ name: 'article', params: { id: article.prev.id } }"
-            class="sketch-card p-4 transition-shadow hover:border-pencil hover:shadow-sketch-lg"
+            class="sketch-card p-4 transition-transform hover:rotate-[-0.5deg]"
           >
             <p class="font-serif text-xs italic text-ink-300">← 上一篇</p>
             <p class="mt-1 font-serif text-base italic text-pencil">{{ article.prev.title }}</p>
@@ -612,7 +652,7 @@ async function confirmDelete() {
           <RouterLink
             v-if="article.next"
             :to="{ name: 'article', params: { id: article.next.id } }"
-            class="sketch-card p-4 text-right transition-shadow hover:border-pencil hover:shadow-sketch-lg"
+            class="sketch-card p-4 text-right transition-transform hover:rotate-[0.5deg]"
           >
             <p class="font-serif text-xs italic text-ink-300">下一篇 →</p>
             <p class="mt-1 font-serif text-base italic text-pencil">{{ article.next.title }}</p>

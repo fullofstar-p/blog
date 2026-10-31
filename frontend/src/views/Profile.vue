@@ -296,7 +296,7 @@ onMounted(() => {
           v-for="tab in tabs"
           :key="tab.key"
           type="button"
-          class="inline-flex min-h-[44px] items-center border-2 border-dashed px-4 font-serif text-base italic transition-all duration-150 active:translate-y-[1px]"
+          class="inline-flex min-h-[44px] items-center border-2 border-dashed px-4 font-serif text-base italic transition-colors duration-150 active:translate-y-[1px]"
           :class="
             activeTab === tab.key
               ? 'border-pencil bg-pencil text-paper'

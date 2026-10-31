@@ -132,7 +132,7 @@ onUnmounted(() => {
           v-for="link in navLinks"
           :key="link.name"
           :to="{ name: link.name }"
-          class="inline-flex min-h-[44px] items-center border-b-2 border-dashed border-transparent px-3 font-serif text-base italic text-ink-700 transition-all duration-150 hover:border-pencil hover:bg-pencil hover:text-paper active:translate-y-[1px]"
+          class="inline-flex min-h-[44px] items-center border-b-2 border-dashed border-transparent px-3 font-serif text-base italic text-ink-700 transition-colors duration-150 hover:border-pencil hover:bg-pencil hover:text-paper active:translate-y-[1px]"
           active-class="border-pencil bg-pencil text-paper rotate-[-1deg]"
         >
           {{ link.label }}
@@ -176,7 +176,7 @@ onUnmounted(() => {
           <div ref="userMenuRef" class="relative">
             <button
               type="button"
-              class="inline-flex min-h-[44px] items-center gap-2 border-2 border-dashed border-pencil bg-paper px-2 py-1 font-serif text-sm italic text-pencil shadow-sketchsm transition-all duration-150 hover:bg-pencil hover:text-paper active:translate-x-[1px] active:translate-y-[1px]"
+              class="inline-flex min-h-[44px] items-center gap-2 border-2 border-dashed border-pencil bg-paper px-2 py-1 font-serif text-sm italic text-pencil shadow-sketchsm transition-colors duration-150 hover:bg-pencil hover:text-paper active:translate-x-[1px] active:translate-y-[1px]"
               :aria-expanded="userMenuOpen ? 'true' : 'false'"
               aria-haspopup="menu"
               @click="userMenuOpen = !userMenuOpen"
@@ -249,13 +249,13 @@ onUnmounted(() => {
         <template v-else>
           <RouterLink
             :to="{ name: 'login' }"
-            class="hidden min-h-[44px] items-center border-2 border-dashed border-pencil px-3 font-serif text-sm italic text-pencil shadow-sketchsm transition-all duration-150 hover:bg-pencil hover:text-paper sm:inline-flex"
+            class="hidden min-h-[44px] items-center border-2 border-dashed border-pencil px-3 font-serif text-sm italic text-pencil shadow-sketchsm transition-colors duration-150 hover:bg-pencil hover:text-paper sm:inline-flex"
           >
             登录
           </RouterLink>
           <RouterLink
             :to="{ name: 'register' }"
-            class="hidden min-h-[44px] items-center border-2 border-dashed border-pencil bg-pencil px-3 font-serif text-sm italic text-paper shadow-sketchsm transition-all duration-150 hover:bg-paper hover:text-pencil sm:inline-flex"
+            class="hidden min-h-[44px] items-center border-2 border-dashed border-pencil bg-pencil px-3 font-serif text-sm italic text-paper shadow-sketchsm transition-colors duration-150 hover:bg-paper hover:text-pencil sm:inline-flex"
           >
             注册
           </RouterLink>

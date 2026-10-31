@@ -1970,24 +1970,69 @@ html.dark .vditor-ir__preview .language-echarts {
   border-radius: 6px;
 }
 
-/* ==========================================================================
-   P3-2：图表 / 公式的上方浮层编辑
+/* --------------------------------------------------------------------------
+   P3-2：点击图表 / 块公式 → Vditor 原生展开源码
    --------------------------------------------------------------------------
-   Vditor 原生点击预览会把源码展开在正文里；MarkdownEditor 拦截点击后打开
-   这个浮层。下方渲染区保持只读，点击空白处关闭并重新渲染。
-   ========================================================================== */
+   Vditor 默认把代码源码绝对定位盖在预览上（公式还会隐藏预览）。
+   这里改成「源码在上、渲染在下」的文档流布局，渲染区保持只读；
+   点击空白处由 MarkdownEditor 收起 `vditor-ir__node--expand`。
+   -------------------------------------------------------------------------- */
+.typora-editor .vditor-ir__node--expand[data-type='code-block'] > pre.vditor-ir__marker--pre,
+.typora-editor .vditor-ir__node--expand[data-type='math-block'] > pre.vditor-ir__marker--pre {
+  position: static !important;
+  inset: auto !important;
+  display: block !important;
+  width: auto !important;
+  height: auto !important;
+  min-height: 0 !important;
+  max-height: 45vh;
+  margin: 0 0 10px !important;
+  padding: 10px 12px !important;
+  overflow: auto;
+  border: 1px solid #d8d0c0 !important;
+  border-radius: 4px;
+  background-color: #f3efe6 !important;
+  color: #2f2f2f !important;
+  font-family: var(--md-mono, 'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, 'Courier New', monospace);
+  font-size: 12.5px !important;
+  line-height: 1.65 !important;
+  white-space: pre-wrap;
+  word-break: break-word;
+  z-index: auto !important;
+}
 
-/* 渲染区右上角的「可编辑」提示 + 图标，让 Mermaid / ECharts / LaTeX 和普通代码块
-   一样有明确的编辑入口；整个渲染区都可点击。 */
+.typora-editor .vditor-ir__node--expand[data-type='code-block'] > pre.vditor-ir__marker--pre > code,
+.typora-editor .vditor-ir__node--expand[data-type='math-block'] > pre.vditor-ir__marker--pre > code {
+  color: #2f2f2f !important;
+  background: transparent !important;
+}
+
+/* 块公式展开时 Vditor 会隐藏下方预览；这里强制保留，保证「源码在上、公式在下」 */
+.typora-editor .vditor-ir__node--expand[data-type='math-block'] > pre.vditor-ir__preview {
+  display: block !important;
+  width: auto !important;
+  height: auto !important;
+  margin-top: 4px;
+}
+
+html.dark .typora-editor .vditor-ir__node--expand[data-type='code-block'] > pre.vditor-ir__marker--pre,
+html.dark .typora-editor .vditor-ir__node--expand[data-type='math-block'] > pre.vditor-ir__marker--pre {
+  border-color: #4a4439 !important;
+  background-color: #2a2723 !important;
+  color: #e7e1d5 !important;
+}
+
+html.dark .typora-editor .vditor-ir__node--expand[data-type='code-block'] > pre.vditor-ir__marker--pre > code,
+html.dark .typora-editor .vditor-ir__node--expand[data-type='math-block'] > pre.vditor-ir__marker--pre > code {
+  color: #e7e1d5 !important;
+}
+
+/* 渲染区右上角的编辑提示：Mermaid / ECharts / LaTeX 和普通代码块一样有明确入口 */
 .typora-editor pre.vditor-ir__preview:has(> .language-mermaid),
 .typora-editor pre.vditor-ir__preview:has(> .language-echarts),
 .typora-editor pre.vditor-ir__preview:has(> div[data-type='math-block']) {
   position: relative;
   cursor: pointer;
-  /* 下方只负责渲染：禁止选中/落光标，避免用户误以为能直接在图表上改源码 */
-  user-select: none;
-  -webkit-user-select: none;
-  caret-color: transparent;
 }
 
 .typora-editor pre.vditor-ir__preview:has(> .language-mermaid)::after,
@@ -2033,156 +2078,4 @@ html.dark .vditor-ir__preview .language-echarts {
 .typora-editor .vditor-ir__node[data-type='code-block']:has(code.language-mermaid) > .vditor-ir__marker--info::before,
 .typora-editor .vditor-ir__node[data-type='code-block']:has(code.language-echarts) > .vditor-ir__marker--info::before {
   content: '✎ ';
-}
-
-/* 浮层本体 */
-.typora-code-panel {
-  position: fixed;
-  z-index: 90;
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-  max-height: calc(100vh - 24px);
-  padding: 12px 14px 10px;
-  border: 2px dashed rgb(var(--pencil));
-  border-radius: 6px;
-  background-color: rgb(var(--paper-soft));
-  color: rgb(var(--pencil));
-  box-shadow: 6px 6px 0 rgb(var(--sketch-shadow));
-}
-
-/* 打开图表源码浮层时会滚动编辑区；关闭浏览器的滚动锚定，避免整个页面跟着跳 */
-.typora-editor,
-.typora-editor__surface,
-.typora-editor .vditor-ir pre.vditor-reset {
-  overflow-anchor: none;
-}
-
-.typora-code-panel__head {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 12px;
-}
-
-.typora-code-panel__title {
-  margin: 0;
-  color: rgb(var(--pencil));
-  font-family: var(--md-font, -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Microsoft YaHei', Arial, sans-serif);
-  font-size: 13px;
-  font-weight: 600;
-  font-style: italic;
-  line-height: 1.4;
-}
-
-.typora-code-panel__hint {
-  margin: 2px 0 0;
-  color: rgb(var(--ink-300));
-  font-family: var(--md-font, -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Microsoft YaHei', Arial, sans-serif);
-  font-size: 11px;
-  font-style: italic;
-  line-height: 1.4;
-}
-
-.typora-code-panel__close {
-  display: inline-flex;
-  width: 28px;
-  height: 28px;
-  flex: none;
-  align-items: center;
-  justify-content: center;
-  border: 1px dashed rgb(var(--pencil) / 0.6);
-  border-radius: 3px;
-  background-color: transparent;
-  color: rgb(var(--ink-500));
-  font-size: 12px;
-  line-height: 1;
-  cursor: pointer;
-}
-
-.typora-code-panel__close:hover {
-  background-color: rgb(var(--pencil));
-  color: rgb(var(--paper));
-}
-
-.typora-code-panel__textarea {
-  width: 100%;
-  min-height: 150px;
-  max-height: 42vh;
-  flex: 1 1 auto;
-  padding: 10px 12px;
-  resize: vertical;
-  border: 1px solid rgb(var(--pencil) / 0.45);
-  border-radius: 4px;
-  outline: none;
-  background-color: rgb(var(--paper));
-  color: rgb(var(--pencil));
-  font-family: var(--md-mono, 'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, 'Courier New', monospace);
-  font-size: 12.5px;
-  line-height: 1.65;
-  tab-size: 2;
-}
-
-.typora-code-panel__textarea:focus {
-  border-color: rgb(var(--pencil));
-  box-shadow: 0 0 0 2px rgb(var(--pencil) / 0.12);
-}
-
-.typora-code-panel__actions {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 10px;
-}
-
-.typora-code-panel__tip {
-  color: rgb(var(--ink-300));
-  font-family: var(--md-font, -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Microsoft YaHei', Arial, sans-serif);
-  font-size: 10.5px;
-  font-style: italic;
-  line-height: 1.4;
-}
-
-.typora-code-panel__buttons {
-  display: inline-flex;
-  flex: none;
-  gap: 6px;
-}
-
-.typora-code-panel__btn {
-  min-height: 30px;
-  padding: 0 12px;
-  border: 1px dashed rgb(var(--pencil) / 0.75);
-  border-radius: 3px;
-  background-color: rgb(var(--paper));
-  color: rgb(var(--pencil));
-  font-family: var(--md-font, -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Microsoft YaHei', Arial, sans-serif);
-  font-size: 12px;
-  font-style: italic;
-  cursor: pointer;
-}
-
-.typora-code-panel__btn:hover {
-  border-style: solid;
-  border-color: rgb(var(--pencil));
-}
-
-.typora-code-panel__btn--primary {
-  background-color: rgb(var(--pencil));
-  color: rgb(var(--paper));
-}
-
-.typora-code-panel__btn--primary:hover {
-  background-color: rgb(var(--ink-700));
-  color: rgb(var(--paper));
-}
-
-@media (max-width: 720px) {
-  .typora-code-panel {
-    padding: 10px;
-  }
-
-  .typora-code-panel__tip {
-    display: none;
-  }
 }
