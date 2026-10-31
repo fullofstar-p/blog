@@ -14,9 +14,10 @@ defineEmits(['select'])
 
 const list = ref(null)
 
-// 长文章滚动时让目录里的当前项保持可见。
+// 长文章滚动时让目录里的当前项保持可见，并尽量居中。
 // 注意只调整目录容器自己的 scrollTop，不能用 scrollIntoView：
 // 桌面端目录滚出视口后，scrollIntoView 会把整个页面拉回目录位置。
+// 居中而不是「刚露头」：滚动条位置才会跟着当前标题在目录里的位置走。
 watch(
   () => props.activeIndex,
   async (index) => {
@@ -27,11 +28,11 @@ watch(
     if (!active) return
     const containerRect = container.getBoundingClientRect()
     const activeRect = active.getBoundingClientRect()
-    if (activeRect.top < containerRect.top) {
-      container.scrollTop -= containerRect.top - activeRect.top + 4
-    } else if (activeRect.bottom > containerRect.bottom) {
-      container.scrollTop += activeRect.bottom - containerRect.bottom + 4
-    }
+    const delta =
+      activeRect.top + activeRect.height / 2 - (containerRect.top + containerRect.height / 2)
+    if (Math.abs(delta) < 2) return
+    const max = container.scrollHeight - container.clientHeight
+    container.scrollTop = Math.min(max, Math.max(0, container.scrollTop + delta))
   }
 )
 </script>

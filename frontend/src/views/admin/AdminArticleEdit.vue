@@ -545,7 +545,7 @@ onBeforeUnmount(() => {
                 v-for="tag in meta.tags"
                 :key="tag.id"
                 type="button"
-                class="inline-flex min-h-[44px] items-center gap-1 border-2 border-dashed px-3 font-serif text-sm italic transition-all duration-150 hover:-rotate-1 hover:bg-pencil hover:text-paper active:translate-y-[1px]"
+                class="inline-flex min-h-[44px] items-center gap-1 border-2 border-dashed px-3 font-serif text-sm italic transition-colors duration-150 hover:bg-pencil hover:text-paper active:translate-y-[1px]"
                 :class="
                   form.tagIds.includes(tag.id)
                     ? 'border-pencil bg-pencil text-paper'

@@ -81,7 +81,7 @@ async function onLogout() {
             v-for="item in navItems"
             :key="item.name"
             :to="{ name: item.name }"
-            class="flex min-h-[44px] items-center gap-2 border-2 border-dashed border-pencil/60 px-3 font-serif text-base italic text-pencil transition-all duration-150 hover:-rotate-1 hover:bg-pencil hover:text-paper active:translate-y-[1px]"
+            class="flex min-h-[44px] items-center gap-2 border-2 border-dashed border-pencil/60 px-3 font-serif text-base italic text-pencil transition-colors duration-150 hover:bg-pencil hover:text-paper active:translate-y-[1px]"
             active-class="border-pencil bg-pencil !text-paper"
           >
             <span aria-hidden="true">{{ item.icon }}</span>

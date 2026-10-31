@@ -87,6 +87,35 @@ const ioDialog = reactive({ open: false, kind: '', fileName: '', title: '' })
 // 长文档导入 / 切换视图 / 生成 PDF 时的遮罩提示（这些操作会阻塞主线程）
 const busy = reactive({ active: false, text: '' })
 
+// P3-2：Mermaid / ECharts / LaTeX 的浮层源码编辑。
+// Vditor 默认点击预览会把源码展开在正文里（还会把下方渲染区隐藏），这里改成
+// 「上方浮层改源码，下方保持只读渲染」；点击空白处关闭并应用。
+const chartEditor = reactive({
+  open: false,
+  kind: '',
+  index: 0,
+  value: '',
+  title: '',
+  width: 560,
+  top: 0,
+  left: 0
+})
+const chartPanel = ref(null)
+const chartTextarea = ref(null)
+let chartNode = null
+let chartPositionFrame = 0
+
+const CHART_EDITOR_LABELS = {
+  mermaid: 'Mermaid 源码',
+  echarts: 'ECharts 配置',
+  math: 'LaTeX 公式'
+}
+const CHART_EDITOR_HINTS = {
+  mermaid: '编辑流程图源码，收起后下方会重新渲染',
+  echarts: '编辑 JSON 配置，收起后下方会重新渲染',
+  math: '编辑 TeX 公式，收起后下方会重新渲染'
+}
+
 let vditor = null
 let disposeEnhance = null
 let ready = false
@@ -299,6 +328,264 @@ function insertSnippet(snippet) {
   }
   vditor.focus()
   scheduleOutline(260)
+}
+
+/* ---------------------------------------------------------------------------
+ * P3-2 图表 / 公式：浮层编辑
+ * ------------------------------------------------------------------------- */
+
+/** 判断一个 IR 节点是不是可渲染的图表 / 块公式 */
+function chartKindOfNode(node) {
+  if (!node || typeof node.getAttribute !== 'function') return ''
+  const type = node.getAttribute('data-type')
+  if (type === 'math-block') return 'math'
+  if (type !== 'code-block') return ''
+  const code = node.querySelector('pre.vditor-ir__marker--pre > code')
+  const className = (code && code.className) || ''
+  if (/(^|\s)language-mermaid(\s|$)/i.test(className)) return 'mermaid'
+  if (/(^|\s)language-echarts(\s|$)/i.test(className)) return 'echarts'
+  return ''
+}
+
+/** 点击是否落在「渲染后的图表 / 块公式」上 */
+function chartHitFromEvent(target) {
+  if (!target || !target.closest || !root.value || !root.value.contains(target)) return null
+  const preview = target.closest('.vditor-ir__preview')
+  if (!preview) return null
+  const node = preview.closest('.vditor-ir__node')
+  const kind = chartKindOfNode(node)
+  if (!kind) return null
+  const code = node.querySelector('pre.vditor-ir__marker--pre > code')
+  if (!code) return null
+  return { node, kind, source: code.textContent }
+}
+
+/** 同类图表在文档中的序号（与 Markdown 里的同类代码块顺序一致） */
+function chartIndexOfNode(kind, node) {
+  if (!root.value) return -1
+  const nodes = Array.from(root.value.querySelectorAll('.vditor-ir__node')).filter(
+    (item) => chartKindOfNode(item) === kind
+  )
+  return nodes.indexOf(node)
+}
+
+/** 浮层位置：优先贴在当前块上方；上方空间不足时贴顶显示，绝不盖到块下方 */
+function positionChartPanel() {
+  chartPositionFrame = 0
+  if (!chartEditor.open || !chartNode) return
+  const rect = chartNode.getBoundingClientRect()
+  const panel = chartPanel.value
+  const panelHeight = panel ? panel.offsetHeight : 300
+  const width = chartEditor.width
+  const left = Math.min(
+    Math.max(12, rect.left),
+    Math.max(12, window.innerWidth - width - 12)
+  )
+  const header = document.querySelector('header')
+  const minTop = (header ? header.offsetHeight : 0) + 8
+  let top = rect.top - panelHeight - 14
+  if (top < minTop) top = minTop
+  if (top + panelHeight > window.innerHeight - 12) {
+    top = Math.max(minTop, window.innerHeight - panelHeight - 12)
+  }
+  chartEditor.left = Math.round(left)
+  chartEditor.top = Math.round(top)
+}
+
+function scheduleChartPanelPosition() {
+  if (!chartEditor.open || chartPositionFrame) return
+  chartPositionFrame = window.requestAnimationFrame(positionChartPanel)
+}
+
+/** 用浮层里的源码替换 Markdown 中第 index 个同类块 */
+function replaceBlockSource(markdown, kind, index, source) {
+  const text = String(markdown || '')
+  const lines = text.split('\n')
+  const body = String(source || '')
+    .replace(/\r\n?/g, '\n')
+    .replace(/\n$/, '')
+    .split('\n')
+
+  if (kind === 'math') {
+    let block = -1
+    let line = 0
+    while (line < lines.length) {
+      if (lines[line].trim() !== '$$') {
+        line += 1
+        continue
+      }
+      const open = line
+      let close = open + 1
+      while (close < lines.length && lines[close].trim() !== '$$') close += 1
+      if (close >= lines.length) break
+      block += 1
+      if (block === index) {
+        return [...lines.slice(0, open + 1), ...body, ...lines.slice(close)].join('\n')
+      }
+      line = close + 1
+    }
+    return text
+  }
+
+  let block = -1
+  let line = 0
+  while (line < lines.length) {
+    const open = /^\s*(`{3,}|~{3,})\s*([^\s`]*)/.exec(lines[line])
+    if (!open) {
+      line += 1
+      continue
+    }
+    const marker = open[1][0]
+    const closeRe = marker === '`' ? /^\s*`{3,}\s*$/ : /^\s*~{3,}\s*$/
+    let close = line + 1
+    while (close < lines.length && !closeRe.test(lines[close])) close += 1
+    if (close >= lines.length) return text
+    const lang = (open[2] || '').toLowerCase()
+    if (lang === kind) {
+      block += 1
+      if (block === index) {
+        return [...lines.slice(0, line + 1), ...body, ...lines.slice(close)].join('\n')
+      }
+    }
+    line = close + 1
+  }
+  return text
+}
+
+/** 把图表块滚到编辑区偏上的位置：给上方浮层留空间，也保证下方渲染区可见 */
+function revealChartNode(node) {
+  const pre = node.closest('pre.vditor-reset')
+  if (!pre || !pre.contains(node)) {
+    node.scrollIntoView({ block: 'center', behavior: 'smooth' })
+    return
+  }
+  const nodeRect = node.getBoundingClientRect()
+  // 图表块通常比编辑区高，不能按「居中」算：让块顶落在视口 36% 左右，
+  // 上方才有足够空间放浮层，同时下方还能看到一部分渲染结果。
+  const desiredTop = Math.min(380, Math.max(250, Math.round(window.innerHeight * 0.36)))
+  const target = pre.scrollTop + nodeRect.top - desiredTop
+  pre.scrollTop = Math.max(0, Math.min(pre.scrollHeight - pre.clientHeight, target))
+}
+
+async function openChartEditor(hit) {
+  if (!vditor || !hit) return
+  const index = chartIndexOfNode(hit.kind, hit.node)
+  if (index < 0) return
+  if (chartEditor.open) closeChartEditor({ apply: false })
+  // 万一节点此前被 Vditor 展开过，先收回源码态，保证下方预览可见
+  hit.node.classList.remove('vditor-ir__node--expand')
+  chartNode = hit.node
+  chartEditor.kind = hit.kind
+  chartEditor.index = index
+  chartEditor.value = hit.source
+  chartEditor.title = CHART_EDITOR_LABELS[hit.kind] || '源码'
+  chartEditor.width = Math.min(620, Math.max(300, window.innerWidth - 24))
+  chartEditor.open = true
+  await nextTick()
+  // 编辑区是一个固定高度的滚动容器，scrollIntoView 在 contenteditable 里不可靠，
+  // 这里直接算内部 scrollTop，把当前块放到视口偏上的位置。
+  const rect = hit.node.getBoundingClientRect()
+  if (rect.top < 340 || rect.bottom > window.innerHeight - 24) {
+    revealChartNode(hit.node)
+    await new Promise((resolve) => setTimeout(resolve, 120))
+  }
+  positionChartPanel()
+  const textarea = chartTextarea.value
+  if (textarea) {
+    // preventScroll：浮层是 fixed 的，聚焦时不要再让浏览器把整页滚一下
+    textarea.focus({ preventScroll: true })
+    textarea.setSelectionRange(textarea.value.length, textarea.value.length)
+  }
+}
+
+function applyChartSource({ kind, index, value }) {
+  if (!vditor || !kind) return
+  const cached = currentMarkdown()
+  let next = replaceBlockSource(cached, kind, index, value)
+  if (next === cached) {
+    // 缓存可能落后于最后一次输入，兜底从 Vditor 再序列化一次
+    try {
+      const fresh = vditor.getValue()
+      next = replaceBlockSource(fresh, kind, index, value)
+    } catch (error) {
+      console.warn('[markdown] 读取正文失败，图表源码未保存', error)
+      return
+    }
+  }
+  if (!next || next === cached) return
+  const internal = vditor.vditor
+  const scroller = internal && internal.ir && internal.ir.element
+  const scrollTop = scroller ? scroller.scrollTop : 0
+  vditor.setValue(next, false)
+  latestMarkdown = next
+  emit('update:modelValue', next)
+  window.clearTimeout(statsTimer)
+  applyStats(next)
+  scheduleOutline(60)
+  // setValue 会重建 DOM，等一帧再把编辑区滚动位置还原
+  window.requestAnimationFrame(() => {
+    const element = vditor && vditor.vditor && vditor.vditor.ir && vditor.vditor.ir.element
+    if (element) element.scrollTop = scrollTop
+  })
+}
+
+function closeChartEditor({ apply = true } = {}) {
+  if (!chartEditor.open) return
+  const snapshot = {
+    kind: chartEditor.kind,
+    index: chartEditor.index,
+    value: chartEditor.value
+  }
+  chartEditor.open = false
+  chartNode = null
+  if (apply) applyChartSource(snapshot)
+}
+
+/** 点击渲染区：阻止 Vditor 展开源码，改成打开上方浮层 */
+function onChartPointerDownCapture(event) {
+  const hit = chartHitFromEvent(event.target)
+  if (!hit) {
+    if (chartEditor.open && chartPanel.value && !chartPanel.value.contains(event.target)) {
+      closeChartEditor({ apply: true })
+    }
+    return
+  }
+  if (ioDialog.open || linkDialog.open || busy.active) return
+  event.preventDefault()
+  event.stopPropagation()
+  if (chartEditor.open) {
+    if (chartNode === hit.node) return
+    // 正在编辑另一个块：先把当前修改收起来，再让用户点一次目标块
+    closeChartEditor({ apply: true })
+    return
+  }
+  openChartEditor(hit)
+}
+
+function onChartMouseDownCapture(event) {
+  if (!chartHitFromEvent(event.target)) return
+  event.preventDefault()
+  event.stopPropagation()
+}
+
+function onChartClickCapture(event) {
+  if (!chartHitFromEvent(event.target)) return
+  event.preventDefault()
+  event.stopPropagation()
+}
+
+function onChartKeydown(event) {
+  if (event.key === 'Escape') {
+    event.preventDefault()
+    event.stopPropagation()
+    closeChartEditor({ apply: false })
+    return
+  }
+  if ((event.ctrlKey || event.metaKey) && event.key === 'Enter') {
+    event.preventDefault()
+    event.stopPropagation()
+    closeChartEditor({ apply: true })
+  }
 }
 
 /* ---------------------------------------------------------------------------
@@ -597,6 +884,7 @@ function gotoHeading(index) {
 
 async function toggleSource() {
   if (!vditor || busy.active) return
+  if (chartEditor.open) closeChartEditor({ apply: true })
   const toSource = getMode(vditor) !== 'sv'
   const finishSwitch = () => {
     if (toSource) sourceSnapshot = latestMarkdown
@@ -828,6 +1116,10 @@ function onDocumentClick(event) {
 
 function onDocumentKeydown(event) {
   if (event.key === 'Escape') {
+    if (chartEditor.open) {
+      closeChartEditor({ apply: false })
+      return
+    }
     openMenu.value = ''
     if (linkDialog.open) {
       linkDialog.open = false
@@ -855,6 +1147,7 @@ function onReady() {
 
 /** 卸载时安全销毁：Vditor 初始化未完成时 destroy() 会抛错 */
 function destroyVditor() {
+  if (chartEditor.open) closeChartEditor({ apply: false })
   if (disposeEnhance) {
     try {
       disposeEnhance()
@@ -909,6 +1202,12 @@ onMounted(() => {
   document.addEventListener('click', onDocumentClick)
   document.addEventListener('keydown', onDocumentKeydown)
   document.addEventListener('fullscreenchange', onFullscreenChange)
+  // 图表/公式渲染区的捕获拦截：必须在 Vditor 的点击展开逻辑之前
+  document.addEventListener('pointerdown', onChartPointerDownCapture, true)
+  document.addEventListener('mousedown', onChartMouseDownCapture, true)
+  document.addEventListener('click', onChartClickCapture, true)
+  window.addEventListener('scroll', scheduleChartPanelPosition, true)
+  window.addEventListener('resize', scheduleChartPanelPosition)
   // 拖放导入：捕获阶段先于 Vditor 的 drop 处理，只拦 Markdown 文件
   if (root.value) {
     root.value.addEventListener('dragover', onEditorDragOver, true)
@@ -928,6 +1227,7 @@ watch(
     }
     // 自己 emit 出去的值（输入/导入）直接忽略：不能再调 getValue() 序列化整篇文档
     if (next === latestMarkdown) return
+    if (chartEditor.open) closeChartEditor({ apply: false })
     latestMarkdown = next
     vditor.setValue(next, true)
     window.clearTimeout(statsTimer)
@@ -950,6 +1250,12 @@ onBeforeUnmount(() => {
   document.removeEventListener('click', onDocumentClick)
   document.removeEventListener('keydown', onDocumentKeydown)
   document.removeEventListener('fullscreenchange', onFullscreenChange)
+  document.removeEventListener('pointerdown', onChartPointerDownCapture, true)
+  document.removeEventListener('mousedown', onChartMouseDownCapture, true)
+  document.removeEventListener('click', onChartClickCapture, true)
+  window.removeEventListener('scroll', scheduleChartPanelPosition, true)
+  window.removeEventListener('resize', scheduleChartPanelPosition)
+  if (chartPositionFrame) window.cancelAnimationFrame(chartPositionFrame)
   if (root.value) {
     root.value.removeEventListener('dragover', onEditorDragOver, true)
     root.value.removeEventListener('drop', onEditorDrop, true)
@@ -1168,5 +1474,69 @@ onBeforeUnmount(() => {
       class="typora-editor__file"
       @change="onImportFileChange"
     />
+
+    <Teleport to="body">
+      <div
+        v-if="chartEditor.open"
+        ref="chartPanel"
+        class="typora-code-panel"
+        role="dialog"
+        aria-modal="false"
+        :aria-label="chartEditor.title"
+        :style="{
+          top: `${chartEditor.top}px`,
+          left: `${chartEditor.left}px`,
+          width: `${chartEditor.width}px`
+        }"
+        @pointerdown.stop
+        @mousedown.stop
+        @click.stop
+      >
+        <div class="typora-code-panel__head">
+          <div class="min-w-0">
+            <p class="typora-code-panel__title">{{ chartEditor.title }}</p>
+            <p class="typora-code-panel__hint">{{ CHART_EDITOR_HINTS[chartEditor.kind] }}</p>
+          </div>
+          <button
+            type="button"
+            class="typora-code-panel__close"
+            title="关闭（Esc）"
+            aria-label="关闭源码编辑框"
+            @click="closeChartEditor({ apply: false })"
+          >
+            ✕
+          </button>
+        </div>
+
+        <textarea
+          ref="chartTextarea"
+          v-model="chartEditor.value"
+          class="typora-code-panel__textarea"
+          spellcheck="false"
+          :aria-label="`${chartEditor.title}源码`"
+          @keydown.stop="onChartKeydown"
+        ></textarea>
+
+        <div class="typora-code-panel__actions">
+          <span class="typora-code-panel__tip">点击空白处关闭并应用 · Ctrl/⌘+Enter 完成</span>
+          <span class="typora-code-panel__buttons">
+            <button
+              type="button"
+              class="typora-code-panel__btn"
+              @click="closeChartEditor({ apply: false })"
+            >
+              取消
+            </button>
+            <button
+              type="button"
+              class="typora-code-panel__btn typora-code-panel__btn--primary"
+              @click="closeChartEditor({ apply: true })"
+            >
+              完成
+            </button>
+          </span>
+        </div>
+      </div>
+    </Teleport>
   </div>
 </template>

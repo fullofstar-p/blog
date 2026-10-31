@@ -1969,3 +1969,220 @@ html.dark .vditor-ir__preview .language-echarts {
   border: 1px solid #d8d0c0;
   border-radius: 6px;
 }
+
+/* ==========================================================================
+   P3-2：图表 / 公式的上方浮层编辑
+   --------------------------------------------------------------------------
+   Vditor 原生点击预览会把源码展开在正文里；MarkdownEditor 拦截点击后打开
+   这个浮层。下方渲染区保持只读，点击空白处关闭并重新渲染。
+   ========================================================================== */
+
+/* 渲染区右上角的「可编辑」提示 + 图标，让 Mermaid / ECharts / LaTeX 和普通代码块
+   一样有明确的编辑入口；整个渲染区都可点击。 */
+.typora-editor pre.vditor-ir__preview:has(> .language-mermaid),
+.typora-editor pre.vditor-ir__preview:has(> .language-echarts),
+.typora-editor pre.vditor-ir__preview:has(> div[data-type='math-block']) {
+  position: relative;
+  cursor: pointer;
+  /* 下方只负责渲染：禁止选中/落光标，避免用户误以为能直接在图表上改源码 */
+  user-select: none;
+  -webkit-user-select: none;
+  caret-color: transparent;
+}
+
+.typora-editor pre.vditor-ir__preview:has(> .language-mermaid)::after,
+.typora-editor pre.vditor-ir__preview:has(> .language-echarts)::after,
+.typora-editor pre.vditor-ir__preview:has(> div[data-type='math-block'])::after {
+  position: absolute;
+  top: 6px;
+  right: 8px;
+  z-index: 3;
+  padding: 2px 7px;
+  border: 1px dashed rgb(var(--pencil) / 0.45);
+  border-radius: 3px;
+  background-color: rgb(var(--paper-soft) / 0.94);
+  color: rgb(var(--ink-300));
+  font-family: var(--md-font, -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Microsoft YaHei', Arial, sans-serif);
+  font-size: 11px;
+  font-style: italic;
+  line-height: 1.5;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.12s ease;
+}
+
+.typora-editor pre.vditor-ir__preview:has(> .language-mermaid)::after {
+  content: '✎ Mermaid';
+}
+
+.typora-editor pre.vditor-ir__preview:has(> .language-echarts)::after {
+  content: '✎ ECharts';
+}
+
+.typora-editor pre.vditor-ir__preview:has(> div[data-type='math-block'])::after {
+  content: '✎ LaTeX';
+}
+
+.typora-editor pre.vditor-ir__preview:has(> .language-mermaid):hover::after,
+.typora-editor pre.vditor-ir__preview:has(> .language-echarts):hover::after,
+.typora-editor pre.vditor-ir__preview:has(> div[data-type='math-block']):hover::after {
+  opacity: 1;
+}
+
+/* 代码块语言标记也加一个铅笔图标，展开源码时能看出这是图表块 */
+.typora-editor .vditor-ir__node[data-type='code-block']:has(code.language-mermaid) > .vditor-ir__marker--info::before,
+.typora-editor .vditor-ir__node[data-type='code-block']:has(code.language-echarts) > .vditor-ir__marker--info::before {
+  content: '✎ ';
+}
+
+/* 浮层本体 */
+.typora-code-panel {
+  position: fixed;
+  z-index: 90;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  max-height: calc(100vh - 24px);
+  padding: 12px 14px 10px;
+  border: 2px dashed rgb(var(--pencil));
+  border-radius: 6px;
+  background-color: rgb(var(--paper-soft));
+  color: rgb(var(--pencil));
+  box-shadow: 6px 6px 0 rgb(var(--sketch-shadow));
+}
+
+/* 打开图表源码浮层时会滚动编辑区；关闭浏览器的滚动锚定，避免整个页面跟着跳 */
+.typora-editor,
+.typora-editor__surface,
+.typora-editor .vditor-ir pre.vditor-reset {
+  overflow-anchor: none;
+}
+
+.typora-code-panel__head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.typora-code-panel__title {
+  margin: 0;
+  color: rgb(var(--pencil));
+  font-family: var(--md-font, -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Microsoft YaHei', Arial, sans-serif);
+  font-size: 13px;
+  font-weight: 600;
+  font-style: italic;
+  line-height: 1.4;
+}
+
+.typora-code-panel__hint {
+  margin: 2px 0 0;
+  color: rgb(var(--ink-300));
+  font-family: var(--md-font, -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Microsoft YaHei', Arial, sans-serif);
+  font-size: 11px;
+  font-style: italic;
+  line-height: 1.4;
+}
+
+.typora-code-panel__close {
+  display: inline-flex;
+  width: 28px;
+  height: 28px;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  border: 1px dashed rgb(var(--pencil) / 0.6);
+  border-radius: 3px;
+  background-color: transparent;
+  color: rgb(var(--ink-500));
+  font-size: 12px;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.typora-code-panel__close:hover {
+  background-color: rgb(var(--pencil));
+  color: rgb(var(--paper));
+}
+
+.typora-code-panel__textarea {
+  width: 100%;
+  min-height: 150px;
+  max-height: 42vh;
+  flex: 1 1 auto;
+  padding: 10px 12px;
+  resize: vertical;
+  border: 1px solid rgb(var(--pencil) / 0.45);
+  border-radius: 4px;
+  outline: none;
+  background-color: rgb(var(--paper));
+  color: rgb(var(--pencil));
+  font-family: var(--md-mono, 'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, 'Courier New', monospace);
+  font-size: 12.5px;
+  line-height: 1.65;
+  tab-size: 2;
+}
+
+.typora-code-panel__textarea:focus {
+  border-color: rgb(var(--pencil));
+  box-shadow: 0 0 0 2px rgb(var(--pencil) / 0.12);
+}
+
+.typora-code-panel__actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.typora-code-panel__tip {
+  color: rgb(var(--ink-300));
+  font-family: var(--md-font, -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Microsoft YaHei', Arial, sans-serif);
+  font-size: 10.5px;
+  font-style: italic;
+  line-height: 1.4;
+}
+
+.typora-code-panel__buttons {
+  display: inline-flex;
+  flex: none;
+  gap: 6px;
+}
+
+.typora-code-panel__btn {
+  min-height: 30px;
+  padding: 0 12px;
+  border: 1px dashed rgb(var(--pencil) / 0.75);
+  border-radius: 3px;
+  background-color: rgb(var(--paper));
+  color: rgb(var(--pencil));
+  font-family: var(--md-font, -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Microsoft YaHei', Arial, sans-serif);
+  font-size: 12px;
+  font-style: italic;
+  cursor: pointer;
+}
+
+.typora-code-panel__btn:hover {
+  border-style: solid;
+  border-color: rgb(var(--pencil));
+}
+
+.typora-code-panel__btn--primary {
+  background-color: rgb(var(--pencil));
+  color: rgb(var(--paper));
+}
+
+.typora-code-panel__btn--primary:hover {
+  background-color: rgb(var(--ink-700));
+  color: rgb(var(--paper));
+}
+
+@media (max-width: 720px) {
+  .typora-code-panel {
+    padding: 10px;
+  }
+
+  .typora-code-panel__tip {
+    display: none;
+  }
+}

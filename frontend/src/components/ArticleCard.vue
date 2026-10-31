@@ -15,13 +15,20 @@ defineProps({
       :aria-label="`阅读文章：${article.title}`"
     >
       <div class="flex flex-col gap-4 md:flex-row md:gap-6">
-        <div v-if="article.cover" class="w-full shrink-0 md:w-44">
+        <div v-if="article.cover" class="relative w-full shrink-0 self-start md:w-44">
           <img
             :src="article.cover"
             :alt="`${article.title} 的封面图`"
             class="h-40 w-full rotate-[-0.4deg] border-2 border-dashed border-pencil/70 object-cover shadow-sketchsm md:h-28"
             loading="lazy"
           />
+          <span
+            class="absolute bottom-2 left-2 inline-flex items-center gap-1 border border-dashed border-pencil/70 bg-paper px-2 py-0.5 font-serif text-xs italic text-ink-700 shadow-sketchsm"
+            :aria-label="`点赞数 ${article.likeCount || 0}`"
+          >
+            <span class="text-sketchred" aria-hidden="true">♥</span>
+            {{ formatViews(article.likeCount) }}
+          </span>
         </div>
 
         <div class="min-w-0 flex-1">

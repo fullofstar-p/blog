@@ -284,8 +284,8 @@ MinIO 配置 CORS 让 PDF 直接内联图片。
 - Docker 运行镜像安装 `fontconfig` + `fonts-noto-cjk`，并启用 `-Djava.awt.headless=true`；
   本地 Windows 回退微软雅黑。
 - 前台文章详情新增分享弹窗：1200×630 PNG 预览、复制链接（Clipboard API + execCommand 回退）、
-  下载 PNG、`navigator.share` 系统分享；文章页动态写入 `og:title` / `og:description` /
-  `og:image` / `og:url`，组件卸载时恢复。
+  下载 PNG；系统分享入口已移除，后续补常见社交媒体分享与下载图片二维码；文章页动态写入
+  `og:title` / `og:description` / `og:image` / `og:url`，组件卸载时恢复。
 - 验证：PNG 尺寸 1200×630、缓存头、404、分享弹窗 `img.naturalWidth`，均通过。
 
 ## 12. 本次交付：数学公式 / Mermaid / 图表（P3-2）

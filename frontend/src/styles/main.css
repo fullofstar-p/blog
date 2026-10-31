@@ -134,7 +134,9 @@
   }
 
   .sketch-card-hover {
-    @apply transition-transform duration-150 ease-out hover:-translate-y-1 hover:rotate-[-0.3deg] hover:shadow-sketch-lg;
+    /* 只改阴影与描边，不再位移/旋转：transform 会让文字在合成层里重采样，
+       鼠标扫过卡片时出现残影，靠近边缘还会反复触发 hover 造成闪烁。 */
+    @apply transition-shadow duration-150 ease-out hover:border-pencil hover:shadow-sketch-lg;
   }
 
   /* 手绘胶带装饰 */
@@ -160,7 +162,9 @@
     @apply inline-flex min-h-[44px] min-w-[44px] select-none items-center justify-center gap-2 rounded-sketch border-2 border-dashed border-pencil bg-paper px-5 py-2 font-serif text-base italic text-pencil shadow-sketch transition-all duration-150 ease-out;
   }
   .sketch-btn:hover {
-    @apply -rotate-1 bg-pencil text-paper shadow-sketchsm;
+    /* 不在 hover 时旋转/位移：旋转会改变可点击区域，鼠标停在边缘时会反复进出，
+       表现为按钮闪烁；按下时的位移保留在手感上。 */
+    @apply bg-pencil text-paper shadow-sketchsm;
   }
   .sketch-btn:active {
     @apply rotate-1 translate-x-[1px] translate-y-[1px] shadow-press;

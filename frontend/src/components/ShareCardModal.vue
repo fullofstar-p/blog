@@ -17,7 +17,6 @@ const imageError = ref(false)
 const retryToken = ref(0)
 const copying = ref(false)
 const downloading = ref(false)
-const sharing = ref(false)
 const actionError = ref('')
 
 const shareUrl = computed(() => (props.article ? getShareCardUrl(props.article.id) : ''))
@@ -29,9 +28,6 @@ const pageUrl = computed(() =>
   props.article ? `${window.location.origin}/article/${props.article.id}` : ''
 )
 const shareTitle = computed(() => (props.article && props.article.title) || '技术分享博客')
-const canNativeShare = computed(
-  () => typeof navigator !== 'undefined' && typeof navigator.share === 'function'
-)
 
 watch(
   () => props.modelValue,
@@ -43,7 +39,6 @@ watch(
     actionError.value = ''
     copying.value = false
     downloading.value = false
-    sharing.value = false
   }
 )
 
@@ -109,6 +104,7 @@ function safeFileName(name) {
 
 async function downloadCard() {
   if (!shareUrl.value || downloading.value) return
+  // TODO(下一轮)：下载前把文章二维码合成到卡片右下角；此处只负责下载服务端 PNG。
   downloading.value = true
   actionError.value = ''
   try {
@@ -133,25 +129,6 @@ async function downloadCard() {
     console.warn('[share] 下载失败', error)
   } finally {
     downloading.value = false
-  }
-}
-
-async function shareNative() {
-  if (!pageUrl.value || sharing.value) return
-  sharing.value = true
-  actionError.value = ''
-  try {
-    await navigator.share({
-      title: shareTitle.value,
-      text: (props.article && props.article.summary) || '',
-      url: pageUrl.value
-    })
-  } catch (error) {
-    if (error && error.name === 'AbortError') return
-    actionError.value = '系统分享失败，可以改用复制链接'
-    console.warn('[share] 系统分享失败', error)
-  } finally {
-    sharing.value = false
   }
 }
 </script>
@@ -209,9 +186,6 @@ async function shareNative() {
         </SketchButton>
         <SketchButton :loading="downloading" @click="downloadCard">
           {{ downloading ? '下载中…' : '下载 PNG' }}
-        </SketchButton>
-        <SketchButton v-if="canNativeShare" variant="primary" :loading="sharing" @click="shareNative">
-          系统分享
         </SketchButton>
       </div>
 

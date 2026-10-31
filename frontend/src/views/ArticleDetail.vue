@@ -222,8 +222,11 @@ async function toggleFavorite() {
 const readingProgress = ref(0)
 const activeHeading = ref(-1)
 const tocOpen = ref(false)
+const showBackTop = ref(false)
 let scrollFrame = 0
 let readingTimer = 0
+let backTopTimer = 0
+let backTopLocked = false
 
 /** 预览区里已渲染的标题，顺序与 Markdown 里的标题一一对应 */
 function previewHeadingElements() {
@@ -244,12 +247,16 @@ function updateReadingState() {
   const maxScroll = documentElement.scrollHeight - window.innerHeight
   readingProgress.value =
     maxScroll > 0 ? Math.min(100, Math.max(0, (window.scrollY / maxScroll) * 100)) : 0
+  if (window.scrollY <= 0) backTopLocked = false
+  showBackTop.value = !backTopLocked && window.scrollY > 560
 
   const elements = previewHeadingElements()
   const line = readingOffset()
   let current = -1
   elements.forEach((element, index) => {
-    if (element.getBoundingClientRect().top <= line) current = index
+    // +6 容差：scrollTo 取整后目标标题可能落在参考线上方 0.5px，
+    // 没有容差时点击目录第 N 项会被判成第 N-1 项，目录滚动条看起来「差一格」。
+    if (element.getBoundingClientRect().top <= line + 6) current = index
   })
   activeHeading.value = current
 }
@@ -271,12 +278,29 @@ function scrollToHeading(index) {
   activeHeading.value = index
 }
 
+function scrollToTop() {
+  const reduceMotion =
+    typeof window.matchMedia === 'function' &&
+    window.matchMedia('(prefers-reduced-motion: reduce)').matches
+  backTopLocked = true
+  showBackTop.value = false
+  window.clearTimeout(backTopTimer)
+  // 平滑滚动被用户打断时也要恢复按钮，不能一直锁到页面顶部
+  backTopTimer = window.setTimeout(() => {
+    backTopLocked = false
+    scheduleReadingState()
+  }, 1200)
+  window.scrollTo({ top: 0, behavior: reduceMotion ? 'instant' : 'smooth' })
+}
+
 async function load() {
   loading.value = true
   error.value = ''
   article.value = null
   activeHeading.value = -1
   readingProgress.value = 0
+  showBackTop.value = false
+  backTopLocked = false
   tocOpen.value = false
   shareOpen.value = false
   related.value = []
@@ -319,6 +343,7 @@ onBeforeUnmount(() => {
   window.removeEventListener('scroll', scheduleReadingState)
   window.removeEventListener('resize', scheduleReadingState)
   window.clearTimeout(readingTimer)
+  window.clearTimeout(backTopTimer)
   if (scrollFrame) window.cancelAnimationFrame(scrollFrame)
   restoreOgMeta()
 })
@@ -375,6 +400,18 @@ async function confirmDelete() {
       >
         <span class="reading-progress__bar" :style="{ width: `${readingProgress}%` }"></span>
       </div>
+
+      <button
+        v-show="showBackTop && !tocOpen"
+        type="button"
+        class="back-to-top"
+        aria-label="回到顶部"
+        title="回到顶部"
+        @click="scrollToTop"
+      >
+        <span aria-hidden="true">↑</span>
+        <span class="back-to-top__text">顶部</span>
+      </button>
 
       <button
         v-if="headings.length"
@@ -541,7 +578,7 @@ async function confirmDelete() {
               v-for="(item, index) in related"
               :key="item.id"
               :to="{ name: 'article', params: { id: item.id } }"
-              class="sketch-card p-4 transition-transform duration-150 hover:rotate-[-0.3deg]"
+              class="sketch-card p-4 transition-shadow duration-150 hover:border-pencil hover:shadow-sketch-lg"
               :class="index % 2 === 0 ? 'rotate-[-0.2deg]' : 'rotate-[0.2deg]'"
             >
               <h3 class="line-clamp-2 font-serif text-base italic text-pencil">{{ item.title }}</h3>
@@ -566,7 +603,7 @@ async function confirmDelete() {
           <RouterLink
             v-if="article.prev"
             :to="{ name: 'article', params: { id: article.prev.id } }"
-            class="sketch-card p-4 transition-transform hover:rotate-[-0.5deg]"
+            class="sketch-card p-4 transition-shadow hover:border-pencil hover:shadow-sketch-lg"
           >
             <p class="font-serif text-xs italic text-ink-300">← 上一篇</p>
             <p class="mt-1 font-serif text-base italic text-pencil">{{ article.prev.title }}</p>
@@ -575,7 +612,7 @@ async function confirmDelete() {
           <RouterLink
             v-if="article.next"
             :to="{ name: 'article', params: { id: article.next.id } }"
-            class="sketch-card p-4 text-right transition-transform hover:rotate-[0.5deg]"
+            class="sketch-card p-4 text-right transition-shadow hover:border-pencil hover:shadow-sketch-lg"
           >
             <p class="font-serif text-xs italic text-ink-300">下一篇 →</p>
             <p class="mt-1 font-serif text-base italic text-pencil">{{ article.next.title }}</p>

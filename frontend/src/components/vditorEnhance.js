@@ -93,7 +93,11 @@ const LANG_META = [
   { value: 'swift', label: 'Swift', short: 'SW', color: '#fa7343' },
   { value: 'xml', label: 'XML', short: 'X', color: '#0060ac' },
   { value: 'dockerfile', label: 'Dockerfile', short: 'DK', color: '#2496ed' },
-  { value: 'diff', label: 'Diff', short: '±', color: '#6b7280' }
+  { value: 'diff', label: 'Diff', short: '±', color: '#6b7280' },
+  // P3-2 图表语言也进入语言选择器：没有这两项时 mermaid / echarts 代码块
+  // 只能显示「?」图标，用户不知道这是可渲染的图表块。
+  { value: 'mermaid', label: 'Mermaid', short: 'M', color: '#ff3670' },
+  { value: 'echarts', label: 'ECharts', short: 'EC', color: '#aa344d' }
 ]
 
 const LANG_BY_VALUE = new Map(LANG_META.map((item) => [item.value, item]))

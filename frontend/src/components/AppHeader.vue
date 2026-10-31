@@ -119,7 +119,7 @@ onUnmounted(() => {
         class="group flex min-h-[44px] items-center gap-2 font-serif text-xl italic text-pencil"
       >
         <span
-          class="inline-flex h-9 w-9 rotate-[-3deg] items-center justify-center border-2 border-dashed border-pencil text-base shadow-sketchsm transition-transform duration-150 group-hover:-rotate-6"
+          class="inline-flex h-9 w-9 rotate-[-3deg] items-center justify-center border-2 border-dashed border-pencil text-base shadow-sketchsm"
           aria-hidden="true"
         >
           ✎
