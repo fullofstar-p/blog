@@ -432,7 +432,7 @@ public class ArticleServiceImpl implements ArticleService {
         if (deleted == 0) {
             throw new BusinessException(ResultCode.NOT_FOUND, "文章不存在或未在回收站");
         }
-        articleTagMapper.delete(new LambdaQueryWrapper<ArticleTag>().eq(ArticleTag::getArticleId, id));
+        articleTagMapper.deleteByArticleId(id);
         commentMapper.delete(new LambdaQueryWrapper<Comment>().eq(Comment::getArticleId, id));
         // 彻底删除时同步清理点赞/收藏记录
         articleLikeMapper.delete(new LambdaQueryWrapper<ArticleLike>().eq(ArticleLike::getArticleId, id));
@@ -493,7 +493,7 @@ public class ArticleServiceImpl implements ArticleService {
         if (deleted == 0) {
             return 0;
         }
-        articleTagMapper.delete(new LambdaQueryWrapper<ArticleTag>().in(ArticleTag::getArticleId, safeIds));
+        articleTagMapper.deleteByArticleIds(safeIds);
         commentMapper.delete(new LambdaQueryWrapper<Comment>().in(Comment::getArticleId, safeIds));
         articleLikeMapper.delete(new LambdaQueryWrapper<ArticleLike>().in(ArticleLike::getArticleId, safeIds));
         articleFavoriteMapper.delete(new LambdaQueryWrapper<ArticleFavorite>().in(ArticleFavorite::getArticleId, safeIds));
@@ -546,7 +546,7 @@ public class ArticleServiceImpl implements ArticleService {
 
     /** 保存文章标签：先清空旧关联，再写入存在的标签 */
     private void saveTags(Long articleId, List<Long> tagIds) {
-        articleTagMapper.delete(new LambdaQueryWrapper<ArticleTag>().eq(ArticleTag::getArticleId, articleId));
+        articleTagMapper.deleteByArticleId(articleId);
         if (tagIds == null || tagIds.isEmpty()) {
             return;
         }

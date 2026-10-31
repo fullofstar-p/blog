@@ -4,7 +4,6 @@ import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.blog.common.BusinessException;
 import com.blog.common.ResultCode;
 import com.blog.dto.TagSaveDTO;
-import com.blog.entity.ArticleTag;
 import com.blog.entity.Tag;
 import com.blog.mapper.ArticleTagMapper;
 import com.blog.mapper.TagMapper;
@@ -62,7 +61,7 @@ public class TagServiceImpl implements TagService {
             throw new BusinessException(ResultCode.NOT_FOUND, "标签不存在");
         }
         // 先清理文章-标签关联，再删除标签
-        articleTagMapper.delete(new LambdaQueryWrapper<ArticleTag>().eq(ArticleTag::getTagId, id));
+        articleTagMapper.deleteByTagId(id);
         tagMapper.deleteById(id);
     }
 
@@ -77,9 +76,7 @@ public class TagServiceImpl implements TagService {
     }
 
     private int countArticles(Long tagId) {
-        Long count = articleTagMapper.selectCount(
-                new LambdaQueryWrapper<ArticleTag>().eq(ArticleTag::getTagId, tagId));
-        return count == null ? 0 : count.intValue();
+        return (int) articleTagMapper.countByTagId(tagId);
     }
 
     private TagVO toVO(Tag tag, int articleCount) {
