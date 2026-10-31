@@ -12,6 +12,8 @@ import org.springframework.web.bind.MissingServletRequestParameterException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.multipart.MaxUploadSizeExceededException;
+import org.springframework.web.servlet.NoHandlerFoundException;
+import org.springframework.web.servlet.resource.NoResourceFoundException;
 
 /**
  * 全局异常处理：把各类异常统一转换为 { code, message, data }。
@@ -74,6 +76,14 @@ public class GlobalExceptionHandler {
     public ResponseEntity<Result<Void>> handleAccessDenied(AccessDeniedException e) {
         return ResponseEntity.status(HttpStatus.FORBIDDEN)
                 .body(Result.fail(ResultCode.FORBIDDEN));
+    }
+
+    /** 静态资源 / 未知路径不存在：返回 404，不打 ERROR 日志（浏览器 favicon 等探测很常见） */
+    @ExceptionHandler({NoResourceFoundException.class, NoHandlerFoundException.class})
+    public ResponseEntity<Result<Void>> handleNotFound(Exception e) {
+        log.debug("资源不存在：{}", e.getMessage());
+        return ResponseEntity.status(HttpStatus.NOT_FOUND)
+                .body(Result.fail(ResultCode.NOT_FOUND));
     }
 
     /** 兜底异常 */
