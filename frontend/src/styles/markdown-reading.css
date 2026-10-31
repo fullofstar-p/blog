@@ -301,3 +301,88 @@ html.dark .reading-toc-mobile {
   color: #e7e1d5;
   box-shadow: 0 12px 32px rgba(0, 0, 0, 0.55);
 }
+
+/* ---------- 5. P3-2：数学公式 / Mermaid / ECharts ---------- */
+/* 行内公式跟随正文字号与颜色（暗色由 markdown.css 的 --md-text 控制） */
+.typora-page .md-editor-preview .md-editor-katex-inline .katex {
+  font-size: 1.05em;
+}
+
+/* 块公式居中；超宽公式由公式自己横向滚动，不撑破纸张 */
+.typora-page .md-editor-preview .md-editor-katex-block {
+  margin: 1em 0;
+  overflow-x: auto;
+  overflow-y: hidden;
+  text-align: center;
+}
+
+.typora-page .md-editor-preview .md-editor-katex-block .katex-display {
+  margin: 0.3em 0;
+  overflow-x: auto;
+  overflow-y: hidden;
+}
+
+/* Mermaid：独立图表卡；超宽图由 MarkdownViewer 的 fitMermaidSvg 按自然宽度撑开，
+   外层容器横向滚动，移动端不会把页面撑宽。
+   MarkdownViewer 自定义渲染的容器同时带 .p32-mermaid 与 .md-editor-mermaid 两个类：
+   - .md-editor-mermaid 兼容既有样式与 e2e 选择器；
+   - 预览库里的 `.md-editor-preview .md-editor-mermaid{display:none}` 由这里覆盖。 */
+.typora-page .md-editor-preview .md-editor-mermaid,
+.typora-page .md-editor-preview .p32-mermaid {
+  display: block;
+  max-width: 100%;
+  margin: 1.1em 0;
+  padding: 10px 12px;
+  overflow-x: auto;
+  overflow-y: hidden;
+  border: 1px solid #e6e0d4;
+  border-radius: 6px;
+  background-color: #fbf7ef;
+}
+
+.typora-page .md-editor-preview .md-editor-mermaid svg,
+.typora-page .md-editor-preview .p32-mermaid svg {
+  display: block;
+  margin: 0 auto;
+  height: auto;
+}
+
+/* ECharts 图表容器（由 MarkdownViewer 把 ```echarts 代码块接管成图表） */
+.typora-page .p32-echarts {
+  width: 100%;
+  height: clamp(260px, 40vw, 380px);
+  margin: 1.1em 0;
+  border: 1px solid #e6e0d4;
+  border-radius: 6px;
+  background-color: #fbf7ef;
+  overflow: hidden;
+}
+
+/* 已渲染成图表的代码块隐藏；原始 Markdown 内容仍在 DOM 中，便于复制与降级 */
+.typora-page .md-editor-preview .md-editor-code.p32-chart-source {
+  display: none;
+}
+
+@media (max-width: 720px) {
+  .typora-page .md-editor-preview .md-editor-mermaid,
+  .typora-page .md-editor-preview .p32-mermaid {
+    padding: 8px 10px;
+  }
+
+  .typora-page .p32-echarts {
+    height: clamp(240px, 62vw, 340px);
+  }
+}
+
+/* 暗色：图表卡换成纸张暗色；ECharts 用 dark 主题 + 透明背景叠在卡片上 */
+html.dark .typora-page .md-editor-preview .md-editor-mermaid,
+html.dark .typora-page .md-editor-preview .p32-mermaid,
+html.dark .typora-page .p32-echarts {
+  border-color: #3a362f;
+  background-color: #1b1a17;
+}
+
+html.dark .typora-page .md-editor-preview .md-editor-katex-inline,
+html.dark .typora-page .md-editor-preview .md-editor-katex-block {
+  color: var(--md-text, #d9d3c6);
+}

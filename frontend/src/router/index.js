@@ -66,6 +66,12 @@ const routes = [
     meta: { title: '个人中心', requiresAuth: true }
   },
   {
+    path: '/notifications',
+    name: 'notifications',
+    component: () => import('@/views/Notifications.vue'),
+    meta: { title: '消息通知', requiresAuth: true }
+  },
+  {
     path: '/admin',
     component: () => import('@/components/AdminLayout.vue'),
     meta: { requiresAuth: true, requiresAdmin: true },

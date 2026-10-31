@@ -17,7 +17,8 @@ export const modLabel = () => (isMac() ? '⌘' : 'Ctrl+')
 /**
  * 顶部菜单（顺序、分隔、快捷键提示按 Typora 的「文件 / 编辑 / 段落 / 格式 / 视图」组织）。
  * cmd 为 'new' / 'import' / 'export-md' / 'export-html' / 'export-pdf' /
- * 'link' / 'image' / 'outline' / 'source' / 'fullscreen' 时由组件接管。
+ * 'link' / 'image' / 'outline' / 'source' / 'fullscreen' /
+ * 'math' / 'mermaid' / 'echarts' 时由组件接管。
  */
 export const MENUS = [
   {
@@ -64,7 +65,11 @@ export const MENUS = [
       { divider: true },
       { cmd: 'code', label: '代码块' },
       { cmd: 'table', label: '表格' },
-      { cmd: 'line', label: '水平分割线' }
+      { cmd: 'line', label: '水平分割线' },
+      { divider: true },
+      { cmd: 'math', label: '公式' },
+      { cmd: 'mermaid', label: 'Mermaid 图' },
+      { cmd: 'echarts', label: '图表（ECharts）' }
     ]
   },
   {
@@ -91,6 +96,30 @@ export const MENUS = [
     ]
   }
 ]
+
+/** 插入模板：公式 / Mermaid / ECharts（由 MarkdownEditor 在光标处插入） */
+export const INSERT_SNIPPETS = {
+  math: ['$$', '', '$$'].join('\n'),
+  mermaid: [
+    '```mermaid',
+    'graph TD',
+    '  A[开始] --> B{是否继续}',
+    '  B -- 是 --> C[完成]',
+    '  B -- 否 --> D[结束]',
+    '```'
+  ].join('\n'),
+  echarts: [
+    '```echarts',
+    '{',
+    '  "title": { "text": "示例图表" },',
+    '  "tooltip": {},',
+    '  "xAxis": { "type": "category", "data": ["一月", "二月", "三月"] },',
+    '  "yAxis": { "type": "value" },',
+    '  "series": [{ "type": "bar", "data": [120, 200, 150] }]',
+    '}',
+    '```'
+  ].join('\n')
+}
 
 /** 取 Vditor 某个工具栏项的按钮（工具栏本身被 CSS 隐藏，但元素与事件都在） */
 function toolbarButton(vditor, key) {

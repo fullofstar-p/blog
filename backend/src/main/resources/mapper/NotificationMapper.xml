@@ -1,0 +1,52 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<!-- 站内通知 Mapper：分页联查文章标题与发送人信息。 -->
+<mapper namespace="com.blog.mapper.NotificationMapper">
+
+    <resultMap id="NotificationVOMap" type="com.blog.vo.NotificationVO">
+        <id column="id" property="id"/>
+        <result column="type" property="type"/>
+        <result column="title" property="title"/>
+        <result column="content" property="content"/>
+        <result column="article_id" property="articleId"/>
+        <result column="article_title" property="articleTitle"/>
+        <result column="comment_id" property="commentId"/>
+        <result column="sender_id" property="senderId"/>
+        <result column="sender_name" property="senderName"/>
+        <result column="sender_avatar" property="senderAvatar"/>
+        <result column="is_read" property="isRead"/>
+        <result column="create_time" property="createTime"/>
+    </resultMap>
+
+    <select id="selectNotificationPage" resultMap="NotificationVOMap">
+        SELECT n.id,
+               n.type,
+               n.title,
+               n.content,
+               n.article_id,
+               n.comment_id,
+               n.sender_id,
+               n.is_read,
+               n.create_time,
+               a.title AS article_title,
+               COALESCE(s.nickname, s.username) AS sender_name,
+               s.avatar AS sender_avatar
+        FROM notification n
+        LEFT JOIN article a ON a.id = n.article_id
+        LEFT JOIN `user` s ON s.id = n.sender_id
+        WHERE n.user_id = #{userId}
+        <if test="unreadOnly">
+            AND n.is_read = 0
+        </if>
+        ORDER BY n.create_time DESC, n.id DESC
+    </select>
+
+    <select id="selectNotificationCount" resultType="long">
+        SELECT COUNT(*)
+        FROM notification n
+        WHERE n.user_id = #{userId}
+        <if test="unreadOnly">
+            AND n.is_read = 0
+        </if>
+    </select>
+</mapper>

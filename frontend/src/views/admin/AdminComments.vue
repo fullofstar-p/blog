@@ -75,7 +75,9 @@ async function audit(comment, status) {
   processingId.value = comment.id
   try {
     await auditComment(comment.id, status)
-    toastSuccess(status === 1 ? '评论已通过' : '评论已拒绝')
+    toastSuccess(
+      status === 1 ? '评论已通过，已发送审核结果通知' : '评论已拒绝，已发送审核结果通知'
+    )
     load()
   } catch (err) {
     console.error('[admin] 审核失败', err)
@@ -183,9 +185,14 @@ onMounted(load)
           {{ comment.content }}
         </p>
 
-        <p class="mt-2 font-serif text-xs italic text-ink-300">
-          文章：{{ comment.articleTitle || '—' }}
-          <span v-if="comment.parentId"> · 回复评论 #{{ comment.parentId }}</span>
+        <p class="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 font-serif text-xs italic text-ink-300">
+          <span>文章：{{ comment.articleTitle || '—' }}</span>
+          <span v-if="typeof comment.depth === 'number'">层级 {{ comment.depth + 1 }}/5</span>
+          <span v-if="comment.replyToNickname">
+            回复 <span class="text-sketchblue">@{{ comment.replyToNickname }}</span>
+          </span>
+          <span v-if="comment.parentId">父评论 #{{ comment.parentId }}</span>
+          <span v-if="comment.rootId && comment.rootId !== comment.id">楼层 #{{ comment.rootId }}</span>
         </p>
 
         <div class="mt-3 flex flex-wrap gap-2">

@@ -37,13 +37,13 @@
 ## 放行清单（无需 Token）
 
 - `POST /api/auth/**`
-- `GET /api/articles/**`（公开文章列表、详情、归档、置顶）
+- `GET /api/articles/**`（公开文章列表、详情、归档、置顶、互动状态、相关文章、分享卡片）
 - `GET /api/categories`、`GET /api/tags`
 - `GET /api/search`
 - `GET /api/articles/{id}/comments`
 - `/doc.html`、`/swagger-ui/**`、`/v3/api-docs/**`、`/actuator/health`
 
-其余接口均需登录；管理接口需 `ADMIN` 角色。
+其余接口均需登录；管理接口需 `ADMIN` 角色。`/api/notifications/**` 与 `/api/favorites` 需要登录。
 
 ## 枚举约定
 
@@ -52,6 +52,7 @@
 - 文章状态 `status`：`0` 草稿 | `1` 已发布
 - 置顶 `isTop`：`0` 否 | `1` 是
 - 评论状态 `status`：`0` 待审核 | `1` 已通过 | `2` 已拒绝
+- 通知类型 `type`：`COMMENT` 文章收到评论 | `REPLY` 有人回复我 | `COMMENT_AUDIT` 评论审核结果
 - 上传分类 `category`：`avatar` | `cover` | `content`
 
 ## 视图对象（VO）
@@ -64,14 +65,20 @@ CategoryVO  { id, name, sort, articleCount }
 ArticleSummaryVO {
   id, title, summary, cover, categoryId, categoryName,
   authorId, authorName, authorAvatar,
-  status, isTop, viewCount,
-  tags: TagVO[], createTime, updateTime
+  status, isTop, viewCount, likeCount, favoriteCount,
+  tags: TagVO[], createTime, updateTime,
+  favoriteTime?   // 仅「我的收藏」接口返回
 }
 ArticleDetailVO = ArticleSummaryVO & {
   content, prev: { id, title } | null, next: { id, title } | null
 }
-CommentVO   { id, articleId, userId, nickname, avatar, parentId, content, likeCount, liked, createTime, replies: CommentVO[] }
+CommentVO   { id, articleId, userId, nickname, avatar, parentId, rootId,
+              replyToUserId, replyToNickname, depth, content, likeCount, liked,
+              createTime, replies: CommentVO[] }
 CommentAdminVO = CommentVO & { articleTitle, status, username }
+NotificationVO { id, type, title, content, articleId, articleTitle, commentId,
+                 senderId, senderName, senderAvatar, isRead, createTime }
+ArticleInteractionVO { liked, favorited, likeCount, favoriteCount }
 ArchiveVO   { year, months: [{ month, count }] }
 FileVO      { url, objectKey, originalName, size, contentType }
 ```
@@ -105,6 +112,13 @@ FileVO      { url, objectKey, originalName, size, contentType }
 | GET | `/api/articles` | 公开 | `pageNum, pageSize, categoryId?, tagId?, keyword?, year?, month?, sort?`（`sort=time\|views`，默认 time） | `PageResult<ArticleSummaryVO>` |
 | GET | `/api/articles/top` | 公开 | `limit?`（默认 5，最大 10） | `ArticleSummaryVO[]` |
 | GET | `/api/articles/{id}` | 公开 | - | `ArticleDetailVO`（阅读量 +1） |
+| GET | `/api/articles/{id}/interaction` | 公开 | - | `ArticleInteractionVO`（未登录 liked/favorited=false） |
+| POST | `/api/articles/{id}/like` | 登录 | - | `{ liked: true, likeCount }`（幂等） |
+| DELETE | `/api/articles/{id}/like` | 登录 | - | `{ liked: false, likeCount }`（幂等） |
+| POST | `/api/articles/{id}/favorite` | 登录 | - | `{ favorited: true, favoriteCount }`（幂等） |
+| DELETE | `/api/articles/{id}/favorite` | 登录 | - | `{ favorited: false, favoriteCount }`（幂等） |
+| GET | `/api/articles/{id}/related` | 公开 | `limit?`（默认 6，最大 12） | `ArticleSummaryVO[]`（共同标签 *3 + 同分类 +2，排除自身/草稿） |
+| GET | `/api/articles/{id}/share-card.png` | 公开 | - | `image/png` 1200×630 分享卡片；仅已发布；`Cache-Control: public, max-age=3600` |
 | GET | `/api/articles/archive` | 公开 | - | `ArchiveVO[]` |
 | GET | `/api/articles/mine` | 登录 | `pageNum, pageSize, status?` | `PageResult<ArticleSummaryVO>` |
 | POST | `/api/articles` | 登录 | `ArticleSaveDTO` | `ArticleSummaryVO` |
@@ -129,6 +143,11 @@ FileVO      { url, objectKey, originalName, size, contentType }
 - 未发布草稿仅作者本人与 ADMIN 可见；公开列表只返回 `status=1`。
 - `isTop` 仅 ADMIN 可设置，普通用户传入忽略。
 - 阅读量：Redis 先自增，定时任务每 60 秒批量落库；缓存文章详情 10 分钟，更新/删除时失效。
+- 互动：点赞/收藏写入 `article_like` / `article_favorite` 唯一键，重复调用幂等；文章表
+  `like_count` / `favorite_count` 为冗余计数；点赞、收藏、取消后主动失效文章详情缓存。
+- 分享卡片：服务端 Java2D 生成 1200×630 PNG（纸张底色 + 标题 + 摘要 + 分类/标签 + 作者/日期 + 站点名），
+  草稿/回收站/不存在返回 404。
+- 相关文章：共同标签数 × 3 + 同分类 + 2 排序，再按发布时间倒序；无共同标签/分类时自然退化为最新文章。
 
 ## 4. 分类模块
 
@@ -152,16 +171,21 @@ FileVO      { url, objectKey, originalName, size, contentType }
 
 | 方法 | 路径 | 权限 | 入参 | 出参 data |
 | ---- | ---- | ---- | ---- | --------- |
-| GET | `/api/articles/{articleId}/comments` | 公开 | - | `CommentVO[]`（仅已通过，一级 + 二级树） |
+| GET | `/api/articles/{articleId}/comments` | 公开 | - | `CommentVO[]`（仅已通过，任意层级楼中楼树） |
 | POST | `/api/comments` | 登录 | `{ articleId, parentId?, content }` | `CommentVO`（状态为待审核） |
-| DELETE | `/api/comments/{id}` | 登录（本人或 ADMIN） | - | `null` |
+| DELETE | `/api/comments/{id}` | 登录（本人或 ADMIN） | - | `null`（递归删除整棵子树） |
 | POST | `/api/comments/{id}/like` | 登录 | - | `{ liked: true, likeCount }` |
 | DELETE | `/api/comments/{id}/like` | 登录 | - | `{ liked: false, likeCount }` |
 | GET | `/api/admin/comments` | ADMIN | `pageNum, pageSize, status?` | `PageResult<CommentAdminVO>` |
-| PUT | `/api/admin/comments/{id}/audit` | ADMIN | `{ status: 1 \| 2 }` | `null` |
-| DELETE | `/api/admin/comments/{id}` | ADMIN | - | `null` |
+| PUT | `/api/admin/comments/{id}/audit` | ADMIN | `{ status: 1 \| 2 }` | `null`（状态变化时发通知） |
+| DELETE | `/api/admin/comments/{id}` | ADMIN | - | `null`（递归删除整棵子树） |
 
-- 二级回复：`parentId` 必须指向同一文章下的一级评论；若指向二级回复，则自动挂到其父评论下（避免三级）。
+- 楼中楼：`parentId` 直接指向被回复的评论；后端记录 `rootId`（楼层根）、`replyToUserId`、
+  `depth`（0 为一级，最大 4，即最多 5 层），超过返回 400「回复层级过深」。
+- 只能回复**已通过审核**的评论（否则 400「只能回复已通过的评论」）；回复提交后同样待审核。
+- 删除父评论会递归删除所有子孙评论，并清理对应评论点赞缓存。
+- 审核通过时通知：根评论 → 文章作者（`COMMENT`，自己评论自己的文章不发）；回复 → 直接父评论作者
+  （`REPLY`）；审核结果 → 评论作者（`COMMENT_AUDIT`）。通知发送失败不影响审核事务。
 - 点赞可取消：再次点击调用 `DELETE /api/comments/{id}/like`；`DELETE` 幂等（未点赞时直接返回当前计数）。
   `CommentVO.liked` 表示当前登录用户是否已赞，未登录时为 `null`。
 
@@ -222,6 +246,47 @@ FileVO      { url, objectKey, originalName, size, contentType }
 统计说明：访问已发布文章详情时记录 PV 与 UV（HyperLogLog，按日去重），Redis 每 60 秒落库到
 `site_daily_stat` / `article_daily_stat`；发布热力图按已发布文章的 `create_time` 聚合。
 
+## 10.2 互动、收藏、通知与分享
+
+### 10.2.1 点赞 / 收藏
+
+| 方法 | 路径 | 权限 | 入参 | 出参 data |
+| ---- | ---- | ---- | ---- | --------- |
+| GET | `/api/articles/{id}/interaction` | 公开 | - | `ArticleInteractionVO` |
+| POST | `/api/articles/{id}/like` | 登录 | - | `{ liked: true, likeCount }` |
+| DELETE | `/api/articles/{id}/like` | 登录 | - | `{ liked: false, likeCount }` |
+| POST | `/api/articles/{id}/favorite` | 登录 | - | `{ favorited: true, favoriteCount }` |
+| DELETE | `/api/articles/{id}/favorite` | 登录 | - | `{ favorited: false, favoriteCount }` |
+| GET | `/api/favorites` | 登录 | `pageNum, pageSize` | `PageResult<ArticleSummaryVO>`（按收藏时间倒序，含 `favoriteTime`） |
+
+- 点赞/收藏/取消均幂等：`article_like` / `article_favorite` 唯一键保证同一用户只计一次；
+  `like_count` / `favorite_count` 与关系表在同一事务里同步增减。
+- 草稿、回收站、不存在的文章返回 404；未登录调用 `interaction` 时 `liked/favorited` 均为 `false`，
+  `likeCount/favoriteCount` 仍返回。
+- 我的收藏只返回已发布且未删除的文章；彻底删除文章时同步清理其点赞/收藏记录。
+
+### 10.2.2 站内通知
+
+| 方法 | 路径 | 权限 | 入参 | 出参 data |
+| ---- | ---- | ---- | ---- | --------- |
+| GET | `/api/notifications` | 登录 | `pageNum, pageSize, unreadOnly?` | `PageResult<NotificationVO>` |
+| GET | `/api/notifications/unread-count` | 登录 | - | `{ count: number }` |
+| PUT | `/api/notifications/{id}/read` | 登录 | - | `null`（只能操作自己的通知） |
+| PUT | `/api/notifications/read-all` | 登录 | - | `{ updated: number }` |
+
+通知类型见「枚举约定」；触发时机见评论模块审核说明。通知表只存站内消息，
+评论审核失败/通知插入失败不会影响审核事务。
+
+### 10.2.3 分享卡片
+
+`GET /api/articles/{id}/share-card.png`（公开）返回 1200×630 PNG：
+
+- 纸张底色 + 手绘虚线边框 + 标题（最多 3 行）+ 摘要（最多 2 行）+ 分类/标签 + 作者/日期 + 站点名；
+- 仅已发布文章可生成，草稿/回收站/不存在返回 HTTP 404；
+- 响应头 `Cache-Control: public, max-age=3600`；
+- 服务端 Java2D 渲染，Docker 运行镜像已安装 `fontconfig` + `fonts-noto-cjk`，并启用
+  `-Djava.awt.headless=true`。
+
 ## 11. 健康检查
 
 | 方法 | 路径 | 权限 | 出参 |
@@ -233,14 +298,15 @@ FileVO      { url, objectKey, originalName, size, contentType }
 | 路由 | 页面 | 说明 |
 | ---- | ---- | ---- |
 | `/` | Home | 文章列表 + 置顶 + 分类/标签侧栏 |
-| `/article/:id` | ArticleDetail | Markdown 渲染、评论 |
+| `/article/:id` | ArticleDetail | Markdown 渲染（公式/Mermaid/ECharts）、点赞收藏分享、相关文章、楼中楼评论 |
 | `/category/:id` | CategoryPage | 分类下文章 |
 | `/tag/:id` | TagPage | 标签下文章 |
 | `/archive` | ArchivePage | 按年月归档 |
 | `/search` | SearchPage | `?keyword=` 搜索 |
 | `/about` | AboutPage | 关于 |
 | `/login`、`/register` | Login / Register | 认证 |
-| `/profile` | Profile | 个人资料、头像上传 |
+| `/profile` | Profile | 个人资料、头像上传、我的收藏 |
+| `/notifications` | Notifications | 消息通知（评论/回复/审核结果、未读筛选、全部已读） |
 | `/admin` | AdminLayout | 需 ADMIN，默认跳转内容看板 |
 | `/admin/dashboard` | AdminDashboard | 内容看板（PV/UV、趋势、热门、发布热力图） |
 | `/admin/articles`、`/admin/articles/new`、`/admin/articles/:id/edit` | 文章管理/编辑（编辑器内含自动保存草稿） |

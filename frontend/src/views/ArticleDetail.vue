@@ -1,19 +1,30 @@
 <script setup>
-import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
-import { useRouter } from 'vue-router'
+import { computed, nextTick, onBeforeUnmount, onMounted, reactive, ref, watch } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
 import ArticleToc from '@/components/ArticleToc.vue'
 import CommentSection from '@/components/CommentSection.vue'
 import MarkdownViewer from '@/components/MarkdownViewer.vue'
+import ShareCardModal from '@/components/ShareCardModal.vue'
 import SketchButton from '@/components/SketchButton.vue'
 import SketchEmpty from '@/components/SketchEmpty.vue'
 import SketchLoading from '@/components/SketchLoading.vue'
 import SketchModal from '@/components/SketchModal.vue'
 import TagPill from '@/components/TagPill.vue'
-import { deleteArticle, getArticle } from '@/api/article'
+import {
+  deleteArticle,
+  favoriteArticle,
+  getArticle,
+  getArticleInteraction,
+  getRelatedArticles,
+  getShareCardUrl,
+  likeArticle,
+  unfavoriteArticle,
+  unlikeArticle
+} from '@/api/article'
 import { useAuthStore } from '@/store/auth'
-import { formatDate, formatViews } from '@/utils/format'
+import { formatDate, formatViews, plainText } from '@/utils/format'
 import { parseMarkdownHeadings } from '@/utils/markdownToc'
-import { toastSuccess } from '@/utils/toast'
+import { pushToast, toastSuccess } from '@/utils/toast'
 
 const props = defineProps({
   id: { type: String, required: true }
@@ -21,6 +32,7 @@ const props = defineProps({
 
 const auth = useAuthStore()
 const router = useRouter()
+const route = useRoute()
 
 const article = ref(null)
 const loading = ref(false)
@@ -35,6 +47,176 @@ const tags = computed(() => (article.value && Array.isArray(article.value.tags) 
 const headings = computed(() =>
   article.value && article.value.content ? parseMarkdownHeadings(article.value.content) : []
 )
+
+// ---------- P1-2 点赞 / 收藏 ----------
+const interaction = reactive({
+  liked: false,
+  favorited: false,
+  likeCount: 0,
+  favoriteCount: 0
+})
+const likeBusy = ref(false)
+const favoriteBusy = ref(false)
+
+// ---------- P1-4 分享卡片 / P1-5 相关文章 ----------
+const shareOpen = ref(false)
+const related = ref([])
+const relatedLoading = ref(false)
+const relatedError = ref('')
+const hashCommentId = ref('')
+
+// ---------- OG meta：分享链接预览（组件卸载时恢复原始值）----------
+const ogOriginal = new Map()
+const OG_PROPERTIES = ['og:title', 'og:description', 'og:image', 'og:url']
+
+function ensureOgMeta(name) {
+  const existing = document.head.querySelector(`meta[property="${name}"]`)
+  if (existing) return { element: existing, created: false }
+  const element = document.createElement('meta')
+  element.setAttribute('property', name)
+  document.head.appendChild(element)
+  return { element, created: true }
+}
+
+function applyOgMeta(data) {
+  if (!data || data.status !== 1) return
+  const origin = window.location.origin
+  const cover = data.cover
+    ? data.cover.startsWith('http')
+      ? data.cover
+      : `${origin}${data.cover.startsWith('/') ? '' : '/'}${data.cover}`
+    : `${origin}${getShareCardUrl(data.id)}`
+  const values = {
+    'og:title': data.title || '',
+    'og:description': plainText(data.summary || data.content, 120),
+    'og:image': cover,
+    'og:url': `${origin}/article/${data.id}`
+  }
+  OG_PROPERTIES.forEach((name) => {
+    const { element, created } = ensureOgMeta(name)
+    if (!ogOriginal.has(name)) {
+      ogOriginal.set(name, {
+        created,
+        content: created ? null : element.getAttribute('content')
+      })
+    }
+    element.setAttribute('content', values[name])
+  })
+}
+
+function restoreOgMeta() {
+  ogOriginal.forEach((original, name) => {
+    const element = document.head.querySelector(`meta[property="${name}"]`)
+    if (!element) return
+    if (original.created) {
+      element.remove()
+    } else if (original.content === null) {
+      element.removeAttribute('content')
+    } else {
+      element.setAttribute('content', original.content)
+    }
+  })
+  ogOriginal.clear()
+}
+
+function readHashCommentId() {
+  const match = /^#comment-(\d+)$/.exec(route.hash || '')
+  hashCommentId.value = match ? match[1] : ''
+}
+
+function syncInteractionFromArticle(data) {
+  interaction.liked = Boolean(data && data.liked)
+  interaction.favorited = Boolean(data && data.favorited)
+  interaction.likeCount = Number(data && data.likeCount) || 0
+  interaction.favoriteCount = Number(data && data.favoriteCount) || 0
+}
+
+async function loadInteraction(id) {
+  try {
+    const data = await getArticleInteraction(id)
+    if (!data) return
+    interaction.liked = Boolean(data.liked)
+    interaction.favorited = Boolean(data.favorited)
+    interaction.likeCount = Number(data.likeCount) || 0
+    interaction.favoriteCount = Number(data.favoriteCount) || 0
+  } catch (err) {
+    // 互动状态是增强信息：失败时保留详情接口带回的计数，不打断阅读
+    console.warn('[article] 互动状态加载失败', err)
+  }
+}
+
+async function loadRelated(id) {
+  relatedLoading.value = true
+  relatedError.value = ''
+  try {
+    const data = await getRelatedArticles(id, 6)
+    related.value = Array.isArray(data) ? data : []
+  } catch (err) {
+    relatedError.value = (err && err.message) || '相关文章加载失败'
+    related.value = []
+  } finally {
+    relatedLoading.value = false
+  }
+}
+
+function requireLoginForInteraction() {
+  if (auth.isLoggedIn) return true
+  pushToast('请先登录后再操作', 'info')
+  router.push({ name: 'login', query: { redirect: route.fullPath } })
+  return false
+}
+
+async function toggleLike() {
+  if (!requireLoginForInteraction() || likeBusy.value || !article.value) return
+  const previous = { liked: interaction.liked, likeCount: interaction.likeCount }
+  const nextLiked = !previous.liked
+  // 乐观更新，失败回滚
+  interaction.liked = nextLiked
+  interaction.likeCount = Math.max(0, previous.likeCount + (nextLiked ? 1 : -1))
+  likeBusy.value = true
+  try {
+    const data = nextLiked
+      ? await likeArticle(article.value.id)
+      : await unlikeArticle(article.value.id)
+    if (data) {
+      interaction.liked = Boolean(data.liked)
+      interaction.likeCount = Number(data.likeCount) || 0
+    }
+  } catch (err) {
+    interaction.liked = previous.liked
+    interaction.likeCount = previous.likeCount
+    console.warn('[article] 点赞操作失败', err)
+  } finally {
+    likeBusy.value = false
+  }
+}
+
+async function toggleFavorite() {
+  if (!requireLoginForInteraction() || favoriteBusy.value || !article.value) return
+  const previous = { favorited: interaction.favorited, favoriteCount: interaction.favoriteCount }
+  const nextFavorited = !previous.favorited
+  interaction.favorited = nextFavorited
+  interaction.favoriteCount = Math.max(
+    0,
+    previous.favoriteCount + (nextFavorited ? 1 : -1)
+  )
+  favoriteBusy.value = true
+  try {
+    const data = nextFavorited
+      ? await favoriteArticle(article.value.id)
+      : await unfavoriteArticle(article.value.id)
+    if (data) {
+      interaction.favorited = Boolean(data.favorited)
+      interaction.favoriteCount = Number(data.favoriteCount) || 0
+    }
+  } catch (err) {
+    interaction.favorited = previous.favorited
+    interaction.favoriteCount = previous.favoriteCount
+    console.warn('[article] 收藏操作失败', err)
+  } finally {
+    favoriteBusy.value = false
+  }
+}
 
 // 阅读进度（0-100）与当前高亮的目录项
 const readingProgress = ref(0)
@@ -96,15 +278,29 @@ async function load() {
   activeHeading.value = -1
   readingProgress.value = 0
   tocOpen.value = false
+  shareOpen.value = false
+  related.value = []
+  relatedError.value = ''
+  relatedLoading.value = false
+  likeBusy.value = false
+  favoriteBusy.value = false
+  syncInteractionFromArticle(null)
   try {
     const data = await getArticle(props.id)
     article.value = data
+    syncInteractionFromArticle(data)
+    readHashCommentId()
     if (data && data.title) document.title = `${data.title} · 技术分享博客`
+    applyOgMeta(data)
     await nextTick()
     scheduleReadingState()
     // MdPreview 渲染 / 封面图加载完成后高度还会变，再校正一次
     window.clearTimeout(readingTimer)
     readingTimer = window.setTimeout(scheduleReadingState, 320)
+    if (data && data.status === 1) {
+      loadInteraction(data.id)
+      loadRelated(data.id)
+    }
   } catch (err) {
     error.value = (err && err.message) || '文章加载失败或不存在'
   } finally {
@@ -124,11 +320,17 @@ onBeforeUnmount(() => {
   window.removeEventListener('resize', scheduleReadingState)
   window.clearTimeout(readingTimer)
   if (scrollFrame) window.cancelAnimationFrame(scrollFrame)
+  restoreOgMeta()
 })
 
 watch(
   () => props.id,
   () => load()
+)
+
+watch(
+  () => route.hash,
+  () => readHashCommentId()
 )
 
 async function confirmDelete() {
@@ -227,6 +429,50 @@ async function confirmDelete() {
             <span v-if="article.updateTime">最后修改 {{ formatDate(article.updateTime) }}</span>
           </div>
 
+          <div v-if="article.status === 1" class="mt-4 flex flex-wrap items-center gap-2">
+            <button
+              type="button"
+              class="sketch-btn sketch-btn-sm min-h-[44px] px-3 text-sm"
+              :class="interaction.liked ? 'border-sketchred text-sketchred' : ''"
+              :aria-pressed="interaction.liked ? 'true' : 'false'"
+              :aria-label="
+                interaction.liked
+                  ? `取消点赞，当前 ${interaction.likeCount} 个赞`
+                  : `点赞，当前 ${interaction.likeCount} 个赞`
+              "
+              :disabled="likeBusy"
+              @click="toggleLike"
+            >
+              <span aria-hidden="true">{{ interaction.liked ? '♥' : '♡' }}</span>
+              点赞 {{ interaction.likeCount }}
+            </button>
+
+            <button
+              type="button"
+              class="sketch-btn sketch-btn-sm min-h-[44px] px-3 text-sm"
+              :class="interaction.favorited ? 'border-sketchyellow text-sketchyellow-deep' : ''"
+              :aria-pressed="interaction.favorited ? 'true' : 'false'"
+              :aria-label="
+                interaction.favorited
+                  ? `取消收藏，当前 ${interaction.favoriteCount} 人收藏`
+                  : `收藏，当前 ${interaction.favoriteCount} 人收藏`
+              "
+              :disabled="favoriteBusy"
+              @click="toggleFavorite"
+            >
+              <span aria-hidden="true">{{ interaction.favorited ? '★' : '☆' }}</span>
+              收藏 {{ interaction.favoriteCount }}
+            </button>
+
+            <button
+              type="button"
+              class="sketch-btn sketch-btn-sm min-h-[44px] px-3 text-sm"
+              @click="shareOpen = true"
+            >
+              分享
+            </button>
+          </div>
+
           <div v-if="canManage" class="mt-4 flex flex-wrap gap-2">
             <RouterLink
               v-if="auth.isAdmin"
@@ -264,6 +510,58 @@ async function confirmDelete() {
           <TagPill v-for="tag in tags" :key="tag.id" :tag="tag" />
         </div>
 
+        <section
+          v-if="article.status === 1 && (relatedLoading || related.length > 0 || relatedError)"
+          class="mt-10 border-t-2 border-dashed border-pencil/40 pt-6"
+          aria-labelledby="related-heading"
+        >
+          <div class="mb-4 flex flex-wrap items-center justify-between gap-2">
+            <h2 id="related-heading" class="font-serif text-2xl italic text-pencil">相关文章</h2>
+            <button
+              v-if="relatedError"
+              type="button"
+              class="sketch-btn sketch-btn-sm min-h-[44px] px-3 text-sm"
+              @click="article && loadRelated(article.id)"
+            >
+              重新加载
+            </button>
+          </div>
+
+          <SketchLoading v-if="relatedLoading" :rows="1" label="正在加载相关文章" />
+
+          <div
+            v-else-if="relatedError"
+            class="border-2 border-dashed border-sketchred/60 bg-paper-soft/70 p-4"
+          >
+            <p class="font-serif text-sm italic text-sketchred" role="alert">{{ relatedError }}</p>
+          </div>
+
+          <div v-else class="grid gap-4 md:grid-cols-3 md:gap-6">
+            <RouterLink
+              v-for="(item, index) in related"
+              :key="item.id"
+              :to="{ name: 'article', params: { id: item.id } }"
+              class="sketch-card p-4 transition-transform duration-150 hover:rotate-[-0.3deg]"
+              :class="index % 2 === 0 ? 'rotate-[-0.2deg]' : 'rotate-[0.2deg]'"
+            >
+              <h3 class="line-clamp-2 font-serif text-base italic text-pencil">{{ item.title }}</h3>
+              <p class="mt-2 font-serif text-xs italic text-ink-300">
+                {{ item.categoryName || '未分类' }} · {{ formatDate(item.createTime) }} · ☕
+                {{ formatViews(item.viewCount) }}
+              </p>
+              <div v-if="item.tags && item.tags.length" class="mt-2 flex flex-wrap gap-1">
+                <span
+                  v-for="tag in item.tags"
+                  :key="tag.id"
+                  class="sketch-badge px-1.5 py-0.5 text-[10px]"
+                >
+                  #{{ tag.name }}
+                </span>
+              </div>
+            </RouterLink>
+          </div>
+        </section>
+
         <nav class="mt-10 grid gap-4 border-t-2 border-dashed border-pencil/40 pt-6 md:grid-cols-2" aria-label="上一篇与下一篇">
           <RouterLink
             v-if="article.prev"
@@ -284,7 +582,11 @@ async function confirmDelete() {
           </RouterLink>
         </nav>
 
-        <CommentSection v-if="article.status === 1" :article-id="article.id" />
+        <CommentSection
+          v-if="article.status === 1"
+          :article-id="article.id"
+          :highlight-comment-id="hashCommentId"
+        />
         <p v-else class="mt-10 border-l-2 border-dashed border-sketchyellow pl-3 font-serif text-sm italic text-sketchyellow-deep">
           这是草稿：发布后才会对读者展示，评论功能也会随之开放。
         </p>
@@ -308,6 +610,8 @@ async function confirmDelete() {
           </SketchButton>
         </template>
       </SketchModal>
+
+      <ShareCardModal v-model="shareOpen" :article="article" />
     </template>
   </div>
 </template>

@@ -627,7 +627,9 @@
   position: relative;
   display: flex;
   flex-direction: column;
-  overflow: hidden;
+  /* 顶部菜单的下拉可能超出编辑器高度（段落菜单较长），不能裁掉；
+     编辑区自身滚动由 .vditor / .typora-editor__body 负责。 */
+  overflow: visible;
   border: 1px solid #d8d0c0;
   border-radius: 6px;
   background-color: #f5f0e8;
@@ -677,6 +679,9 @@
   left: 0;
   z-index: 60;
   min-width: 208px;
+  /* 段落菜单项变多后可能超过编辑器高度：限制高度并允许滚动 */
+  max-height: min(70vh, 520px);
+  overflow-y: auto;
   padding: 4px;
   border: 1px solid #d8d0c0;
   border-radius: 6px;
@@ -1903,4 +1908,64 @@ html.dark .typora-editor .vditor-reset hr:hover {
     #7d7464 7px,
     transparent 7px
   );
+}
+
+/* ==========================================================================
+   P3-2：数学公式 / Mermaid / ECharts（编辑器即时渲染）
+   --------------------------------------------------------------------------
+   Vditor IR 的公式与图表预览都挂在 .vditor-ir__preview 里：公式跟随正文颜色，
+   Mermaid / ECharts 给一张浅色“图表卡”，暗色模式下也保持可读。
+   ========================================================================== */
+
+/* 行内公式跟随正文，别把行高撑得太夸张 */
+.vditor-ir__preview .language-math {
+  max-width: 100%;
+  overflow-x: auto;
+  overflow-y: hidden;
+  vertical-align: middle;
+}
+
+.vditor-ir__preview .language-math .katex,
+.vditor-ir__preview .katex {
+  font-size: 1.05em;
+}
+
+/* 块公式：超宽公式自己横向滚动，不撑破编辑区 */
+.vditor-ir__preview .language-math .katex-display,
+.vditor-ir__preview .katex-display {
+  margin: 0.4em 0;
+  overflow-x: auto;
+  overflow-y: hidden;
+}
+
+/* Mermaid：超宽图横向滚动 */
+.vditor-ir__preview .language-mermaid {
+  max-width: 100%;
+  overflow-x: auto;
+  overflow-y: hidden;
+  text-align: center;
+}
+
+.vditor-ir__preview .language-mermaid svg {
+  display: block;
+  max-width: 100%;
+  margin: 0 auto;
+  height: auto;
+}
+
+/* ECharts：Vditor 默认给 420px 高，这里补圆角，避免图表溢出卡片 */
+.vditor-ir__preview .language-echarts {
+  max-width: 100%;
+  overflow: hidden;
+  border-radius: 4px;
+}
+
+/* 暗色编辑器里 Mermaid / ECharts 仍是浅色主题的 SVG / canvas，
+   给它们一张纸色卡片，避免深色边框与标签糊在暗背景上 */
+html.dark .vditor-ir__preview .language-mermaid,
+html.dark .vditor-ir__preview .language-echarts {
+  padding: 8px;
+  background-color: #faf6ee;
+  border: 1px solid #d8d0c0;
+  border-radius: 6px;
 }

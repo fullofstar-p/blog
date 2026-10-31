@@ -42,6 +42,12 @@ public class Article {
 
     private Integer viewCount;
 
+    /** 点赞数（冗余计数，与 article_like 同步） */
+    private Integer likeCount;
+
+    /** 收藏数（冗余计数，与 article_favorite 同步） */
+    private Integer favoriteCount;
+
     @TableField(fill = FieldFill.INSERT)
     private LocalDateTime createTime;
 

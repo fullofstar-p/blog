@@ -10,10 +10,14 @@ import com.blog.common.ResultCode;
 import com.blog.dto.ArticleSaveDTO;
 import com.blog.dto.ArchiveRowDTO;
 import com.blog.entity.Article;
+import com.blog.entity.ArticleFavorite;
+import com.blog.entity.ArticleLike;
 import com.blog.entity.ArticleTag;
 import com.blog.entity.Category;
 import com.blog.entity.Comment;
 import com.blog.entity.Tag;
+import com.blog.mapper.ArticleFavoriteMapper;
+import com.blog.mapper.ArticleLikeMapper;
 import com.blog.mapper.ArticleMapper;
 import com.blog.mapper.ArticleTagMapper;
 import com.blog.mapper.CategoryMapper;
@@ -26,6 +30,7 @@ import com.blog.service.ArticleTagAssembler;
 import com.blog.service.StatsService;
 import com.blog.vo.ArchiveVO;
 import com.blog.vo.ArticleDetailVO;
+import com.blog.vo.ArticleInteractionVO;
 import com.blog.vo.ArticleSummaryVO;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
@@ -63,6 +68,8 @@ public class ArticleServiceImpl implements ArticleService {
 
     private final ArticleMapper articleMapper;
     private final ArticleTagMapper articleTagMapper;
+    private final ArticleLikeMapper articleLikeMapper;
+    private final ArticleFavoriteMapper articleFavoriteMapper;
     private final TagMapper tagMapper;
     private final CategoryMapper categoryMapper;
     private final CommentMapper commentMapper;
@@ -155,6 +162,120 @@ public class ArticleServiceImpl implements ArticleService {
             yearVO.getMonths().add(monthCount);
         }
         return new ArrayList<>(byYear.values());
+    }
+
+    @Override
+    public ArticleInteractionVO interaction(Long id) {
+        Article article = requirePublishedArticle(id);
+        ArticleInteractionVO vo = new ArticleInteractionVO();
+        vo.setLikeCount(safeCount(article.getLikeCount()));
+        vo.setFavoriteCount(safeCount(article.getFavoriteCount()));
+        LoginUser loginUser = SecurityUtils.getLoginUserOrNull();
+        if (loginUser == null) {
+            vo.setLiked(false);
+            vo.setFavorited(false);
+        } else {
+            vo.setLiked(articleLikeMapper.selectCount(new LambdaQueryWrapper<ArticleLike>()
+                    .eq(ArticleLike::getArticleId, id)
+                    .eq(ArticleLike::getUserId, loginUser.getId())) > 0);
+            vo.setFavorited(articleFavoriteMapper.selectCount(new LambdaQueryWrapper<ArticleFavorite>()
+                    .eq(ArticleFavorite::getArticleId, id)
+                    .eq(ArticleFavorite::getUserId, loginUser.getId())) > 0);
+        }
+        return vo;
+    }
+
+    @Override
+    @Transactional
+    public Map<String, Object> like(Long id) {
+        Article article = requirePublishedArticle(id);
+        Long userId = SecurityUtils.getUserId();
+        int inserted = articleLikeMapper.insertIgnore(id, userId);
+        if (inserted > 0) {
+            articleMapper.update(null, new LambdaUpdateWrapper<Article>()
+                    .eq(Article::getId, id)
+                    .setSql("like_count = like_count + 1"));
+            evictDetailCache(id);
+        }
+        Article latest = articleMapper.selectById(id);
+        int likeCount = latest == null ? safeCount(article.getLikeCount()) : safeCount(latest.getLikeCount());
+        return Map.of("liked", true, "likeCount", likeCount);
+    }
+
+    @Override
+    @Transactional
+    public Map<String, Object> unlike(Long id) {
+        Article article = requirePublishedArticle(id);
+        Long userId = SecurityUtils.getUserId();
+        int removed = articleLikeMapper.delete(new LambdaQueryWrapper<ArticleLike>()
+                .eq(ArticleLike::getArticleId, id)
+                .eq(ArticleLike::getUserId, userId));
+        if (removed > 0) {
+            articleMapper.update(null, new LambdaUpdateWrapper<Article>()
+                    .eq(Article::getId, id)
+                    .setSql("like_count = GREATEST(like_count - 1, 0)"));
+            evictDetailCache(id);
+        }
+        Article latest = articleMapper.selectById(id);
+        int likeCount = latest == null ? safeCount(article.getLikeCount()) : safeCount(latest.getLikeCount());
+        return Map.of("liked", false, "likeCount", likeCount);
+    }
+
+    @Override
+    @Transactional
+    public Map<String, Object> favorite(Long id) {
+        Article article = requirePublishedArticle(id);
+        Long userId = SecurityUtils.getUserId();
+        int inserted = articleFavoriteMapper.insertIgnore(id, userId);
+        if (inserted > 0) {
+            articleMapper.update(null, new LambdaUpdateWrapper<Article>()
+                    .eq(Article::getId, id)
+                    .setSql("favorite_count = favorite_count + 1"));
+            evictDetailCache(id);
+        }
+        Article latest = articleMapper.selectById(id);
+        int favoriteCount = latest == null ? safeCount(article.getFavoriteCount()) : safeCount(latest.getFavoriteCount());
+        return Map.of("favorited", true, "favoriteCount", favoriteCount);
+    }
+
+    @Override
+    @Transactional
+    public Map<String, Object> unfavorite(Long id) {
+        Article article = requirePublishedArticle(id);
+        Long userId = SecurityUtils.getUserId();
+        int removed = articleFavoriteMapper.delete(new LambdaQueryWrapper<ArticleFavorite>()
+                .eq(ArticleFavorite::getArticleId, id)
+                .eq(ArticleFavorite::getUserId, userId));
+        if (removed > 0) {
+            articleMapper.update(null, new LambdaUpdateWrapper<Article>()
+                    .eq(Article::getId, id)
+                    .setSql("favorite_count = GREATEST(favorite_count - 1, 0)"));
+            evictDetailCache(id);
+        }
+        Article latest = articleMapper.selectById(id);
+        int favoriteCount = latest == null ? safeCount(article.getFavoriteCount()) : safeCount(latest.getFavoriteCount());
+        return Map.of("favorited", false, "favoriteCount", favoriteCount);
+    }
+
+    @Override
+    public PageResult<ArticleSummaryVO> myFavorites(int pageNum, int pageSize) {
+        Long userId = SecurityUtils.getUserId();
+        int current = Math.max(1, pageNum);
+        int size = Math.min(Math.max(1, pageSize), 50);
+        long total = articleMapper.selectFavoriteCount(userId);
+        Page<ArticleSummaryVO> page = countSkippedPage(current, size, total);
+        IPage<ArticleSummaryVO> result = articleMapper.selectFavoritePage(page, userId);
+        articleTagAssembler.fill(result.getRecords());
+        return PageResult.of(result);
+    }
+
+    @Override
+    public List<ArticleSummaryVO> related(Long id, int limit) {
+        int limitValue = Math.min(Math.max(1, limit), 12);
+        requirePublishedArticle(id);
+        List<ArticleSummaryVO> list = articleMapper.selectRelated(id, limitValue);
+        articleTagAssembler.fill(list);
+        return list;
     }
 
     @Override
@@ -313,6 +434,9 @@ public class ArticleServiceImpl implements ArticleService {
         }
         articleTagMapper.delete(new LambdaQueryWrapper<ArticleTag>().eq(ArticleTag::getArticleId, id));
         commentMapper.delete(new LambdaQueryWrapper<Comment>().eq(Comment::getArticleId, id));
+        // 彻底删除时同步清理点赞/收藏记录
+        articleLikeMapper.delete(new LambdaQueryWrapper<ArticleLike>().eq(ArticleLike::getArticleId, id));
+        articleFavoriteMapper.delete(new LambdaQueryWrapper<ArticleFavorite>().eq(ArticleFavorite::getArticleId, id));
         statsService.purgeArticleStats(id);
         evictDetailCache(id);
     }
@@ -371,6 +495,8 @@ public class ArticleServiceImpl implements ArticleService {
         }
         articleTagMapper.delete(new LambdaQueryWrapper<ArticleTag>().in(ArticleTag::getArticleId, safeIds));
         commentMapper.delete(new LambdaQueryWrapper<Comment>().in(Comment::getArticleId, safeIds));
+        articleLikeMapper.delete(new LambdaQueryWrapper<ArticleLike>().in(ArticleLike::getArticleId, safeIds));
+        articleFavoriteMapper.delete(new LambdaQueryWrapper<ArticleFavorite>().in(ArticleFavorite::getArticleId, safeIds));
         statsService.purgeArticleStats(safeIds);
         safeIds.forEach(this::evictDetailCache);
         return deleted;
@@ -386,6 +512,19 @@ public class ArticleServiceImpl implements ArticleService {
                 .distinct()
                 .limit(100)
                 .toList();
+    }
+
+    /** 校验并返回已发布文章；草稿/不存在统一 404 */
+    private Article requirePublishedArticle(Long id) {
+        Article article = articleMapper.selectById(id);
+        if (article == null || !Integer.valueOf(1).equals(article.getStatus())) {
+            throw new BusinessException(ResultCode.NOT_FOUND, "文章不存在或未发布");
+        }
+        return article;
+    }
+
+    private int safeCount(Integer value) {
+        return value == null ? 0 : value;
     }
 
     /** 发布状态下正文必填 */

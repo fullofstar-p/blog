@@ -35,7 +35,7 @@
 │       │   ├── common/       # Result / PageResult / 异常 / 全局处理
 │       │   ├── config/       # MyBatis-Plus / Redis / Security / S3 / MinIO 初始化 / Knife4j
 │       │   ├── security/     # JWT 工具、过滤器、UserDetails、SecurityUtils
-│       │   ├── entity/       # 7 张表实体
+│       │   ├── entity/       # 实体（10 个类，对应 12 张表）
 │       │   ├── mapper/       # Mapper 接口（复杂 SQL 用 XML）
 │       │   ├── dto/ vo/      # 入参 / 出参
 │       │   ├── service/      # 业务接口与实现
@@ -93,6 +93,14 @@ docker compose up -d --build        # Docker
 对应环境变量：`ADMIN_USERNAME`、`ADMIN_PASSWORD`。
 
 初始化顺序：MySQL 首次启动执行 `sql/init.sql`（建库建表 + 演示分类/标签）→ 后端启动时自动创建管理员、创建 MinIO bucket 并设置公共读 → 前端 Nginx 托管静态资源并代理 `/api`。
+
+**已有数据库升级**（不要重复执行 `sql/init.sql`，它会 DROP 表）：P1-1 楼中楼/通知、P1-2 点赞收藏执行一次
+`sql/upgrade-2026-11-p1-community.sql`；内容看板执行 `sql/upgrade-2026-11-p1-8-dashboard.sql`；
+回收站执行 `sql/upgrade-2026-10-p0-8-recycle.sql`。全新库直接用 `sql/init.sql` 即可，已包含全部变更。
+
+> **分享卡片字体**：P1-4 的服务端 PNG 依赖中文字体。`backend/Dockerfile` 运行镜像已改为
+> `eclipse-temurin:17-jre-jammy` 并安装 `fontconfig` + `fonts-noto-cjk`、启用
+> `-Djava.awt.headless=true`；本机直接跑 jar 时使用系统字体（Windows 回退微软雅黑）。
 
 ## 环境变量
 
@@ -192,7 +200,11 @@ node scripts/smoke-api.mjs   # 认证/文章/搜索/评论/上传/管理端 40 �
 - **分页性能**：列表/搜索的 COUNT 单独走 `selectSummaryCount` / `selectSearchCount`，标签改为按当前页 `articleId` 批量查询（`ArticleTagAssembler`），不再在列表 SQL 里用相关子查询聚合标签。这样分页插件不会把复杂 SQL 包成 `SELECT COUNT(*) FROM (整段查询)` 全量执行——这是之前文章分页约 5s 的根因。3 万篇文章实测首页约 0.3s。
 - **对象存储**：`FileStorageService` 接口 + `MinioFileStorageService` 实现，底层 `S3Client`，配置 `endpoint/access-key/secret-key/bucket/public-endpoint`；上传限制 jpg/jpeg/png/webp/gif，最大 5 MB。
 - **搜索抽象**：`SearchService` 接口，当前 `MysqlSearchService` 用 LIKE + 相关度权重（标题 5 / 摘要 3 / 标签 2 / 正文 1），预留 Elasticsearch 实现位；表上已建 ngram 全文索引，可平滑升级。
-- **评论**：两级树，待审核/通过/拒绝状态，管理端审核；点赞用 Redis Set 去重，支持取消点赞（`DELETE` 幂等），`CommentVO.liked` 返回当前用户的点赞状态。
+- **评论**：楼中楼（`parent_id` 直接父评论、`root_id` 楼层根、`depth` 最多 5 层，可「回复 @昵称」），待审核/通过/拒绝状态，管理端审核；审核通过时按根评论/回复/审核结果分别给文章作者、被回复人、评论作者发站内通知。点赞用 Redis Set 去重，支持取消点赞（`DELETE` 幂等），`CommentVO.liked` 返回当前用户的点赞状态。
+- **点赞 / 收藏**：文章 `like_count` / `favorite_count` 冗余计数，`article_like` / `article_favorite` 以 `(article_id, user_id)` 唯一键保证幂等；点赞/收藏/取消后主动失效详情缓存。接口提供互动状态、点赞/收藏/取消与「我的收藏」分页；文章详情操作条支持乐观更新与失败回滚。
+- **相关文章（P1-5）**：共同标签数 × 3 + 同分类 + 2 排序，再按发布时间倒序；排除自身/草稿/回收站，无共同标签/分类时退化为最新已发布文章，文章详情正文下方展示 3 列卡片。
+- **分享卡片（P1-4）**：`GET /api/articles/{id}/share-card.png` 用 Java2D 生成 1200×630 纸张风 PNG（标题/摘要/分类/标签/作者/日期/站点名），仅已发布文章可生成、缓存 1 小时；前台分享弹窗支持预览、复制链接、下载 PNG、系统分享，并动态写入 OG meta。
+- **公式 / Mermaid / 图表（P3-2）**：编辑器「段落」菜单可插入公式、Mermaid、ECharts；阅读页用本地 KaTeX / Mermaid / ECharts 渲染（复用 Vditor 自带的 `/vditor/dist/js/*` 资源，不新增 npm 依赖、不请求 CDN），Mermaid / ECharts 主题跟随亮暗色。
 - **回收站**：文章删除改为逻辑删除（`deleted=1` + `deleted_time`，保留文章标签关联），管理端 `GET /api/admin/articles/recycle` 分页查看，`PUT /{id}/restore` 恢复、`DELETE /{id}/purge` 彻底删除（同时清理标签关联与评论）；列表 / 搜索 / 归档 / 详情 / 上下篇统一过滤已删除文章，删除与恢复时主动失效详情缓存。
 - **内容看板（P1-8）**：访问已发布文章详情时在 Redis 记录当日 PV、UV（HyperLogLog，登录用户按 ID、匿名按 IP + UA 哈希，不存原始 IP）与文章每日阅读量，`StatsSyncTask` 每 60 秒落库到 `site_daily_stat` / `article_daily_stat`；`GET /api/admin/stats/dashboard` 返回今日/区间 PV/UV、阅读趋势、热门文章和过去一年每日发布热力图（含当前/最长连续发布天数）。每日阅读数据从该版本上线后开始采集，之前的历史只有文章总阅读量。
 
@@ -205,6 +217,10 @@ node scripts/smoke-api.mjs   # 认证/文章/搜索/评论/上传/管理端 40 �
 - **自动保存草稿**：编辑器内容变化后 700ms 防抖写 `localStorage`，草稿每 15 秒写回服务端（`status=0`）；新文章首次自动保存会创建草稿并记住 ID，已发布文章只保留本地草稿、不改线上内容；刷新/重进可恢复本地草稿，关闭页面或站内跳转会提示未保存修改（详见 [frontend/README.md](frontend/README.md)）。
 - **内容看板**：后台默认首页 `/admin/dashboard`，包含今日/区间 PV/UV 概览、近 7/30/90 天 PV/UV 折线图（SVG，悬停看当天数据）、热门文章榜，以及 GitHub 贡献图样式的「发布热力图」（过去一年 53 周 × 7 天，5 级着色，悬停显示日期与发布数，附当前/最长连续天数）。
 - **批量管理**：文章管理支持当前页全选/半选、批量置顶/取消置顶、批量删除（进回收站）；回收站支持批量恢复、批量彻底删除（同时清理标签、评论与每日统计）。切换筛选/重置/翻页时保留列表并半透明刷新，只有首次进入才显示骨架屏，不再闪烁。
+- **消息通知（P1-1）**：顶栏铃铛 + 未读角标（60 秒轮询 + 路由切换刷新），`/notifications` 支持全部/未读筛选、手动全部已读、点击单条标记已读并按 `#comment-{id}` 跳转到评论锚点；通知页与头部共享未读状态。
+- **互动与收藏（P1-2）**：文章标题下方「点赞 / 收藏 / 分享」操作条（乐观更新、失败回滚、未登录跳登录），个人中心新增「我的收藏」tab（分页、取消收藏、空态）；评论区支持任意层级楼中楼，回复显示「回复 @昵称」，第 5 层后禁止继续回复。
+- **相关文章与分享（P1-4 / P1-5）**：正文下方 3 列相关文章卡片（移动端 1 列）；分享弹窗预览服务端生成的 1200×630 PNG，支持复制链接、下载 PNG、系统分享，并动态注入 OG meta。
+- **公式 / Mermaid / 图表（P3-2）**：编辑器「段落」菜单新增「公式」「Mermaid 图」「图表（ECharts）」；阅读页用本地 KaTeX 渲染行内/块公式，自定义接管 Mermaid SVG 与 ECharts Canvas（严格 JSON，非法配置回退源码）；全部资源来自 `public/vditor/dist/js`，断网/无 CDN 仍可渲染，Mermaid/ECharts 主题跟随亮暗色，宽图横向滚动。
 - Markdown：后台写文章用 Vditor 的**即时渲染（IR）**内核 + **Typora 式外壳**——顶部「文件 / 编辑 / 段落 / 格式 / 视图」菜单栏代替图标工具栏，「文件」菜单支持新建、导入 / 导出 Markdown（也可以把 `.md` 文件直接拖进编辑器）、导出独立 HTML 与直接下载的 PDF（浏览器端按块分页 + SVG foreignObject 原生渲染，不弹打印框，300 页约 10s；长文档的 Markdown 文本会缓存、大纲/字数走防抖，十几万字导入与切换源码模式不再反复全量序列化，详见 [frontend/README.md](frontend/README.md)），右侧「大纲」展开标题侧栏（点击跳转、随滚动高亮）、「源码」在 IR / SV 之间切换（`Ctrl+/`）、「全屏」铺满视口（优先 Fullscreen API，被拒时退回 CSS 全屏）；表格悬停时在表格左上角浮出一排图标按钮（插入/删除行列、删除整张表格，带 tooltip）；代码块右下角可直接点选语言（常用语言下拉），代码块内 `Tab` / `Shift+Tab` 缩进；底部状态栏显示当前模式与实时字数；快捷键沿用 Typora（`Ctrl+1~6`/`Ctrl+0` 标题、`Ctrl+B` 粗体、`Ctrl+I` 斜体、`Ctrl+K` 链接）。Markdown 快捷输入与 Typora 一致：`#` + 空格渲染标题、`-` + 空格渲染列表、```` + 回车渲染代码块、表格源码（表头 + `---` 分隔行）回车后转成真正的表格。手写 `2.` + 空格时保留起始序号（同时写 `ol` 的 `start` / `data-marker` 与 `li` 的 `data-marker`，存成 Markdown 也是 `2.`），被代码块等隔断的有序列表不会又回到 1，回车继续编号 3、4；已经在列表项里时不接管空格，避免改坏原列表。行内标记即时渲染：输入完 `**加粗**`、`` `行内代码` `` 的闭合标记后立刻收起源标记，选中文字用「格式」菜单或 `Ctrl+B/I/U` 也只显示渲染结果（Vditor 默认要再按空格或方向键才收起），光标进入节点内部时标记会自动展开方便改源码。代码块编辑态也直接渲染成高亮代码：预览层始终显示并决定高度，可编辑的源码层透明叠在上面，输入时看到的就是高亮后的代码，展开/收起高度不变、不会再跳动；围栏反引号与顶部语言行不显示，语言标识在右下角（新建时输入语言也显示在同一位置），悬停代码块右上角出现复制按钮、提示在按钮右侧；单行与多行代码块的复制/语言按钮不会再重叠。语言按钮和下拉改成了带图标的列表：品牌色图标 + 完整语言名，下拉样式与顶部菜单一致，单击出列表、双击变成输入框可手写任意语言标识（输入框直接在按钮原位、同尺寸显示，不会重叠）；语言栏里按 `Backspace` 不会再插出空行（Vditor 原本会在标记开头插入段落）。代码块底色是纯纸张色（`#efe9db`），Vditor 自带的那张 20×20 网格底图已去掉，阅读页同样处理。水平分隔线（`---` + 回车生成的 hr）在 IR 模式下不可编辑，Vditor 只在 Firefox 里处理相邻删除，Chromium 下删不掉：这里补上单击选中（蓝色高亮）后按 `Backspace` / `Delete` 删除，以及光标在 hr 后一段开头按 `Backspace`、前一段末尾按 `Delete` 删除，hr 加高到 13px 方便点中，删除后 Markdown 与撤销/重做正常同步。正文排版参考 **Typora**：系统无衬线字体、粗体标题、实线细边框、灰底代码块与 GitHub 高亮配色，但底色仍用站点纸张色（`#f5f0e8` / 代码块 `#efe9db`），不再使用纯白。前台阅读页把正文放进一张**纸张页面卡片**（`src/styles/markdown-reading.css`：纸张底 `#faf6ee`、1px 浅灰实线、小圆角、860px 居中），代码块沿用 `markdown.css` 的纸色（`#efe9db`、14px、无边框），`markdown-reading.css` 只补代码块 chrome（语言名在右下角、复制按钮悬停出现在右上角）；代码高亮走**本地 highlight.js + GitHub 浅色主题**（`public/highlight/github.css` 由 `scripts/copy-vditor.mjs` 生成），不再从 unpkg 拉 CDN，离线也有高亮。页面其它外壳仍是手绘纸张风。阅读页还带右侧 sticky 目录（点击平滑跳转、滚动时高亮当前标题，窄屏为右下角「目录」抽屉）和顶部 3px 阅读进度条。另外修复了编辑页「正文模块不见了」：编辑已有文章时 `loading` 初始为 `true`，数据回来前不挂载表单，避免 `MarkdownEditor` 在 Vditor 初始化完成前被卸载销毁而抛错。
 
 ## 接口文档

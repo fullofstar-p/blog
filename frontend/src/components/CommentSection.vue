@@ -1,5 +1,5 @@
 <script setup>
-import { computed, onMounted, ref, watch } from 'vue'
+import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import CommentItem from './CommentItem.vue'
 import SketchEmpty from './SketchEmpty.vue'
@@ -10,7 +10,9 @@ import { useAuthStore } from '@/store/auth'
 import { toastError, toastSuccess } from '@/utils/toast'
 
 const props = defineProps({
-  articleId: { type: [String, Number], required: true }
+  articleId: { type: [String, Number], required: true },
+  // 通知跳转带 #comment-{id} 时，滚动并短暂高亮目标评论
+  highlightCommentId: { type: [String, Number], default: null }
 })
 
 const auth = useAuthStore()
@@ -25,6 +27,39 @@ const submitting = ref(false)
 const submitted = ref(false)
 const deleteTarget = ref(null)
 const deleting = ref(false)
+const highlightedId = ref(null)
+let highlightTimer = 0
+let lastHandledHighlight = null
+
+/** 滚动到通知指向的评论，并短暂高亮；同一目标只处理一次，避免刷新时反复跳动 */
+async function scrollToHighlight() {
+  const target = props.highlightCommentId
+  if (!target) {
+    highlightedId.value = null
+    return
+  }
+  const key = String(target)
+  if (lastHandledHighlight === key) return
+  await nextTick()
+  const element = document.getElementById(`comment-${key}`)
+  if (!element) {
+    highlightedId.value = null
+    return
+  }
+  lastHandledHighlight = key
+  highlightedId.value = key
+  const reduceMotion =
+    typeof window.matchMedia === 'function' &&
+    window.matchMedia('(prefers-reduced-motion: reduce)').matches
+  const header = document.querySelector('header')
+  const offset = (header ? header.offsetHeight : 0) + 24
+  const top = element.getBoundingClientRect().top + window.scrollY - offset
+  window.scrollTo({ top: Math.max(0, top), behavior: reduceMotion ? 'auto' : 'smooth' })
+  window.clearTimeout(highlightTimer)
+  highlightTimer = window.setTimeout(() => {
+    highlightedId.value = null
+  }, 3200)
+}
 
 async function load() {
   loading.value = true
@@ -38,10 +73,22 @@ async function load() {
   } finally {
     loading.value = false
   }
+  scrollToHighlight()
 }
 
 onMounted(load)
 watch(() => props.articleId, load)
+watch(
+  () => props.highlightCommentId,
+  () => {
+    lastHandledHighlight = null
+    scrollToHighlight()
+  }
+)
+
+onBeforeUnmount(() => {
+  window.clearTimeout(highlightTimer)
+})
 
 function goLogin() {
   router.push({ name: 'login', query: { redirect: router.currentRoute.value.fullPath } })
@@ -193,6 +240,7 @@ function countComments(list) {
           :key="comment.id"
           :comment="comment"
           :depth="0"
+          :highlight-comment-id="highlightedId"
           @replied="onReplyPosted"
           @delete="askDelete"
           @liked="onLiked"
@@ -206,7 +254,7 @@ function countComments(list) {
       @update:model-value="deleteTarget = null"
     >
       <p class="font-serif text-sm leading-relaxed text-ink-700">
-        确定要删除这条评论吗？删除后不可恢复。
+        确定要删除这条评论吗？它下面的所有回复也会一并删除，且不可恢复。
       </p>
       <template #footer>
         <button type="button" class="sketch-btn min-h-[44px] px-4" @click="deleteTarget = null">

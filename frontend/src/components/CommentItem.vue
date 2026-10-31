@@ -8,7 +8,9 @@ import { pushToast, toastError, toastSuccess } from '@/utils/toast'
 
 const props = defineProps({
   comment: { type: Object, required: true },
-  depth: { type: Number, default: 0 }
+  depth: { type: Number, default: 0 },
+  // 通知跳转高亮：任意层级的目标评论都能被识别
+  highlightCommentId: { type: [String, Number], default: null }
 })
 
 const emit = defineEmits(['replied', 'delete', 'liked'])
@@ -39,6 +41,14 @@ watch(
 
 const replies = computed(() => (Array.isArray(props.comment.replies) ? props.comment.replies : []))
 const isReply = computed(() => props.depth > 0)
+// 后端最多 5 层（depth 0-4），到第 5 层后不再允许继续回复
+const canReply = computed(() => props.depth < 4)
+const isHighlighted = computed(
+  () =>
+    props.highlightCommentId !== null &&
+    props.highlightCommentId !== undefined &&
+    String(props.comment.id) === String(props.highlightCommentId)
+)
 const canDelete = computed(() =>
   Boolean(auth.user && (auth.user.id === props.comment.userId || auth.isAdmin))
 )
@@ -69,10 +79,8 @@ async function submitReply() {
 
   submitting.value = true
   try {
-    const parentId = isReply.value
-      ? props.comment.parentId || props.comment.id
-      : props.comment.id
-    await createComment({ articleId: props.comment.articleId, parentId, content })
+    // 楼中楼：parentId 直接指向被回复的那条评论（后端负责 rootId / depth / 通知）
+    await createComment({ articleId: props.comment.articleId, parentId: props.comment.id, content })
     toastSuccess('回复已提交，审核通过后展示')
     replyText.value = ''
     replyOpen.value = false
@@ -107,8 +115,12 @@ async function onLike() {
 
 <template>
   <article
-    class="border-l-2 border-dashed border-pencil/40 pl-3 sm:pl-4"
-    :class="isReply ? 'ml-2 sm:ml-6' : ''"
+    :id="`comment-${comment.id}`"
+    class="border-l-2 border-dashed pl-3 sm:pl-4"
+    :class="[
+      isReply ? 'ml-2 sm:ml-6' : '',
+      isHighlighted ? 'border-sketchyellow bg-sketchyellow/10' : 'border-pencil/40'
+    ]"
   >
     <div class="flex gap-3">
       <div class="shrink-0">
@@ -137,6 +149,11 @@ async function onLike() {
           </span>
         </div>
 
+        <p v-if="comment.replyToNickname" class="mt-1 font-serif text-xs italic text-ink-300">
+          回复
+          <span class="text-sketchblue">@{{ comment.replyToNickname }}</span>
+        </p>
+
         <p class="mt-1 whitespace-pre-line font-serif text-sm leading-relaxed text-ink-700">
           {{ comment.content }}
         </p>
@@ -160,9 +177,16 @@ async function onLike() {
           </button>
 
           <button
-            v-if="!isReply"
             type="button"
-            class="inline-flex min-h-[44px] items-center border-2 border-dashed border-transparent px-2 font-serif text-xs italic text-ink-500 transition-colors hover:border-pencil/50 hover:bg-pencil hover:text-paper"
+            class="inline-flex min-h-[44px] items-center border-2 border-dashed border-transparent px-2 font-serif text-xs italic text-ink-500 transition-colors"
+            :class="
+              canReply
+                ? 'hover:border-pencil/50 hover:bg-pencil hover:text-paper'
+                : 'cursor-not-allowed opacity-50'
+            "
+            :disabled="!canReply"
+            :title="canReply ? '回复这条评论' : '最多支持 5 层回复'"
+            :aria-label="canReply ? `回复 ${comment.nickname || '这条评论'}` : '已达最大回复层级'"
             @click="toggleReply"
           >
             回复
@@ -216,6 +240,7 @@ async function onLike() {
             :key="reply.id"
             :comment="reply"
             :depth="depth + 1"
+            :highlight-comment-id="highlightCommentId"
             @replied="emit('replied')"
             @delete="(id) => emit('delete', id)"
             @liked="(payload) => emit('liked', payload)"

@@ -76,6 +76,10 @@ admin:
   username: ${ADMIN_USERNAME:admin}
   password: ${ADMIN_PASSWORD:admin123456}
 
+blog:
+  # 分享卡片底部展示的站点名
+  site-name: ${BLOG_SITE_NAME:技术分享博客}
+
 springdoc:
   api-docs:
     enabled: true

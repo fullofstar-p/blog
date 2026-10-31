@@ -5,6 +5,7 @@ import 'vditor/dist/index.css'
 import { uploadFile } from '@/api/file'
 import { enhanceVditor } from '@/components/vditorEnhance'
 import {
+  INSERT_SNIPPETS,
   MENUS,
   activeHeadingIndex,
   canExitSourceFast,
@@ -39,6 +40,8 @@ import { countArticle } from '@/utils/wordCount'
  * - 视图菜单可在左侧打开「大纲」、切换「源码模式」（IR ↔ SV）、全屏；
  * - 底部状态栏显示当前模式与字数；表格旁浮出插入/删除行列与删除表格的图标条；
  * - 加粗/斜体/链接等快捷键沿用 Typora（Ctrl+B / Ctrl+I / Ctrl+K / Ctrl+/）。
+ * - P3-2：「段落」菜单可插入公式（KaTeX）、Mermaid 图、ECharts 图表模板；
+ *   数学公式与图表预览全部使用本地 /vditor/dist 资源，离线也能渲染。
  *
  * 菜单命令统一委托给 typoraChrome.js，内部点击 Vditor 自己的隐藏按钮，
  * 这样 Markdown 语法处理、撤销栈、选区行为仍是 Vditor 原生实现；
@@ -272,8 +275,28 @@ function run(cmd) {
     fileInput.value && fileInput.value.click()
     return
   }
+  if (cmd === 'math' || cmd === 'mermaid' || cmd === 'echarts') {
+    insertSnippet(INSERT_SNIPPETS[cmd])
+    return
+  }
   if (!vditor) return
   runCommand(vditor, cmd)
+  vditor.focus()
+  scheduleOutline(260)
+}
+
+/**
+ * 在光标处插入块级模板（公式 / Mermaid / ECharts）。
+ * 前后各补一个换行，避免模板和当前段落黏在一起；Vditor 会把插入文本
+ * 当作输入处理，IR 里的公式预览与图表预览会随之自动渲染。
+ */
+function insertSnippet(snippet) {
+  if (!vditor || !snippet) return
+  try {
+    vditor.insertValue(`\n${snippet}\n`)
+  } catch (error) {
+    console.warn('[markdown] 插入模板失败', error)
+  }
   vditor.focus()
   scheduleOutline(260)
 }
@@ -859,7 +882,17 @@ onMounted(() => {
     lang: 'zh_CN',
     icon: 'ant',
     theme: 'classic',
-    preview: { mode: 'editor' },
+    // P3-2：公式用 KaTeX；图片/代码块/公式块预览打开。
+    // Mermaid 与 ECharts 的图表预览由 codeBlockPreview + 本地 /vditor/dist/js 运行时渲染。
+    preview: {
+      mode: 'editor',
+      math: { engine: 'KaTeX' },
+      markdown: {
+        inlineMath: true,
+        mathBlockPreview: true,
+        codeBlockPreview: true
+      }
+    },
     cdn: '/vditor',
     cache: { enable: false },
     counter: { enable: false },

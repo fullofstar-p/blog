@@ -6,7 +6,9 @@
 
 | 验证项 | 结果 |
 | ---- | ---- |
-| API 冒烟（`scripts/smoke-api.mjs`） | 37 / 37 通过（新增点赞取消 3 项断言后共 40 项，待重跑） |
+| API 冒烟（`scripts/smoke-api.mjs`） | 37 / 37 通过（旧脚本；本次新增互动/通知等由下方 P1 冒烟覆盖） |
+| P1-1 / P1-2 / P1-4 / P1-5 API 冒烟（2026-10-31） | 26 / 26 通过：点赞/收藏幂等、收藏分页、相关文章、分享卡片 PNG 1200×630 + 缓存头 + 404、5 层楼中楼、递归删除、通知生成/未读/已读/越权 403 |
+| P1 / P3-2 前端 E2E（无头 Edge，2026-10-31） | 20 / 20 通过：动作条、相关文章、分享弹窗、通知页、收藏夹、暗色/移动端、KaTeX/Mermaid/ECharts、编辑器菜单与 IR 公式、无 CDN 请求 |
 | 页面渲染冒烟（jsdom 加载 `frontend/dist`） | 前台 11 项 + 管理端 9 项通过 |
 | 对象存储公共读 URL（联调时用 MinIO 便携版验证） | HTTP 200，越权删除返回 403 |
 | JWT 刷新 / 登出黑名单 | 刷新后旧 accessToken 立即失效 |
@@ -43,6 +45,9 @@ docker compose -f docker-compose.infra.yml up -d
 - **已有数据库升级**：
   - 回收站：执行一次 `sql/upgrade-2026-10-p0-8-recycle.sql`（新增 `article.deleted_time` 与索引）
   - 内容看板：执行一次 `sql/upgrade-2026-11-p1-8-dashboard.sql`（新增 `site_daily_stat` / `article_daily_stat`）
+  - P1-1 楼中楼/通知 + P1-2 点赞收藏：执行一次 `sql/upgrade-2026-11-p1-community.sql`
+    （`comment` 新增 `root_id/reply_to_user_id/depth`，新增 `notification` / `article_like` /
+    `article_favorite`，`article` 新增 `like_count/favorite_count`）
   - 新的 `init.sql` 已包含上述变更，全新库无需执行
 - 对象存储默认用 **RustFS**（S3 兼容，带 Web 控制台）：MinIO 社区版已停止发布镜像，
   2026-09-11 Docker Hub 上的 `minio/minio` / `minio/mc` 全部下架；后端只用标准 S3 API，不感知存储实现。
@@ -100,6 +105,9 @@ mkdir .dev\mysql-data -Force
 - 优先用 Docker：`docker run -d --name blog-redis -p 6379:6379 redis:7-alpine`
 - 或 Memurai（Windows 原生 Redis 兼容服务）
 - 说明：本机受限沙箱里 cygwin/msys2 版 Redis 会因命名管道被禁用而启动失败，联调时改用纯 Java 的 `jedis-mock` 作为替身；**生产/正常开发请使用真实 Redis 7**。此时启动后端需加 `--management.health.redis.enabled=false`（jedis-mock 的 `INFO` 字段不完整，会让 actuator 健康检查误报 DOWN），真实 Redis 不需要这个参数。
+- **分享卡片字体（P1-4）**：`GET /api/articles/{id}/share-card.png` 用 Java2D 渲染中文，本机直接跑
+  jar 时使用系统字体（Windows 回退微软雅黑）；Docker 运行镜像已安装
+  `fontconfig` + `fonts-noto-cjk` 并加 `-Djava.awt.headless=true`，容器内无需额外配置。
 
 **MinIO**
 

@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
 <!--
-  评论 Mapper：前台已通过评论（组装两级树）与后台分页联查。
+  评论 Mapper：前台已通过评论（递归组装楼中楼）与后台分页联查。
 -->
 <mapper namespace="com.blog.mapper.CommentMapper">
 
@@ -12,6 +12,10 @@
         <result column="nickname" property="nickname"/>
         <result column="avatar" property="avatar"/>
         <result column="parent_id" property="parentId"/>
+        <result column="root_id" property="rootId"/>
+        <result column="reply_to_user_id" property="replyToUserId"/>
+        <result column="reply_to_nickname" property="replyToNickname"/>
+        <result column="depth" property="depth"/>
         <result column="content" property="content"/>
         <result column="like_count" property="likeCount"/>
         <result column="create_time" property="createTime"/>
@@ -28,19 +32,28 @@
         c.article_id,
         c.user_id,
         c.parent_id,
+        c.root_id,
+        c.reply_to_user_id,
+        c.depth,
         c.content,
         c.like_count,
         c.create_time,
         COALESCE(u.nickname, u.username) AS nickname,
-        u.avatar
+        u.avatar,
+        COALESCE(ru.nickname, ru.username) AS reply_to_nickname
     </sql>
 
-    <!-- 前台：某篇文章下已通过的评论（一级 + 二级），由 Service 组装树 -->
+    <sql id="CommentJoins">
+        LEFT JOIN `user` u ON u.id = c.user_id
+        LEFT JOIN `user` ru ON ru.id = c.reply_to_user_id
+    </sql>
+
+    <!-- 前台：某篇文章下已通过的评论（任意层级），由 Service 递归组装树 -->
     <select id="selectApprovedByArticle" resultMap="CommentVOMap">
         SELECT
         <include refid="CommentColumns"/>
         FROM comment c
-        LEFT JOIN `user` u ON u.id = c.user_id
+        <include refid="CommentJoins"/>
         WHERE c.article_id = #{articleId}
           AND c.status = 1
         ORDER BY c.create_time ASC, c.id ASC
@@ -54,7 +67,7 @@
         a.title AS article_title,
         u.username AS username
         FROM comment c
-        LEFT JOIN `user` u ON u.id = c.user_id
+        <include refid="CommentJoins"/>
         LEFT JOIN article a ON a.id = c.article_id
         <where>
             <if test="status != null">

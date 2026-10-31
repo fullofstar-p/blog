@@ -10,6 +10,8 @@ Vue 3 + Vite + Tailwind CSS 实现的手绘素描本（Sketch Style）博客前�
 - Tailwind CSS 3（自绘手写体主题，不依赖重型 UI 库）
 - Axios（统一请求/响应拦截器）
 - Vditor（正文即时渲染编辑，支持 wysiwyg / ir / sv 三种模式）+ md-editor-v3（详情页预览）+ highlight.js（代码高亮）
+- KaTeX / Mermaid / ECharts：阅读页复用 Vditor 自带的本地运行时资源（`public/vditor/dist/js/{katex,mermaid,echarts}`），
+  不新增 npm 依赖，离线可用
 - ESLint + Prettier
 
 ## 常用命令
@@ -96,6 +98,37 @@ src/
 - **列表不闪烁**：首次加载才显示骨架屏，之后筛选/重置/翻页/操作后刷新时保留现有表格并加
   `opacity-60` + `aria-busy`，表头显示「更新中…」，不会再出现「表格 → 骨架屏 → 表格」的闪烁。
   文章管理、回收站、评论审核、用户管理都已改为该模式。
+
+## 社区互动（P1-1 / P1-2）
+
+- **楼中楼评论**：`CommentItem` 递归渲染任意层级（后端最多 5 层）；任意层级都可回复，
+  回复显示「回复 @昵称」；第 5 层按钮禁用并提示；通知跳转带 `#comment-{id}` 时
+  `CommentSection` 会滚动到目标评论并短暂高亮（`prefers-reduced-motion` 下瞬时滚动）。
+- **消息通知**：顶栏铃铛 + 未读角标，60 秒轮询 + 路由切换刷新；`/notifications`
+  支持全部/未读筛选、分页、手动「全部已读」、点击单条标记已读并跳文章评论锚点。
+  通知页与头部共享 `api/notification.js` 里的未读 reactive 状态。
+- **点赞 / 收藏**：文章详情标题下操作条（♥ 点赞 / ☆ 收藏 / 分享），乐观更新、失败回滚、
+  未登录跳登录；个人中心新增「我的收藏」tab（`?tab=favorites` 深链、分页、取消收藏、空态）。
+- **相关文章**：正文下方 3 列卡片（移动端 1 列），显示分类/日期/阅读量/标签。
+- **分享卡片**：`ShareCardModal` 预览 `/api/articles/{id}/share-card.png`（1200×630），
+  支持复制链接（Clipboard API + execCommand 回退）、下载 PNG、`navigator.share` 系统分享；
+  文章页动态写入 `og:title/og:description/og:image/og:url`，卸载时恢复。
+
+## 公式 / Mermaid / 图表（P3-2）
+
+- 编辑器「段落」菜单新增「公式」「Mermaid 图」「图表（ECharts）」三项，插入模板后由 Vditor 原生预览；
+  Vditor 显式配置 `preview.math = { engine: 'KaTeX' }`、`mathBlockPreview` / `codeBlockPreview`。
+- 阅读页 `MarkdownViewer`：
+  - KaTeX 用本地 `/vditor/dist/js/katex/katex.min.js` + CSS（含字体）；
+  - **Mermaid** 关闭 md-editor 自带插件（`:no-mermaid="true"`），自己扫描 `code.language-mermaid`，
+    加载本地 mermaid.min.js，用两参数 `mermaid.render(id, code)` 渲染成 SVG 图表卡；
+  - **ECharts** 没有 md-editor 钩子，同样自定义接管：扫描 `code.language-echarts`，解析严格 JSON
+    后渲染 `.p32-echarts` Canvas；非法 JSON / 加载失败保留源码块；
+  - `:no-iconfont="true"` 避免 md-editor 从 `at.alicdn.com` 拉图标字体；
+  - 扫描逻辑用 `data-p32-chart` 标记 + `scanning/scanAgain` 补扫，兼容 md-editor 重渲染；
+  - Mermaid 主题跟随站点亮/暗色，宽图按 viewBox 自然宽度横向滚动，移动端页面不横向溢出。
+- 所有资源由 `scripts/copy-vditor.mjs` 从 Vditor dist 拷贝（`js/katex`、`js/mermaid`、`js/echarts`），
+  `predev`/`prebuild` 自动执行；`public/vditor` 已 gitignore。
 
 ## Markdown / 代码高亮
 
