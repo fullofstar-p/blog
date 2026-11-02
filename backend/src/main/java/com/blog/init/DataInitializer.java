@@ -1,6 +1,8 @@
 package com.blog.init;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.blog.constant.SecurityConstants;
+import com.blog.constant.UserConstants;
 import com.blog.entity.User;
 import com.blog.mapper.UserMapper;
 import lombok.RequiredArgsConstructor;
@@ -34,7 +36,7 @@ public class DataInitializer implements ApplicationRunner {
     @Override
     public void run(ApplicationArguments args) {
         Long adminCount = userMapper.selectCount(
-                new LambdaQueryWrapper<User>().eq(User::getRole, "ADMIN"));
+                new LambdaQueryWrapper<User>().eq(User::getRole, SecurityConstants.ROLE_ADMIN));
         if (adminCount != null && adminCount > 0) {
             log.info("已存在 ADMIN 账号，跳过初始管理员创建");
             return;
@@ -43,8 +45,8 @@ public class DataInitializer implements ApplicationRunner {
         admin.setUsername(adminUsername);
         admin.setPassword(passwordEncoder.encode(adminPassword));
         admin.setNickname("管理员");
-        admin.setRole("ADMIN");
-        admin.setStatus(1);
+        admin.setRole(SecurityConstants.ROLE_ADMIN);
+        admin.setStatus(UserConstants.STATUS_ENABLED);
         userMapper.insert(admin);
         log.info("已创建初始管理员账号：{}", adminUsername);
         if (DEFAULT_ADMIN_PASSWORD.equals(adminPassword)) {

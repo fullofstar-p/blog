@@ -24,6 +24,7 @@
 ├── docs/
 │   ├── API.md                # 前后端接口契约（唯一真源）
 │   ├── LOCAL_DEV.md          # 本地开发/联调与冒烟说明
+│   ├── OPTIMIZATION.md       # 工程优化清单与技术债（按优先级）
 │   └── ROADMAP.md            # 后续功能清单、迭代排期与里程碑
 ├── sql/
 │   └── init.sql              # MySQL 8 建表 SQL（首次启动自动执行）
@@ -33,6 +34,7 @@
 │   └── src/main/
 │       ├── java/com/blog/
 │       │   ├── common/       # Result / PageResult / 异常 / 全局处理
+│       │   ├── constant/     # 领域常量（Redis key、分页、状态、角色、文件限制）
 │       │   ├── config/       # MyBatis-Plus / Redis / Security / S3 / MinIO 初始化 / Knife4j
 │       │   ├── security/     # JWT 工具、过滤器、UserDetails、SecurityUtils
 │       │   ├── entity/       # 实体（10 个类，对应 12 张表）
@@ -189,6 +191,10 @@ npm run build
 node scripts/seed-demo.mjs   # 3 篇演示文章 + 评论/点赞 + 1 篇草稿
 node scripts/smoke-api.mjs   # 认证/文章/搜索/评论/上传/管理端 40 项断言
 ```
+
+## 工程优化清单
+
+工程侧的技术债、性能热点与安全加固项统一记录在 [docs/OPTIMIZATION.md](docs/OPTIMIZATION.md)，按 P0 / P1 / P2 分级并标注工作量。当前建议优先：测试与 CI、登录限流与 refresh token 清理、搜索改用 FULLTEXT、业务异常 HTTP 状态码统一、标签批量插入与阅读量 Redis pipeline。
 
 ## 设计说明
 

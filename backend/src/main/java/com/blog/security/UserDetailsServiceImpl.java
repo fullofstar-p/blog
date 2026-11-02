@@ -1,6 +1,8 @@
 package com.blog.security;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.blog.constant.SecurityConstants;
+import com.blog.constant.UserConstants;
 import com.blog.entity.User;
 import com.blog.mapper.UserMapper;
 import lombok.RequiredArgsConstructor;
@@ -26,8 +28,8 @@ public class UserDetailsServiceImpl implements UserDetailsService {
         }
         return org.springframework.security.core.userdetails.User.withUsername(user.getUsername())
                 .password(user.getPassword())
-                .authorities("ROLE_" + user.getRole())
-                .disabled(user.getStatus() == null || user.getStatus() != 1)
+                .authorities(SecurityConstants.ROLE_PREFIX + user.getRole())
+                .disabled(user.getStatus() == null || user.getStatus() != UserConstants.STATUS_ENABLED)
                 .build();
     }
 }

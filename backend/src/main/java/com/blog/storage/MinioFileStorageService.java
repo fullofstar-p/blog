@@ -2,6 +2,7 @@ package com.blog.storage;
 
 import com.blog.common.BusinessException;
 import com.blog.common.ResultCode;
+import com.blog.constant.FileConstants;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
@@ -15,7 +16,6 @@ import software.amazon.awssdk.services.s3.model.PutObjectRequest;
 
 import java.io.InputStream;
 import java.util.Locale;
-import java.util.Set;
 import java.util.UUID;
 
 /**
@@ -26,15 +26,6 @@ import java.util.UUID;
 @Service
 @RequiredArgsConstructor
 public class MinioFileStorageService implements FileStorageService {
-
-    private static final Set<String> ALLOWED_CONTENT_TYPES =
-            Set.of("image/jpeg", "image/png", "image/webp", "image/gif");
-    private static final Set<String> ALLOWED_EXTENSIONS =
-            Set.of("jpg", "jpeg", "png", "webp", "gif");
-    private static final Set<String> ALLOWED_CATEGORIES =
-            Set.of("avatar", "cover", "content");
-    /** 单文件大小上限：5MB */
-    private static final long MAX_SIZE = 5L * 1024 * 1024;
 
     private final S3Client s3Client;
 
@@ -50,16 +41,17 @@ public class MinioFileStorageService implements FileStorageService {
             throw new BusinessException(ResultCode.BAD_REQUEST, "请选择要上传的文件");
         }
         String cat = StringUtils.hasText(category) ? category.trim().toLowerCase(Locale.ROOT) : "";
-        if (!ALLOWED_CATEGORIES.contains(cat)) {
+        if (!FileConstants.ALLOWED_CATEGORIES.contains(cat)) {
             throw new BusinessException(ResultCode.BAD_REQUEST, "上传分类不合法");
         }
-        if (file.getSize() > MAX_SIZE) {
+        if (file.getSize() > FileConstants.MAX_SIZE) {
             throw new BusinessException(ResultCode.BAD_REQUEST, "文件大小不能超过 5MB");
         }
         String contentType = file.getContentType() == null
                 ? "" : file.getContentType().toLowerCase(Locale.ROOT);
         String extension = resolveExtension(file.getOriginalFilename());
-        if (!ALLOWED_CONTENT_TYPES.contains(contentType) || !ALLOWED_EXTENSIONS.contains(extension)) {
+        if (!FileConstants.ALLOWED_CONTENT_TYPES.contains(contentType)
+                || !FileConstants.ALLOWED_EXTENSIONS.contains(extension)) {
             throw new BusinessException(ResultCode.BAD_REQUEST, "仅支持 jpg/png/webp/gif 图片");
         }
 

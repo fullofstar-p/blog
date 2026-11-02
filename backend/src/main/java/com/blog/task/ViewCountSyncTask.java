@@ -1,6 +1,7 @@
 package com.blog.task;
 
 import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
+import com.blog.constant.RedisKeys;
 import com.blog.entity.Article;
 import com.blog.mapper.ArticleMapper;
 import lombok.RequiredArgsConstructor;
@@ -21,15 +22,12 @@ import java.util.Set;
 @RequiredArgsConstructor
 public class ViewCountSyncTask {
 
-    private static final String VIEW_COUNT_PREFIX = "article:views:";
-    private static final String VIEW_PENDING_KEY = "article:views:pending";
-
     private final StringRedisTemplate stringRedisTemplate;
     private final ArticleMapper articleMapper;
 
     @Scheduled(fixedDelay = 60_000L, initialDelay = 60_000L)
     public void syncViewCounts() {
-        Set<String> pendingIds = stringRedisTemplate.opsForSet().members(VIEW_PENDING_KEY);
+        Set<String> pendingIds = stringRedisTemplate.opsForSet().members(RedisKeys.ARTICLE_VIEW_PENDING_KEY);
         if (pendingIds == null || pendingIds.isEmpty()) {
             return;
         }
@@ -41,16 +39,16 @@ public class ViewCountSyncTask {
             try {
                 articleId = Long.valueOf(idText);
             } catch (NumberFormatException e) {
-                stringRedisTemplate.opsForSet().remove(VIEW_PENDING_KEY, idText);
+                stringRedisTemplate.opsForSet().remove(RedisKeys.ARTICLE_VIEW_PENDING_KEY, idText);
                 continue;
             }
-            String viewKey = VIEW_COUNT_PREFIX + articleId;
+            String viewKey = RedisKeys.ARTICLE_VIEW_COUNT_PREFIX + articleId;
             try {
                 String raw = stringRedisTemplate.opsForValue().get(viewKey);
                 long delta = raw == null ? 0L : Long.parseLong(raw);
                 if (delta <= 0) {
                     stringRedisTemplate.delete(viewKey);
-                    stringRedisTemplate.opsForSet().remove(VIEW_PENDING_KEY, idText);
+                    stringRedisTemplate.opsForSet().remove(RedisKeys.ARTICLE_VIEW_PENDING_KEY, idText);
                     continue;
                 }
                 articleMapper.update(null, new LambdaUpdateWrapper<Article>()
@@ -60,7 +58,7 @@ public class ViewCountSyncTask {
                 Long remaining = stringRedisTemplate.opsForValue().increment(viewKey, -delta);
                 if (remaining != null && remaining <= 0) {
                     stringRedisTemplate.delete(viewKey);
-                    stringRedisTemplate.opsForSet().remove(VIEW_PENDING_KEY, idText);
+                    stringRedisTemplate.opsForSet().remove(RedisKeys.ARTICLE_VIEW_PENDING_KEY, idText);
                 }
                 log.debug("文章阅读量落库：articleId={}, delta={}", articleId, delta);
             } catch (Exception e) {

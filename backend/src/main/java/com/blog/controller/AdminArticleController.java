@@ -2,6 +2,7 @@ package com.blog.controller;
 
 import com.blog.common.PageResult;
 import com.blog.common.Result;
+import com.blog.constant.SecurityConstants;
 import com.blog.dto.BatchIdsDTO;
 import com.blog.dto.BatchTopDTO;
 import com.blog.dto.TopDTO;
@@ -25,7 +26,7 @@ import org.springframework.web.bind.annotation.RestController;
  */
 @RestController
 @RequestMapping("/api/admin/articles")
-@PreAuthorize("hasRole('ADMIN')")
+@PreAuthorize(SecurityConstants.HAS_ROLE_ADMIN)
 @RequiredArgsConstructor
 public class AdminArticleController {
 

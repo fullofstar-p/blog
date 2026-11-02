@@ -1,6 +1,7 @@
 package com.blog.controller;
 
 import com.blog.common.Result;
+import com.blog.constant.FileConstants;
 import com.blog.service.FileService;
 import com.blog.vo.FileVO;
 import lombok.RequiredArgsConstructor;
@@ -30,7 +31,7 @@ public class FileController {
      */
     @PostMapping("/upload")
     public Result<FileVO> upload(@RequestParam("file") MultipartFile file,
-                                 @RequestParam(value = "category", defaultValue = "content") String category) {
+                                 @RequestParam(value = "category", defaultValue = FileConstants.DEFAULT_CATEGORY) String category) {
         return Result.success(fileService.upload(file, category));
     }
 

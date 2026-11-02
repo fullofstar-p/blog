@@ -1,5 +1,7 @@
 package com.blog.dto;
 
+import com.blog.constant.ArticleConstants;
+
 import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotBlank;
@@ -32,12 +34,12 @@ public class ArticleSaveDTO {
     private List<Long> tagIds;
 
     /** 0 草稿 / 1 已发布，默认草稿 */
-    @Min(value = 0, message = "文章状态不合法")
-    @Max(value = 1, message = "文章状态不合法")
+    @Min(value = ArticleConstants.STATUS_DRAFT, message = "文章状态不合法")
+    @Max(value = ArticleConstants.STATUS_PUBLISHED, message = "文章状态不合法")
     private Integer status;
 
     /** 仅 ADMIN 可设置 */
-    @Min(value = 0, message = "置顶标记不合法")
-    @Max(value = 1, message = "置顶标记不合法")
+    @Min(value = ArticleConstants.NOT_TOP, message = "置顶标记不合法")
+    @Max(value = ArticleConstants.TOP, message = "置顶标记不合法")
     private Integer isTop;
 }

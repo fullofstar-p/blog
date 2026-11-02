@@ -3,6 +3,7 @@ package com.blog.service.impl;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.blog.common.BusinessException;
 import com.blog.common.ResultCode;
+import com.blog.constant.FileConstants;
 import com.blog.entity.FileObject;
 import com.blog.mapper.FileObjectMapper;
 import com.blog.security.LoginUser;
@@ -17,16 +18,12 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
 import org.springframework.web.multipart.MultipartFile;
 
-import java.util.Set;
-
 /**
  * 文件服务实现：上传写审计表，删除校验归属（上传者或 ADMIN）。
  */
 @Service
 @RequiredArgsConstructor
 public class FileServiceImpl implements FileService {
-
-    private static final Set<String> ALLOWED_CATEGORIES = Set.of("avatar", "cover", "content");
 
     private final FileObjectMapper fileObjectMapper;
     private final FileStorageService fileStorageService;
@@ -37,8 +34,8 @@ public class FileServiceImpl implements FileService {
         if (file == null || file.isEmpty()) {
             throw new BusinessException(ResultCode.BAD_REQUEST, "请选择要上传的文件");
         }
-        String cat = StringUtils.hasText(category) ? category.trim().toLowerCase() : "content";
-        if (!ALLOWED_CATEGORIES.contains(cat)) {
+        String cat = StringUtils.hasText(category) ? category.trim().toLowerCase() : FileConstants.DEFAULT_CATEGORY;
+        if (!FileConstants.ALLOWED_CATEGORIES.contains(cat)) {
             throw new BusinessException(ResultCode.BAD_REQUEST, "上传分类不合法");
         }
         Long uploaderId = SecurityUtils.getUserId();

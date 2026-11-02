@@ -1,5 +1,7 @@
 package com.blog.dto;
 
+import com.blog.constant.SecurityConstants;
+
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Pattern;
 import lombok.Data;
@@ -11,6 +13,6 @@ import lombok.Data;
 public class UserRoleDTO {
 
     @NotBlank(message = "角色不能为空")
-    @Pattern(regexp = "^(ADMIN|USER)$", message = "角色只能为 ADMIN 或 USER")
+    @Pattern(regexp = SecurityConstants.ROLE_PATTERN, message = "角色只能为 ADMIN 或 USER")
     private String role;
 }

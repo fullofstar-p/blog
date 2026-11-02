@@ -1,5 +1,6 @@
 package com.blog.security;
 
+import com.blog.constant.SecurityConstants;
 import com.blog.entity.User;
 import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.Jwts;
@@ -19,13 +20,6 @@ import java.util.Date;
  */
 @Component
 public class JwtUtils {
-
-    /** token 类型：访问令牌 */
-    public static final String TYPE_ACCESS = "access";
-    /** token 类型：刷新令牌 */
-    public static final String TYPE_REFRESH = "refresh";
-
-    private static final String BEARER_PREFIX = "Bearer ";
 
     @Value("${jwt.secret}")
     private String secret;
@@ -54,12 +48,12 @@ public class JwtUtils {
 
     /** 签发 access token */
     public String generateAccessToken(User user, String jti) {
-        return generate(user, jti, TYPE_ACCESS, accessExpire);
+        return generate(user, jti, SecurityConstants.TOKEN_TYPE_ACCESS, accessExpire);
     }
 
     /** 签发 refresh token */
     public String generateRefreshToken(User user, String jti) {
-        return generate(user, jti, TYPE_REFRESH, refreshExpire);
+        return generate(user, jti, SecurityConstants.TOKEN_TYPE_REFRESH, refreshExpire);
     }
 
     private String generate(User user, String jti, String type, long ttlSeconds) {
@@ -119,10 +113,10 @@ public class JwtUtils {
      * 从 Authorization 请求头中提取 Bearer token。
      */
     public String resolveToken(String authorizationHeader) {
-        if (authorizationHeader == null || !authorizationHeader.startsWith(BEARER_PREFIX)) {
+        if (authorizationHeader == null || !authorizationHeader.startsWith(SecurityConstants.BEARER_PREFIX)) {
             return null;
         }
-        String token = authorizationHeader.substring(BEARER_PREFIX.length()).trim();
+        String token = authorizationHeader.substring(SecurityConstants.BEARER_PREFIX.length()).trim();
         return token.isEmpty() ? null : token;
     }
 
