@@ -1,0 +1,141 @@
+# ============================================================================
+# Release：构建前后端镜像并推送到 GHCR（GitHub Container Registry）
+#
+# 触发：
+#   push 到 dev     → 镜像 tag：dev、sha-xxxxxxx
+#   push 到 master  → 镜像 tag：master、latest、sha-xxxxxxx
+#   push 标签 v1.2.3 → 镜像 tag：v1.2.3、1.2.3
+#   手动 Run workflow → 同上（按所选分支）
+#
+# 可选自动部署：仓库 Variables 里把 ENABLE_AUTO_DEPLOY 设为 true，并配置
+# SSH_HOST / SSH_USER / SSH_PRIVATE_KEY（可选 SSH_PORT）后，master 分支构建完成
+# 会通过 SSH 在服务器上执行 deploy/deploy.sh。详细步骤见 docs/DEPLOY.md。
+#
+# 镜像命名（{owner}/{repo} 为小写仓库全名）：
+#   ghcr.io/{owner}/{repo}/backend:latest
+#   ghcr.io/{owner}/{repo}/frontend:latest
+# ============================================================================
+name: Release · GHCR 镜像
+
+on:
+  push:
+    branches: [dev, master]
+    tags: ['v*.*.*']
+  workflow_dispatch:
+
+# 同一分支/标签的发布串行执行，避免并发构建互相覆盖 latest
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+env:
+  REGISTRY: ghcr.io
+
+permissions:
+  contents: read
+  packages: write
+
+jobs:
+  # 先算好小写命名空间与本次提交的 sha tag，供矩阵构建和部署复用
+  prepare:
+    name: 计算镜像命名
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      namespace: ${{ steps.ns.outputs.value }}
+      tag: ${{ steps.meta.outputs.tag }}
+    steps:
+      - name: 小写化仓库名（GHCR 要求全小写）
+        id: ns
+        run: echo "value=${GITHUB_REPOSITORY,,}" >> "$GITHUB_OUTPUT"
+
+      - name: 生成 sha tag
+        id: meta
+        run: echo "tag=sha-${GITHUB_SHA::7}" >> "$GITHUB_OUTPUT"
+
+  images:
+    name: 构建并推送 ${{ matrix.service }}
+    needs: prepare
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - service: backend
+            context: ./backend
+            file: ./backend/Dockerfile
+          - service: frontend
+            context: ./frontend
+            file: ./frontend/Dockerfile
+    steps:
+      - name: 检出代码
+        uses: actions/checkout@v4
+
+      - name: 启用 Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: 登录 GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: 生成镜像元数据（tag / label）
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.REGISTRY }}/${{ needs.prepare.outputs.namespace }}/${{ matrix.service }}
+          tags: |
+            type=ref,event=branch
+            type=ref,event=tag
+            type=semver,pattern={{version}}
+            type=sha,prefix=sha-,format=short
+            type=raw,value=latest,enable=${{ github.ref == 'refs/heads/master' }}
+
+      - name: 构建并推送
+        uses: docker/build-push-action@v6
+        with:
+          context: ${{ matrix.context }}
+          file: ${{ matrix.file }}
+          # 阿里云 ECS 基本都是 x86_64；若实例为 ARM（倚天），改成 linux/arm64
+          platforms: linux/amd64
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          # GitHub Actions 原生缓存，跨工作流复用 Maven / npm 之前的镜像层
+          cache-from: type=gha,scope=${{ matrix.service }}
+          cache-to: type=gha,mode=max,scope=${{ matrix.service }}
+
+  # 可选：master 分支镜像发布成功后，SSH 到 ECS 执行发布脚本
+  deploy:
+    name: 部署到阿里云 ECS（可选）
+    needs: [prepare, images]
+    if: ${{ github.ref == 'refs/heads/master' && vars.ENABLE_AUTO_DEPLOY == 'true' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    # 在仓库 Settings → Environments 里给 production 配置审批人，可做发布卡点
+    environment: production
+    env:
+      SSH_HOST: ${{ secrets.SSH_HOST }}
+      SSH_USER: ${{ secrets.SSH_USER }}
+      SSH_PORT: ${{ secrets.SSH_PORT || 22 }}
+      IMAGE_TAG: ${{ needs.prepare.outputs.tag }}
+    steps:
+      - name: 准备 SSH 私钥与 known_hosts
+        run: |
+          install -m 700 -d ~/.ssh
+          printf '%s\n' "$SSH_PRIVATE_KEY" > ~/.ssh/id_ed25519
+          chmod 600 ~/.ssh/id_ed25519
+          ssh-keyscan -p "$SSH_PORT" -H "$SSH_HOST" >> ~/.ssh/known_hosts
+        env:
+          SSH_PRIVATE_KEY: ${{ secrets.SSH_PRIVATE_KEY }}
+
+      - name: 服务器同步代码并发布镜像
+        run: |
+          ssh -i ~/.ssh/id_ed25519 -p "$SSH_PORT" "$SSH_USER@$SSH_HOST" \
+            "set -euo pipefail; cd /opt/blog && \
+             git fetch --prune origin master && \
+             git reset --hard FETCH_HEAD && \
+             IMAGE_TAG='$IMAGE_TAG' ./deploy/deploy.sh"

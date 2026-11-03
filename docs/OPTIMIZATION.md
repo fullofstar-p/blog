@@ -10,7 +10,7 @@
 
 | 顺序 | 事项 | 原因 |
 | ---- | ---- | ---- |
-| 1 | 补测试 + CI（A1/A2） | 编辑器、TOC、分享等交互复杂，没有回归网，后续改动风险最高 |
+| 1 | 补测试（A1；CI 已就绪，A2） | 编辑器、TOC、分享等交互复杂，没有回归网，后续改动风险最高 |
 | 2 | 登录限流 + refresh token 清理/自动续期（A3/A4） | 安全风险 + Redis 键持续膨胀，前端刷新体验也依赖它 |
 | 3 | 搜索改用 FULLTEXT（A6） | 索引已建但没用，改造成本低、性能收益最直接 |
 | 4 | 业务异常统一 HTTP 状态码（A5） | 影响监控、网关、浏览器行为，越晚改成本越高 |
@@ -23,14 +23,14 @@
 | # | 现状 / 问题 | 建议 | 收益 | 工作量 |
 | - | ----------- | ---- | ---- | ------ |
 | A1 | 自动化测试基本空白：[backend/pom.xml](../backend/pom.xml) 未引入 `spring-boot-starter-test`，`backend/src/test` 为空；前端没有 Vitest / Playwright | 后端 JUnit 5 + Testcontainers 覆盖认证、文章 CRUD、评论审核、统计；前端 Vitest 覆盖 TOC 解析、格式化、Markdown 工具；Playwright 覆盖登录、编辑器渲染、分享弹窗 | 防止回归，敢重构 | L |
-| A2 | 没有 CI：仓库没有 `.github/workflows` | 增加三条流水线：后端 `mvn verify`、前端 `lint + build + test`、`docker compose build` | PR 质量门禁 | S |
+| A2 | CI 已落地但覆盖有限：[ci.yml](../.github/workflows/ci.yml) 只跑后端 `mvn package` + 前端 `lint/build`，没有测试，也没有 PR 阶段的镜像构建；镜像发布见 [release.yml](../.github/workflows/release.yml) | 补测试后把 CI 改成 `mvn verify`；再加一个只构建不推送的 Docker job（PR 阶段提前发现 Dockerfile/依赖问题） | PR 质量门禁 | S |
 | A3 | 登录 / 注册 / 评论 / 上传都没有限流，存在爆破与刷接口风险 | Redis 滑动窗口：登录按 IP + 账号 5 次/分钟，注册 / 评论按 IP 限制，用 Filter 或 Interceptor 实现 | 安全 | M |
 | A4 | refresh token 无上限且前端不自动续期：[request.js](../frontend/src/api/request.js) 收到 401 直接清 session，[auth store](../frontend/src/store/auth.js) 的 `refreshSession` 未被拦截器使用；实测 Redis 已积累 150+ 个 `refresh:*` 键 | 登录时按用户只保留最近 N 个 refresh token（如 5 个）；前端 401 做单飞刷新 + 请求队列重放，失败再登出 | 安全 + Redis 减负 + 登录态更稳 | M |
 | A5 | 业务错误返回 HTTP 200：[GlobalExceptionHandler.java](../backend/src/main/java/com/blog/common/GlobalExceptionHandler.java) 中参数校验、404、409 都返回 200，只有 401/403 用对应状态 | 统一为 4xx/5xx（前端拦截器已兼容 body `code`，可平滑迁移）；或明确约定并在网关层处理 | 监控、网关、缓存语义正确 | M |
 | A6 | 搜索没有用上已有的全文索引：[init.sql](../sql/init.sql) 已建 `FULLTEXT ft_article_ngram`，但 [ArticleMapper.xml](../backend/src/main/resources/mapper/ArticleMapper.xml) 仍用 `LIKE CONCAT('%', #{keyword}, '%')` 扫正文 | 改为 `MATCH(...) AGAINST(... IN BOOLEAN MODE)` + 相关度排序，标签匹配保留 `EXISTS`；先用 `EXPLAIN` 对比 | 搜索从全表扫描降为索引检索 | M |
 | A7 | 唯一键并发冲突未映射：标签 / 分类重名等场景可能抛 `DuplicateKeyException` 落到兜底 500 | 在 `GlobalExceptionHandler` 增加 `DataIntegrityViolationException → 409` | 错误语义准确 | S |
-| A8 | 生产配置存在默认弱值：[application.yml](../backend/src/main/resources/application.yml) 的 JWT secret、MySQL 密码、admin 密码均带默认值 | 增加 `prod` profile 启动校验（缺环境变量直接 fail-fast），删除弱默认；README 标注生产必改项 | 避免误用默认密钥 | S |
-| A9 | CORS 与端口暴露：[SecurityConfig.java](../backend/src/main/java/com/blog/config/SecurityConfig.java) 的 `allowedOriginPatterns("*")` 无条件生效，compose 把 backend 8080 直接映射到宿主机 | 按环境收紧 CORS；生产环境后端只走 Nginx 内网，不直接暴露端口 | 降低攻击面 | S |
+| A8 | 生产配置存在默认弱值：[application.yml](../backend/src/main/resources/application.yml) 的 JWT secret、MySQL 密码、admin 密码均带默认值 | 增加 `prod` profile 启动校验（缺环境变量直接 fail-fast），删除弱默认；生产必改项见 [DEPLOY.md](DEPLOY.md) 第 9 节 | 避免误用默认密钥 | S |
+| A9 | CORS 与端口暴露：[SecurityConfig.java](../backend/src/main/java/com/blog/config/SecurityConfig.java) 的 `allowedOriginPatterns("*")` 无条件生效；开发编排把 backend 8080 直接映射到宿主机（生产编排 [docker-compose.prod.yml](../docker-compose.prod.yml) 已只绑内网，见 [DEPLOY.md](DEPLOY.md)） | 按环境收紧 CORS；生产环境后端只走 Nginx 内网，不直接暴露端口 | 降低攻击面 | S |
 
 ---
 
