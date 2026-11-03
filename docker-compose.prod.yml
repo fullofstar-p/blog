@@ -1,0 +1,215 @@
+# ============================================================================
+# 技术分享博客 · 生产部署编排（阿里云 Ubuntu 24.04 + Docker + GHCR）
+#
+# 与 docker-compose.yml（本地完整栈，源码构建）的区别：
+#   1. backend / frontend 不再 build，直接拉取 GitHub Actions 推到 GHCR 的镜像；
+#   2. MySQL / Redis / backend 不发布任何宿主机端口，只在 compose 网络内互访；
+#      frontend 与对象存储只绑 127.0.0.1，由宿主机 Nginx 反代并终结 HTTPS；
+#   3. 服务名/容器名带 prod 前缀，和本地开发栈（name: blog）互不干扰；
+#   4. 每个容器限制内存、日志轮转，长期运行不会撑爆内存和磁盘。
+#
+# 服务器上的用法（仓库根目录，首次先 cp .env.prod.example .env 并填好密码）：
+#   ./deploy/deploy.sh                 # 拉取 IMAGE_TAG（默认 latest）并启动
+#   ./deploy/deploy.sh sha-1a2b3c4     # 指定版本 / 回滚
+#   docker compose -f docker-compose.prod.yml ps
+#   docker compose -f docker-compose.prod.yml logs -f --tail=100 backend
+#
+# 完整步骤、Nginx、HTTPS、备份与排错见 docs/DEPLOY.md。
+# ============================================================================
+
+name: blog-prod
+
+# 统一日志轮转：单文件 10MB、保留 3 个，避免容器日志写满系统盘
+x-logging: &default-logging
+  driver: json-file
+  options:
+    max-size: "10m"
+    max-file: "3"
+
+services:
+  # ---------------------------------------------------------------------------
+  # MySQL 8.0：首次启动自动执行 ./sql/init.sql（建库建表 + 演示分类/标签）
+  # 数据在 named volume；宿主机不映射 3306，只能从 compose 网络访问。
+  # ---------------------------------------------------------------------------
+  mysql:
+    image: mysql:8.0
+    container_name: blog-prod-mysql
+    restart: unless-stopped
+    environment:
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:?MYSQL_ROOT_PASSWORD is required}
+      MYSQL_DATABASE: ${MYSQL_DATABASE:-blog}
+      TZ: ${TZ:-Asia/Shanghai}
+    command:
+      - --character-set-server=utf8mb4
+      - --collation-server=utf8mb4_unicode_ci
+      - --default-time-zone=+08:00
+      # 与 sql/init.sql 里的 ngram 全文索引保持一致
+      - --ngram_token_size=2
+    volumes:
+      - mysql-data:/var/lib/mysql
+      # 只挂 init.sql：MySQL entrypoint 会执行目录下所有 .sql，
+      # 若把整个 ./sql 挂进去，升级脚本（ALTER ADD COLUMN）会在全新库上重复执行并报错。
+      # 升级仍手动执行 sql/upgrade-*.sql，见 docs/DEPLOY.md 第 7 节。
+      - type: bind
+        source: ./sql/init.sql
+        target: /docker-entrypoint-initdb.d/init.sql
+        read_only: true
+    healthcheck:
+      test: ["CMD-SHELL", "mysqladmin ping -h 127.0.0.1 -uroot -p$$MYSQL_ROOT_PASSWORD --silent"]
+      interval: 10s
+      timeout: 5s
+      retries: 15
+      start_period: 40s
+    deploy:
+      resources:
+        limits:
+          memory: 1g
+    logging: *default-logging
+    networks:
+      - blog-prod-net
+
+  # ---------------------------------------------------------------------------
+  # Redis 7：JWT 白名单/黑名单 + 详情缓存 + 浏览量计数缓冲
+  # 无密码但不对宿主机发布端口，只在 compose 网络内可达。
+  # ---------------------------------------------------------------------------
+  redis:
+    image: redis:7-alpine
+    container_name: blog-prod-redis
+    restart: unless-stopped
+    command: ["redis-server", "--appendonly", "yes"]
+    volumes:
+      - redis-data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    deploy:
+      resources:
+        limits:
+          memory: 256m
+    logging: *default-logging
+    networks:
+      - blog-prod-net
+
+  # ---------------------------------------------------------------------------
+  # 对象存储（S3 兼容）：默认 RustFS。
+  # 后端只用标准 S3 API（AWS SDK v2，path-style），换成 MinIO/OSS 不改代码。
+  # 9000 只绑 127.0.0.1，由宿主机 Nginx 以 /files/ 前缀对外提供图片直链；
+  # 9001 控制台不对宿主机发布（需要时临时 `docker compose port` 或 SSH 隧道）。
+  # ---------------------------------------------------------------------------
+  objectstore:
+    image: ${OBJECTSTORE_IMAGE:-rustfs/rustfs:latest}
+    container_name: blog-prod-objectstore
+    restart: unless-stopped
+    environment:
+      RUSTFS_ADDRESS: 0.0.0.0:9000
+      RUSTFS_CONSOLE_ENABLE: "false"
+      RUSTFS_ACCESS_KEY: ${MINIO_ROOT_USER:?MINIO_ROOT_USER is required}
+      RUSTFS_SECRET_KEY: ${MINIO_ROOT_PASSWORD:?MINIO_ROOT_PASSWORD is required}
+      TZ: ${TZ:-Asia/Shanghai}
+    ports:
+      # 仅供宿主机 Nginx 反代，不要改成 0.0.0.0
+      - "127.0.0.1:${OBJECTSTORE_HOST_PORT:-9000}:9000"
+    volumes:
+      - objectstore-data:/data
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://127.0.0.1:9000/health || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 20s
+    deploy:
+      resources:
+        limits:
+          memory: 512m
+    logging: *default-logging
+    networks:
+      - blog-prod-net
+
+  # ---------------------------------------------------------------------------
+  # 后端：镜像来自 GHCR，不再在服务器上编译。
+  # 不对宿主机发布端口；前端容器 Nginx 通过 http://backend:8080 访问。
+  # 健康检查来自 backend/Dockerfile 的 HEALTHCHECK（/actuator/health）。
+  # ---------------------------------------------------------------------------
+  backend:
+    image: ${IMAGE_NAMESPACE:?IMAGE_NAMESPACE is required}/backend:${IMAGE_TAG:-latest}
+    container_name: blog-prod-backend
+    restart: unless-stopped
+    environment:
+      TZ: ${TZ:-Asia/Shanghai}
+      # MySQL / Redis 走 compose 内部 DNS
+      MYSQL_HOST: mysql
+      MYSQL_PORT: 3306
+      MYSQL_DATABASE: ${MYSQL_DATABASE:-blog}
+      MYSQL_USERNAME: root
+      MYSQL_PASSWORD: ${MYSQL_ROOT_PASSWORD}
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      REDIS_DATABASE: 0
+      # S3 客户端走内部地址；浏览器拿到的图片 URL 走 PUBLIC_BASE_URL + /files
+      MINIO_ENDPOINT: http://objectstore:9000
+      MINIO_ACCESS_KEY: ${MINIO_ROOT_USER}
+      MINIO_SECRET_KEY: ${MINIO_ROOT_PASSWORD}
+      MINIO_BUCKET: ${MINIO_BUCKET:-blog}
+      MINIO_PUBLIC_ENDPOINT: ${PUBLIC_BASE_URL:?PUBLIC_BASE_URL is required}/files
+      MINIO_REGION: us-east-1
+      JWT_SECRET: ${JWT_SECRET:?JWT_SECRET is required}
+      JWT_ACCESS_EXPIRE: ${JWT_ACCESS_EXPIRE:-7200}
+      JWT_REFRESH_EXPIRE: ${JWT_REFRESH_EXPIRE:-604800}
+      ADMIN_USERNAME: ${ADMIN_USERNAME:-admin}
+      ADMIN_PASSWORD: ${ADMIN_PASSWORD:?ADMIN_PASSWORD is required}
+      BLOG_SITE_NAME: ${BLOG_SITE_NAME:-技术分享博客}
+    expose:
+      - "8080"
+    depends_on:
+      mysql:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      # 与本地编排一致：对象存储只要启动即可，建桶由后端带重试完成
+      objectstore:
+        condition: service_started
+    deploy:
+      resources:
+        limits:
+          memory: 1g
+    logging: *default-logging
+    networks:
+      - blog-prod-net
+
+  # ---------------------------------------------------------------------------
+  # 前端：镜像来自 GHCR（Nginx 托管静态资源 + /api 反代 backend:8080）。
+  # 绑定 127.0.0.1:${FRONTEND_HOST_PORT}，由宿主机 Nginx 反代 80/443 并签证书。
+  # ---------------------------------------------------------------------------
+  frontend:
+    image: ${IMAGE_NAMESPACE}/frontend:${IMAGE_TAG:-latest}
+    container_name: blog-prod-frontend
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:${FRONTEND_HOST_PORT:-8081}:80"
+    depends_on:
+      backend:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q -O /dev/null http://127.0.0.1/ || exit 1"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+    deploy:
+      resources:
+        limits:
+          memory: 128m
+    logging: *default-logging
+    networks:
+      - blog-prod-net
+
+volumes:
+  mysql-data:
+  redis-data:
+  objectstore-data:
+
+networks:
+  blog-prod-net:
+    driver: bridge

@@ -2,6 +2,9 @@
 .env
 .env.local
 .env.*.local
+# 服务器生产变量（含数据库/JWT 密码；仓库里只保留 .env.prod.example 模板）
+.env.prod
+.env.production
 
 # ---------------- Java / Maven ----------------
 backend/target/

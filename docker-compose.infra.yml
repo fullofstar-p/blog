@@ -88,11 +88,13 @@ services:
     volumes:
       - mysql-data:/var/lib/mysql
       # 仅在数据卷为空（首次启动）时执行；改完 init.sql 需 down -v 才会重跑。
+      # 只挂 init.sql：entrypoint 会执行目录下所有 .sql，整个 sql/ 挂进去会把
+      # upgrade-*.sql（ALTER ADD COLUMN）也跑一遍并在全新库上报错。
       # 用长语法带 bind.selinux: z —— Rocky/RHEL 的 SELinux 需要重打标签，
       # 短语法里的 ":ro,z" 会被 podman-compose 判成未知选项，故写成长语法。
       - type: bind
-        source: ./sql
-        target: /docker-entrypoint-initdb.d
+        source: ./sql/init.sql
+        target: /docker-entrypoint-initdb.d/init.sql
         read_only: true
         bind:
           selinux: z
