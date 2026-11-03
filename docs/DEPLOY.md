@@ -410,8 +410,10 @@ ghcr.io/<owner>/<repo>/frontend:<tag>
 
 构建使用 Buildx + GitHub Actions 缓存（`type=gha`，backend/frontend 分开 scope），矩阵并行构建两个镜像，`platforms: linux/amd64`（ARM ECS 见注释改成 `linux/arm64`）。
 
+> 参考耗时：本仓库首次在 `dev` 上实跑（2026-11-03，GitHub 托管 runner）：CI 45s；Release 3m28s（frontend 1m5s、backend 3m19s）。Maven 依赖进缓存后会快一些。
+
 > **两条容易踩的坑**
-> 1. `GITHUB_TOKEN` 默认权限不够时推包会 403：到 `Settings → Actions → General → Workflow permissions` 选 **Read and write permissions**。
+> 1. `GITHUB_TOKEN` 默认权限不够时推包会 403：到 `Settings → Actions → General → Workflow permissions` 选 **Read and write permissions**（本仓库已改为该设置）。
 > 2. 仓库名含大写时 GHCR 会报 invalid reference：工作流已用 `${GITHUB_REPOSITORY,,}` 转小写，但 `.env` 里的 `IMAGE_NAMESPACE` 必须自己也写小写。
 
 ### 5.3 GHCR 包可见性与服务器拉取
