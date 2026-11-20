@@ -38,15 +38,20 @@ jobs:
       matrix:
         include:
           - service: mysql
+            repo: mysql
             source: mysql:8.0
             tag: "8.0"
           - service: redis
+            repo: redis
             source: redis:7-alpine
             tag: "7-alpine"
+          # 注意 repo=rustfs：docker-compose.prod.yml 里对象存储的镜像名是 rustfs
           - service: objectstore
+            repo: rustfs
             source: rustfs/rustfs:latest
             tag: "latest"
           - service: alpine
+            repo: alpine
             source: alpine:3.20
             tag: "3.20"
     steps:
@@ -57,15 +62,16 @@ jobs:
           username: ${{ secrets.ACR_USERNAME }}
           password: ${{ secrets.ACR_PASSWORD }}
 
-      - name: 拉取并转推 ${{ matrix.service }}
+      - name: 拉取并转推 ${{ matrix.repo }}
         env:
           REGISTRY: ${{ vars.ACR_REGISTRY }}
           NAMESPACE: ${{ vars.ACR_NAMESPACE }}
           SOURCE: ${{ matrix.source }}
           TAG: ${{ matrix.tag }}
+          REPO: ${{ matrix.repo }}
         run: |
           set -euo pipefail
-          target="${REGISTRY}/${NAMESPACE}/${{ matrix.service }}:${TAG}"
+          target="${REGISTRY}/${NAMESPACE}/${REPO}:${TAG}"
           echo "同步 ${SOURCE} → ${target}"
           docker pull "${SOURCE}"
           docker tag "${SOURCE}" "${target}"
