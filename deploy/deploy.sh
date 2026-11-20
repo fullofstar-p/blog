@@ -64,16 +64,21 @@ log "校验 compose 配置 ..."
 "${COMPOSE[@]}" config -q
 
 log "拉取业务镜像（backend / frontend，来自阿里云 ACR）..."
-# 只拉业务镜像：避免每次部署顺带升级 mysql / redis / rustfs 的 latest，
-# 基础设施镜像需要升级时手动 docker compose pull mysql redis objectstore。
+# 只拉业务镜像：避免每次部署顺带升级 mysql / redis / rustfs；
+# 这三个基础镜像也在 ACR 里（sync-infra.yml 同步），升级请改那个工作流后手动 Run。
 if ! "${COMPOSE[@]}" pull backend frontend; then
   REGISTRY="$(awk -F= '/^IMAGE_REGISTRY=/{print $2; exit}' "$ENV_FILE" 2>/dev/null | tr -d '[:space:]')"
   die "拉取镜像失败。若上面提示 unauthorized / denied / no such host，先登录 ACR（见 docs/DEPLOY.md 3.5 节）：
     docker login --username=<阿里云账号登录名或 RAM 全名> ${REGISTRY:-<IMAGE_REGISTRY>}"
 fi
 
-log "启动 / 更新容器 ..."
-"${COMPOSE[@]}" up -d --remove-orphans
+log "启动 / 更新容器（首次会从 ACR 拉取 mysql / redis / rustfs）..."
+if ! "${COMPOSE[@]}" up -d --remove-orphans; then
+  warn "首次启动失败，10 秒后重试一次（多为网络或镜像拉取抖动）..."
+  sleep 10
+  "${COMPOSE[@]}" up -d --remove-orphans \
+    || die "启动失败，看上方报错：镜像问题检查 docker login（3.5 节）和 sync-infra 工作流（5.6 节）是否已同步基础镜像"
+fi
 
 # 前端容器的 nginx 在启动时解析 backend 的容器 IP 并缓存；
 # backend 被重建后 IP 会变，必须强制重建 frontend，否则 /api 会 502。

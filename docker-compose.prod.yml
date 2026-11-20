@@ -3,6 +3,8 @@
 #
 # 与 docker-compose.yml（本地完整栈，源码构建）的区别：
 #   1. backend / frontend 不再 build，直接拉取 GitHub Actions 推到阿里云 ACR 的镜像；
+#      mysql / redis / rustfs 的基础镜像也同步在 ACR 里（.github/workflows/sync-infra.yml），
+#      服务器部署全程不访问 Docker Hub。
 #   2. MySQL / Redis / backend 不发布任何宿主机端口，只在 compose 网络内互访；
 #      frontend 与对象存储只绑 127.0.0.1，由宿主机 Nginx 反代并终结 HTTPS；
 #   3. 服务名/容器名带 prod 前缀，和本地开发栈（name: blog）互不干扰；
@@ -30,9 +32,10 @@ services:
   # ---------------------------------------------------------------------------
   # MySQL 8.0：首次启动自动执行 ./sql/init.sql（建库建表 + 演示分类/标签）
   # 数据在 named volume；宿主机不映射 3306，只能从 compose 网络访问。
+  # 镜像来自 ACR（由 sync-infra.yml 同步），服务器部署不再依赖 Docker Hub。
   # ---------------------------------------------------------------------------
   mysql:
-    image: mysql:8.0
+    image: ${IMAGE_REGISTRY}/${IMAGE_NAMESPACE}/mysql:8.0
     container_name: blog-prod-mysql
     restart: unless-stopped
     environment:
@@ -73,7 +76,7 @@ services:
   # 无密码但不对宿主机发布端口，只在 compose 网络内可达。
   # ---------------------------------------------------------------------------
   redis:
-    image: redis:7-alpine
+    image: ${IMAGE_REGISTRY}/${IMAGE_NAMESPACE}/redis:7-alpine
     container_name: blog-prod-redis
     restart: unless-stopped
     command: ["redis-server", "--appendonly", "yes"]
@@ -93,13 +96,13 @@ services:
       - blog-prod-net
 
   # ---------------------------------------------------------------------------
-  # 对象存储（S3 兼容）：默认 RustFS。
+  # 对象存储（S3 兼容）：默认 RustFS，镜像来自 ACR。
   # 后端只用标准 S3 API（AWS SDK v2，path-style），换成 MinIO/OSS 不改代码。
   # 9000 只绑 127.0.0.1，由宿主机 Nginx 以 /files/ 前缀对外提供图片直链；
   # 9001 控制台不对宿主机发布（需要时临时 `docker compose port` 或 SSH 隧道）。
   # ---------------------------------------------------------------------------
   objectstore:
-    image: ${OBJECTSTORE_IMAGE:-rustfs/rustfs:latest}
+    image: ${IMAGE_REGISTRY}/${IMAGE_NAMESPACE}/rustfs:latest
     container_name: blog-prod-objectstore
     restart: unless-stopped
     environment:
