@@ -298,7 +298,9 @@ git checkout master
 git log --oneline -1
 ```
 
-服务器上的仓库只用来放部署文件（compose、sql、脚本），**不要在这里改代码**；自动部署会执行 `git reset --hard`。
+服务器上的目录只用来放部署文件（compose、SQL、脚本），**不要在这里改代码**；自动部署会用 GitHub Actions 上传的文件覆盖这些部署文件。
+
+> 国内 ECS `git clone` 也可能被断（`GnuTLS recv error (-110)`）。备选：本机 clone 后打包上传——`tar -czf - docker-compose.prod.yml deploy sql | ssh deploy@<ECS> "mkdir -p /opt/blog && tar -xzf - -C /opt/blog"`；或先把仓库导入 Gitee，再从 Gitee clone。
 
 ---
 
@@ -538,16 +540,17 @@ gh secret   set ACR_PASSWORD  --body '<ACR 固定密码>'
 
 4. 可选卡点：`Settings → Environments → New environment → production`，配置 Required reviewers，发布前需人工批准。
 
-开启后：`master` 的镜像推送成功 → Actions 通过 SSH 执行
+开启后：`master` 的镜像推送成功 → Actions 先把 `docker-compose.prod.yml`、`deploy/`、`sql/` 用 `tar` 覆盖到服务器 `/opt/blog`，再 SSH 执行发布脚本：
 
 ```bash
 cd /opt/blog
-git fetch --prune origin master
-git reset --hard FETCH_HEAD
 IMAGE_TAG=sha-xxxxxxx ./deploy/deploy.sh
 ```
 
-> 注意：自动部署会**硬重置**服务器仓库，别在 `/opt/blog` 里留未提交改动。
+> **为什么不让服务器自己 `git fetch`**：国内 ECS 直连 GitHub 经常被中断，报 `fatal: unable to access 'https://github.com/...': GnuTLS recv error (-110): The TLS connection was non-properly terminated`。改成从 runner 上传部署文件后，服务器只需要能访问 ACR 的 VPC 域名，不再依赖 GitHub。
+>
+> 服务器上的 `.env` 不会被覆盖（它在 `.gitignore` 里，不参与同步）；被覆盖的只有 compose、部署脚本和 SQL。
+> 自动部署不再执行 `git reset --hard`，`/opt/blog` 里的 git 工作区会和实际文件不一致，别再在那里 `git pull` 混用；需要版本管理就用本地仓库。
 > 生产环境更稳的做法是保持自动部署关闭，发布时人工确认一次 `./deploy/deploy.sh`。
 >
 > **安全组只放行自己 IP 时自动部署会失败**：GitHub 托管 runner 的出口 IP 不固定，`ssh-keyscan` 连 22 端口会超时（工作流会提示「无法连接 <host>:<port>」）。两条路：把 `ENABLE_AUTO_DEPLOY` 设为 `false`，在服务器上手动 `./deploy/deploy.sh`（推荐，改一行 .env 都不用重新构建）；或临时放行 runner 出口 IP，但 GitHub IP 段很大、会变，不建议长期这么用。
@@ -645,12 +648,25 @@ echo | openssl s_client -connect blog.ai-talking-chat.xyz:443 -servername blog.a
 
 ### 7.1 更新发布（手动）
 
+最常见的发布只是换了镜像，部署文件没变，直接：
+
 ```bash
 cd /opt/blog
-git fetch --prune origin master
-git reset --hard FETCH_HEAD        # 仅同步部署文件（compose/sql/脚本）
 ./deploy/deploy.sh                 # 用 .env 的 IMAGE_TAG（默认 latest）
 ```
+
+如果 compose / 部署脚本 / SQL 也变了（例如新增 `.env` 变量、改了端口），要先把新文件推到服务器。**国内 ECS 直连 GitHub 经常被中断**（`fatal: unable to access 'https://github.com/...': GnuTLS recv error (-110)`），推荐从本机仓库上传：
+
+```bash
+# 本机：先 git pull 拿到最新部署文件，再打包覆盖到服务器（不依赖服务器访问 GitHub）
+cd ~/path/to/Blog
+tar -czf - docker-compose.prod.yml deploy sql \
+  | ssh deploy@<ECS 公网 IP> "cd /opt/blog && tar -xzf - && chmod +x deploy/*.sh"
+```
+
+然后在服务器上 `./deploy/deploy.sh`（`.env` 在服务器本地，不会被覆盖）。
+
+> 服务器能稳定访问 GitHub 时，也可以用 `git fetch --prune origin master && git reset --hard FETCH_HEAD` 同步部署文件；但直接上传更省事，也不受网络影响。
 
 只更新某一个服务时也可以直接：
 
@@ -767,6 +783,7 @@ docker compose -f docker-compose.prod.yml --env-file .env up -d objectstore back
 | ---- | ---- | ---- |
 | `docker compose pull` 报 `unauthorized` | 没登录 ACR、登录用了别的域名、用户名填成了主账号 ID，或固定密码被重置 | 按 3.5 重新 `docker login --username=<登录名> <VPC 域名>`；用控制台访问凭证页的命令 |
 | `docker compose pull` 报 `denied` / `manifest unknown` | 命名空间/仓库名写错，或 Actions 还没推成功 | 核对 `.env` 的 `IMAGE_REGISTRY`/`IMAGE_NAMESPACE` 与 Actions 的 `ACR_REGISTRY`/`ACR_NAMESPACE`；到 ACR 控制台确认 `blog/backend` 有该 tag |
+| 自动部署 job 报 `fatal: unable to access 'https://github.com/...': GnuTLS recv error (-110)` | 国内 ECS 直连 GitHub 的 TLS 被中断（很常见，不是配置错） | 工作流已改成从 runner 上传部署文件，服务器不再访问 GitHub；手动发布同样用 tar/scp 推送（7.1） |
 | 自动部署 job 失败于「准备 SSH 私钥与 known_hosts」 | 安全组 22 只放行了本机 IP，GitHub 托管 runner 出口 IP 不固定，`ssh-keyscan` 超时；或 `SSH_HOST` 填成了内网 IP | 推荐 `ENABLE_AUTO_DEPLOY=false` 改手动发布；要自动部署就得放行 runner 出口 IP（不推荐 0.0.0.0/0） |
 | 拉取报 `no such host` 或超时 | `.env` 里用了公网域名，或 ECS 与 ACR 地域不同 | 换成与 ECS 同地域实例的 VPC 域名（2.3） |
 | `TOOMANYREQUESTS` | 个人版共享带宽触发限流 | 降低并发拉取、错峰重试；长期稳定需求升级企业版 |
