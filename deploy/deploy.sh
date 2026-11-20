@@ -2,7 +2,7 @@
 # ============================================================================
 # 技术分享博客 · 服务器端发布脚本（阿里云 Ubuntu 24.04 + Docker Compose）
 #
-# 做的事：校验 compose 配置 → 拉取 GHCR 镜像 → 重建容器 → 等健康检查 → 清理悬空镜像。
+# 做的事：校验 compose 配置 → 拉取阿里云 ACR 镜像 → 重建容器 → 等健康检查 → 清理悬空镜像。
 # 不负责：git pull（交给 GitHub Actions 或手动执行）、Nginx 证书（见 docs/DEPLOY.md）。
 #
 # 用法（仓库根目录）：
@@ -63,10 +63,14 @@ COMPOSE=(docker compose -f "$COMPOSE_FILE" --env-file "$ENV_FILE")
 log "校验 compose 配置 ..."
 "${COMPOSE[@]}" config -q
 
-log "拉取业务镜像（backend / frontend）..."
+log "拉取业务镜像（backend / frontend，来自阿里云 ACR）..."
 # 只拉业务镜像：避免每次部署顺带升级 mysql / redis / rustfs 的 latest，
 # 基础设施镜像需要升级时手动 docker compose pull mysql redis objectstore。
-"${COMPOSE[@]}" pull backend frontend
+if ! "${COMPOSE[@]}" pull backend frontend; then
+  REGISTRY="$(awk -F= '/^IMAGE_REGISTRY=/{print $2; exit}' "$ENV_FILE" 2>/dev/null | tr -d '[:space:]')"
+  die "拉取镜像失败。若上面提示 unauthorized / denied / no such host，先登录 ACR（见 docs/DEPLOY.md 3.5 节）：
+    docker login --username=<阿里云账号登录名或 RAM 全名> ${REGISTRY:-<IMAGE_REGISTRY>}"
+fi
 
 log "启动 / 更新容器 ..."
 "${COMPOSE[@]}" up -d --remove-orphans

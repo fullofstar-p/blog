@@ -1,6 +1,6 @@
 # 本地开发与联调
 
-本文记录本机 / 本地虚拟机的全链路联调方式，以及可复用的验证脚本。**生产部署见 [DEPLOY.md](DEPLOY.md)（Docker + GitHub Actions + GHCR + 阿里云）。**
+本文记录本机 / 本地虚拟机的全链路联调方式，以及可复用的验证脚本。**生产部署见 [DEPLOY.md](DEPLOY.md)（Docker + GitHub Actions + 阿里云 ACR + 阿里云 ECS）。**
 
 ## 已验证结果
 
