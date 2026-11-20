@@ -549,6 +549,8 @@ IMAGE_TAG=sha-xxxxxxx ./deploy/deploy.sh
 
 > 注意：自动部署会**硬重置**服务器仓库，别在 `/opt/blog` 里留未提交改动。
 > 生产环境更稳的做法是保持自动部署关闭，发布时人工确认一次 `./deploy/deploy.sh`。
+>
+> **安全组只放行自己 IP 时自动部署会失败**：GitHub 托管 runner 的出口 IP 不固定，`ssh-keyscan` 连 22 端口会超时（工作流会提示「无法连接 <host>:<port>」）。两条路：把 `ENABLE_AUTO_DEPLOY` 设为 `false`，在服务器上手动 `./deploy/deploy.sh`（推荐，改一行 .env 都不用重新构建）；或临时放行 runner 出口 IP，但 GitHub IP 段很大、会变，不建议长期这么用。
 
 ### 5.5 发布节奏与回滚
 
@@ -765,6 +767,7 @@ docker compose -f docker-compose.prod.yml --env-file .env up -d objectstore back
 | ---- | ---- | ---- |
 | `docker compose pull` 报 `unauthorized` | 没登录 ACR、登录用了别的域名、用户名填成了主账号 ID，或固定密码被重置 | 按 3.5 重新 `docker login --username=<登录名> <VPC 域名>`；用控制台访问凭证页的命令 |
 | `docker compose pull` 报 `denied` / `manifest unknown` | 命名空间/仓库名写错，或 Actions 还没推成功 | 核对 `.env` 的 `IMAGE_REGISTRY`/`IMAGE_NAMESPACE` 与 Actions 的 `ACR_REGISTRY`/`ACR_NAMESPACE`；到 ACR 控制台确认 `blog/backend` 有该 tag |
+| 自动部署 job 失败于「准备 SSH 私钥与 known_hosts」 | 安全组 22 只放行了本机 IP，GitHub 托管 runner 出口 IP 不固定，`ssh-keyscan` 超时；或 `SSH_HOST` 填成了内网 IP | 推荐 `ENABLE_AUTO_DEPLOY=false` 改手动发布；要自动部署就得放行 runner 出口 IP（不推荐 0.0.0.0/0） |
 | 拉取报 `no such host` 或超时 | `.env` 里用了公网域名，或 ECS 与 ACR 地域不同 | 换成与 ECS 同地域实例的 VPC 域名（2.3） |
 | `TOOMANYREQUESTS` | 个人版共享带宽触发限流 | 降低并发拉取、错峰重试；长期稳定需求升级企业版 |
 | Actions Release 卡在「读取 ACR 配置」失败 | 没配 `ACR_REGISTRY` / `ACR_NAMESPACE` | 按 5.2 配好 4 个设置后重跑 |
