@@ -477,6 +477,17 @@ curl -I https://blog.ai-talking-chat.xyz/files/blog/<objectKey>   # 200 且 Cont
 | Secret | `ACR_USERNAME` | 阿里云账号登录名，或 RAM 用户 `<登录名>@<账号别名>.onaliyun.com` |
 | Secret | `ACR_PASSWORD` | ACR 控制台「访问凭证」里设置的固定密码 |
 
+也可以在本机用 `gh` 一次配好（把值换成自己的）：
+
+```bash
+gh variable set ACR_REGISTRY  --body 'crpi-xxxx.cn-hangzhou.personal.cr.aliyuncs.com'
+gh variable set ACR_NAMESPACE --body 'blog'
+gh secret   set ACR_USERNAME  --body '<阿里云账号登录名或 RAM 全名>'
+gh secret   set ACR_PASSWORD  --body '<ACR 固定密码>'
+```
+
+> `--body` 会把值写进 shell 历史；在意的话用 `gh secret set ACR_PASSWORD < 密码文件`，或直接在网页里填。
+
 构建使用 Buildx + GitHub Actions 缓存（`type=gha`，backend/frontend 分开 scope），矩阵并行构建两个镜像，`platforms: linux/amd64`（ARM ECS 见注释改成 `linux/arm64`）。
 
 > 参考耗时（2026-11-03 在 `dev` 上实测，GitHub 托管 runner，缓存冷启动）：CI 45s；Release 3m28s（frontend 1m5s、backend 3m19s）。这是构建本身的基线，推 ACR 的额外耗时取决于 runner 到阿里云的链路，首次可能多几十秒。
