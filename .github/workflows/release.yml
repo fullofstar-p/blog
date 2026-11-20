@@ -1,5 +1,5 @@
 # ============================================================================
-# Release：构建前后端镜像并推送到 GHCR（GitHub Container Registry）
+# Release：构建前后端镜像并推送到阿里云容器镜像服务 ACR
 #
 # 触发：
 #   push 到 dev     → 镜像 tag：dev、sha-xxxxxxx
@@ -7,15 +7,24 @@
 #   push 标签 v1.2.3 → 镜像 tag：v1.2.3、1.2.3
 #   手动 Run workflow → 同上（按所选分支）
 #
-# 可选自动部署：仓库 Variables 里把 ENABLE_AUTO_DEPLOY 设为 true，并配置
-# SSH_HOST / SSH_USER / SSH_PRIVATE_KEY（可选 SSH_PORT）后，master 分支构建完成
-# 会通过 SSH 在服务器上执行 deploy/deploy.sh。详细步骤见 docs/DEPLOY.md。
+# 推送地址（用 ACR 的「公网域名」，GitHub 托管 runner 不在 VPC 内）：
+#   <ACR_REGISTRY>/<ACR_NAMESPACE>/backend:<tag>
+#   <ACR_REGISTRY>/<ACR_NAMESPACE>/frontend:<tag>
+# 服务器拉取用同一仓库的「VPC 域名」（见 docker-compose.prod.yml 与 docs/DEPLOY.md）。
 #
-# 镜像命名（{owner}/{repo} 为小写仓库全名）：
-#   ghcr.io/{owner}/{repo}/backend:latest
-#   ghcr.io/{owner}/{repo}/frontend:latest
+# 必须先配置（Settings → Secrets and variables → Actions）：
+#   Variables: ACR_REGISTRY   ACR 公网域名，如 crpi-xxxx.cn-hangzhou.personal.cr.aliyuncs.com
+#                              企业版形如 <实例名>-registry.cn-hangzhou.cr.aliyuncs.com
+#              ACR_NAMESPACE  ACR 命名空间，如 blog
+#   Secrets:   ACR_USERNAME   阿里云账号登录名，或 RAM 用户 <登录名>@<账号别名>.onaliyun.com
+#              ACR_PASSWORD   ACR 控制台「访问凭证」里单独设置的固定密码（不是阿里云登录密码）
+# 未配置时 prepare 阶段会直接失败并提示缺哪一项（故意 fail-fast，避免静默不发布）。
+#
+# 可选自动部署：Variables 里把 ENABLE_AUTO_DEPLOY 设为 true，并配置
+# SSH_HOST / SSH_USER / SSH_PRIVATE_KEY（可选 SSH_PORT）后，master 分支镜像推送成功
+# 会通过 SSH 在服务器上执行 deploy/deploy.sh。详细步骤见 docs/DEPLOY.md。
 # ============================================================================
-name: Release · GHCR 镜像
+name: Release · ACR 镜像
 
 on:
   push:
@@ -28,36 +37,72 @@ concurrency:
   group: release-${{ github.ref }}
   cancel-in-progress: false
 
-env:
-  REGISTRY: ghcr.io
-
+# 推 ACR 用的是独立的 Registry 密码，不经过 GITHUB_TOKEN，所以只读仓库内容即可
 permissions:
   contents: read
-  packages: write
 
 jobs:
-  # 先算好小写命名空间与本次提交的 sha tag，供矩阵构建和部署复用
+  # 先读出 ACR 配置、算好 namespace 与本次提交的 sha tag，供矩阵构建和部署复用
   prepare:
-    name: 计算镜像命名
+    name: 读取 ACR 配置
     runs-on: ubuntu-latest
     timeout-minutes: 5
     outputs:
-      namespace: ${{ steps.ns.outputs.value }}
-      tag: ${{ steps.meta.outputs.tag }}
+      registry: ${{ steps.cfg.outputs.registry }}
+      namespace: ${{ steps.cfg.outputs.namespace }}
+      tag: ${{ steps.cfg.outputs.tag }}
     steps:
-      - name: 小写化仓库名（GHCR 要求全小写）
-        id: ns
-        run: echo "value=${GITHUB_REPOSITORY,,}" >> "$GITHUB_OUTPUT"
+      - name: 校验 Variables 并生成镜像路径
+        id: cfg
+        env:
+          ACR_REGISTRY: ${{ vars.ACR_REGISTRY }}
+          ACR_NAMESPACE: ${{ vars.ACR_NAMESPACE }}
+        run: |
+          set -euo pipefail
 
-      - name: 生成 sha tag
-        id: meta
-        run: echo "tag=sha-${GITHUB_SHA::7}" >> "$GITHUB_OUTPUT"
+          # 容错：允许把 https://、首尾空格、末尾斜杠一起粘进来
+          registry="${ACR_REGISTRY:-}"
+          registry="${registry//[[:space:]]/}"
+          registry="${registry#https://}"
+          registry="${registry#http://}"
+          registry="${registry%/}"
+
+          namespace="${ACR_NAMESPACE:-}"
+          namespace="${namespace//[[:space:]]/}"
+          namespace="${namespace#/}"
+          namespace="${namespace%/}"
+          # Docker 镜像路径必须全小写；大写的命名空间会 push 失败
+          namespace="${namespace,,}"
+
+          if [[ -z "$registry" ]]; then
+            echo "::error::缺少仓库变量 ACR_REGISTRY（Settings → Secrets and variables → Actions → Variables）"
+            echo "::error::填 ACR 公网域名，如 crpi-xxxx.cn-hangzhou.personal.cr.aliyuncs.com"
+            exit 1
+          fi
+          if [[ -z "$namespace" ]]; then
+            echo "::error::缺少仓库变量 ACR_NAMESPACE，如 blog"
+            exit 1
+          fi
+          if [[ ! "$namespace" =~ ^[a-z0-9][a-z0-9._-]*$ ]]; then
+            echo "::error::ACR_NAMESPACE 只能由字母、数字、点、下划线、连字符组成，不能带 /（当前：$namespace）"
+            exit 1
+          fi
+
+          echo "镜像前缀：${registry}/${namespace}/{backend,frontend}"
+          {
+            echo "registry=$registry"
+            echo "namespace=$namespace"
+            echo "tag=sha-${GITHUB_SHA::7}"
+          } >> "$GITHUB_OUTPUT"
 
   images:
     name: 构建并推送 ${{ matrix.service }}
     needs: prepare
     runs-on: ubuntu-latest
     timeout-minutes: 40
+    env:
+      REGISTRY: ${{ needs.prepare.outputs.registry }}
+      IMAGE_NAMESPACE: ${{ needs.prepare.outputs.namespace }}
     strategy:
       fail-fast: false
       matrix:
@@ -75,18 +120,18 @@ jobs:
       - name: 启用 Buildx
         uses: docker/setup-buildx-action@v3
 
-      - name: 登录 GHCR
+      - name: 登录阿里云 ACR
         uses: docker/login-action@v3
         with:
           registry: ${{ env.REGISTRY }}
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
+          username: ${{ secrets.ACR_USERNAME }}
+          password: ${{ secrets.ACR_PASSWORD }}
 
       - name: 生成镜像元数据（tag / label）
         id: meta
         uses: docker/metadata-action@v5
         with:
-          images: ${{ env.REGISTRY }}/${{ needs.prepare.outputs.namespace }}/${{ matrix.service }}
+          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAMESPACE }}/${{ matrix.service }}
           tags: |
             type=ref,event=branch
             type=ref,event=tag
@@ -108,7 +153,7 @@ jobs:
           cache-from: type=gha,scope=${{ matrix.service }}
           cache-to: type=gha,mode=max,scope=${{ matrix.service }}
 
-  # 可选：master 分支镜像发布成功后，SSH 到 ECS 执行发布脚本
+  # 可选：master 分支镜像推送成功后，SSH 到 ECS 执行发布脚本
   deploy:
     name: 部署到阿里云 ECS（可选）
     needs: [prepare, images]

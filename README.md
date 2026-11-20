@@ -10,7 +10,7 @@
 | 后端 | Spring Boot 3.3、JDK 17、Spring Security + JWT、MyBatis-Plus、Jakarta Validation、Knife4j（OpenAPI 3） |
 | 数据 | MySQL 8.0、Redis 7 |
 | 存储 | MinIO，使用 **AWS SDK for Java v2（S3Client）**，不依赖 MinIO 专属 SDK，便于迁移 OSS |
-| 部署 | 本地 Docker Compose 五服务；生产 GitHub Actions 构建镜像 → GHCR → 阿里云 ECS 拉镜像运行，宿主机 Nginx + HTTPS（见 [docs/DEPLOY.md](docs/DEPLOY.md)） |
+| 部署 | 本地 Docker Compose 五服务；生产 GitHub Actions 构建镜像 → 阿里云 ACR → 阿里云 ECS 用 VPC 域名拉镜像运行，宿主机 Nginx + HTTPS（见 [docs/DEPLOY.md](docs/DEPLOY.md)） |
 
 ## 目录结构
 
@@ -19,15 +19,15 @@
 ├── .env.example              # 本地开发环境变量模板（复制为 .env）
 ├── .env.prod.example         # 生产环境变量模板（服务器 .env，见 docs/DEPLOY.md）
 ├── .gitignore
-├── .github/workflows/        # CI 构建校验 + GHCR 镜像发布（可选自动部署）
+├── .github/workflows/        # CI 构建校验 + ACR 镜像发布（可选自动部署）
 ├── docker-compose.yml        # 五服务编排 + 数据卷 + healthcheck（本地完整栈）
 ├── docker-compose.infra.yml  # 仅基础设施：MySQL/Redis/对象存储，免 .env 直接跑
-├── docker-compose.prod.yml   # 生产编排：拉 GHCR 镜像 + 资源/日志限制 + 端口只绑本机
+├── docker-compose.prod.yml   # 生产编排：拉 ACR 镜像 + 资源/日志限制 + 端口只绑本机
 ├── README.md
 ├── deploy/                   # 服务器发布/备份脚本 + 宿主机 Nginx 模板
 ├── docs/
 │   ├── API.md                # 前后端接口契约（唯一真源）
-│   ├── DEPLOY.md             # 生产部署：Docker + GitHub Actions + GHCR + 阿里云
+│   ├── DEPLOY.md             # 生产部署：Docker + GitHub Actions + ACR + 阿里云 ECS
 │   ├── LOCAL_DEV.md          # 本地开发/联调与冒烟说明
 │   ├── OPTIMIZATION.md       # 工程优化清单与技术债（按优先级）
 │   └── ROADMAP.md            # 后续功能清单、迭代排期与里程碑
@@ -109,21 +109,21 @@ docker compose up -d --build        # Docker
 > `eclipse-temurin:17-jre-jammy` 并安装 `fontconfig` + `fonts-noto-cjk`、启用
 > `-Djava.awt.headless=true`；本机直接跑 jar 时使用系统字体（Windows 回退微软雅黑）。
 
-## 生产部署（Docker + GitHub Actions + GHCR + 阿里云）
+## 生产部署（Docker + GitHub Actions + 阿里云 ACR + 阿里云 ECS）
 
-生产环境不需要在服务器装 JDK / Node：GitHub Actions 构建前后端镜像并推到 GHCR，
-阿里云 ECS（Ubuntu 24.04）用 [`docker-compose.prod.yml`](docker-compose.prod.yml) 拉镜像运行，
+生产环境不需要在服务器装 JDK / Node：GitHub Actions 构建前后端镜像并推送到阿里云容器镜像服务 ACR，
+阿里云 ECS（Ubuntu 24.04）用 [`docker-compose.prod.yml`](docker-compose.prod.yml) 通过 VPC 域名拉镜像运行，
 宿主机 Nginx 反代 80/443 并签发 HTTPS，MySQL / Redis / 对象存储只开放在 compose 内网。
 
 | 动作 | 命令 / 位置 |
 | ---- | ---- |
-| 首次准备 | 服务器初始化 Docker → 填 [`.env.prod.example`](.env.prod.example) 为 `.env` → `docker login ghcr.io` |
-| 发布 | `dev` 合到 `master` → Actions 自动构建 `latest` → 服务器 `./deploy/deploy.sh` |
+| 首次准备 | 建 ACR 实例（地域与 ECS 相同）→ 仓库 Variables/Secrets 配 `ACR_*` → 服务器装 Docker、`docker login <ACR VPC 域名>`、填 [`.env.prod.example`](.env.prod.example) |
+| 发布 | `dev` 合到 `master` → Actions 自动构建 `latest` 并推 ACR → 服务器 `./deploy/deploy.sh` |
 | 回滚 | `./deploy/deploy.sh sha-xxxxxxx` |
 | 备份 | `./deploy/backup.sh`（MySQL + 对象存储数据卷） |
 | 自动部署（可选） | 配置 SSH secrets + `ENABLE_AUTO_DEPLOY=true`，master 构建完成后自动发布 |
 
-完整步骤（安全组、Docker 安装、Nginx、certbot、GHCR 权限、自动部署、排错、安全清单）见
+完整步骤（ACR 准备、安全组、Docker 安装、Nginx、certbot、权限、自动部署、排错、安全清单）见
 **[docs/DEPLOY.md](docs/DEPLOY.md)**。
 
 ## 环境变量
