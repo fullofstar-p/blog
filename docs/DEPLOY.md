@@ -229,8 +229,9 @@ docker compose version     # Docker Compose version v2.2x+
 
 ### 3.3 配置 Docker daemon（镜像加速 + 日志轮转）
 
-MySQL / Redis / RustFS / Alpine 都来自 Docker Hub，国内拉取建议配镜像加速器（ACR 控制台 → 镜像工具 → 镜像加速器，每个账号有独立地址；也可以换成其他加速源）。
-注意：**`registry-mirrors` 只对 Docker Hub 生效**；业务镜像走 ACR 的 VPC 域名，不经过镜像加速，也不需要加速。
+**生产部署已经不依赖 Docker Hub**：mysql / redis / rustfs 的基础镜像会通过 Actions 的 [sync-infra.yml](../.github/workflows/sync-infra.yml) 同步到 ACR（5.6 节），服务器只从 ACR 的 VPC 域名拉。这里配加速器主要是给「手动 pull 工具镜像（alpine 等）」和本地调试用；地址在 ACR 控制台 → 镜像工具 → 镜像加速器（每个账号一个专属地址）。
+
+> 不要只配第三方免费镜像站（如 `docker.xuanyuan.me`）：会随机返回「免费节点当前繁忙，请稍后重试」，把部署卡住。要用就配阿里云官方加速器，或同时配多个源。
 
 ```bash
 sudo mkdir -p /etc/docker
@@ -238,7 +239,7 @@ sudo tee /etc/docker/daemon.json > /dev/null <<'JSON'
 {
   "log-driver": "json-file",
   "log-opts": { "max-size": "20m", "max-file": "3" },
-  "registry-mirrors": ["https://docker.xuanyuan.me"],
+  "registry-mirrors": ["https://<你的加速器ID>.mirror.aliyuncs.com"],
   "live-restore": true
 }
 JSON
@@ -577,6 +578,23 @@ git push origin v1.0.0
 > 想在正式发布前先看 `dev` 的效果，可临时 `IMAGE_TAG=dev ./deploy/deploy.sh`（验证完记得发回 `latest`）。
 > 注意 `latest` 只跟随 `master`：如果 `master` 落后于 `dev`，先合并再发布，否则线上还是旧版本。
 
+### 5.6 基础设施镜像同步（[sync-infra.yml](../.github/workflows/sync-infra.yml)）
+
+生产编排里的 mysql / redis / rustfs（以及备份脚本用的 alpine）也都指向 ACR：
+
+```text
+<ACR_REGISTRY>/<ACR_NAMESPACE>/mysql:8.0
+<ACR_REGISTRY>/<ACR_NAMESPACE>/redis:7-alpine
+<ACR_REGISTRY>/<ACR_NAMESPACE>/rustfs:latest
+<ACR_REGISTRY>/<ACR_NAMESPACE>/alpine:3.20
+```
+
+它们由 `Sync infra images to ACR` 工作流手动触发同步（Actions 页面左侧选中该工作流 → Run workflow）：从 Docker Hub 拉取后打 tag 推到 ACR。这样服务器部署全程只从 ACR 的 VPC 域名拉镜像，**不再受 Docker Hub 不稳 / 第三方加速器限流影响**（典型报错：`免费节点当前繁忙，请稍后重试`）。
+
+- **第一次部署前必须先跑一次**，否则 `docker compose up` 会报 `manifest unknown`；
+- 升级基础镜像：改工作流里对应条目的 `source` / `tag`（例如把 mysql 的 `8.0` 换成 `8.4`），Run 一次后再发布。MySQL 大版本升级不能只换镜像，要按官方步骤迁移数据；
+- 同步失败最常见是 runner 拉 Docker Hub 被限流，重跑即可。
+
 ---
 
 ## 6. 宿主机 Nginx + HTTPS
@@ -758,6 +776,8 @@ docker compose -f docker-compose.prod.yml --env-file .env up -d objectstore back
 
 备份要落到**另一块盘或对象存储**才算数：可再用 `ossutil` / `rclone` 把 `/var/backups/blog` 同步到阿里云 OSS，并定期做一次恢复演练。
 
+> 恢复命令里的 `alpine:3.20` 来自 Docker Hub；服务器拉不到时（镜像加速器繁忙/被墙），用 ACR 里同步的同一镜像：把 `alpine:3.20` 换成 `${IMAGE_REGISTRY}/${IMAGE_NAMESPACE}/alpine:3.20`（见 5.6，值从 `.env` 取）。
+
 ### 7.6 监控、磁盘与重启
 
 - 站点可用性：阿里云云监控「站点监控」或自建 Uptime Kuma，探测 `https://<域名>/` 与 `/api/articles?page=1&size=1`。
@@ -784,6 +804,7 @@ docker compose -f docker-compose.prod.yml --env-file .env up -d objectstore back
 | `docker compose pull` 报 `unauthorized` | 没登录 ACR、登录用了别的域名、用户名填成了主账号 ID，或固定密码被重置 | 按 3.5 重新 `docker login --username=<登录名> <VPC 域名>`；用控制台访问凭证页的命令 |
 | `docker compose pull` 报 `denied` / `manifest unknown` | 命名空间/仓库名写错，或 Actions 还没推成功 | 核对 `.env` 的 `IMAGE_REGISTRY`/`IMAGE_NAMESPACE` 与 Actions 的 `ACR_REGISTRY`/`ACR_NAMESPACE`；到 ACR 控制台确认 `blog/backend` 有该 tag |
 | 自动部署 job 报 `fatal: unable to access 'https://github.com/...': GnuTLS recv error (-110)` | 国内 ECS 直连 GitHub 的 TLS 被中断（很常见，不是配置错） | 工作流已改成从 runner 上传部署文件，服务器不再访问 GitHub；手动发布同样用 tar/scp 推送（7.1） |
+| `docker compose up` 报 `免费节点当前繁忙，请稍后重试` / Docker Hub 拉取失败 | 第三方镜像加速器限流；或 ACR 里还没同步基础镜像（mysql/redis/rustfs） | 先 Run 一次 `Sync infra images to ACR`（5.6），部署就不再访问 Docker Hub；手动拉工具镜像失败时换阿里云官方加速器（3.3） |
 | 自动部署 job 失败于「准备 SSH 私钥与 known_hosts」 | 安全组 22 只放行了本机 IP，GitHub 托管 runner 出口 IP 不固定，`ssh-keyscan` 超时；或 `SSH_HOST` 填成了内网 IP | 推荐 `ENABLE_AUTO_DEPLOY=false` 改手动发布；要自动部署就得放行 runner 出口 IP（不推荐 0.0.0.0/0） |
 | 拉取报 `no such host` 或超时 | `.env` 里用了公网域名，或 ECS 与 ACR 地域不同 | 换成与 ECS 同地域实例的 VPC 域名（2.3） |
 | `TOOMANYREQUESTS` | 个人版共享带宽触发限流 | 降低并发拉取、错峰重试；长期稳定需求升级企业版 |
@@ -820,7 +841,7 @@ docker compose -f docker-compose.prod.yml --env-file .env up -d objectstore back
 - [ ] 3306 / 6379 / 8080 / 9000 / 9001 不对公网发布（本编排已保证，且不要额外加端口映射）。
 - [ ] HTTPS 生效、自动续期验证通过；必要时加 HSTS（确认全站 https 后再加）。
 - [ ] ACR 仓库保持私有；CI 用独立 RAM 子账号（企业版按 `cr:PushRepository` 给最小权限），服务器账号只需拉取权限；固定密码定期轮换，泄露立即重置并更新 GitHub Secret。
-- [ ] 定期更新基础镜像（`docker compose pull` 后重建），关注 MySQL/Redis/Nginx 安全公告。
+- [ ] 定期更新基础镜像：改 [sync-infra.yml](../.github/workflows/sync-infra.yml) 的版本后 Run 一次，再发布；关注 MySQL/Redis/Nginx 安全公告。
 - [ ] 备份任务在跑、备份文件在另一块盘/OSS、做过至少一次恢复演练。
 - [ ] 阿里云账号开启 MFA，ECS 快照策略按需开启。
 
@@ -833,7 +854,6 @@ docker compose -f docker-compose.prod.yml --env-file .env up -d objectstore back
 | `IMAGE_REGISTRY` | — | ✅ | ACR **VPC 域名**（服务器拉取用），如 `crpi-xxxx-vpc.cn-hangzhou.personal.cr.aliyuncs.com` |
 | `IMAGE_NAMESPACE` | — | ✅ | ACR 命名空间，如 `blog`，与 Actions 变量 `ACR_NAMESPACE` 一致 |
 | `IMAGE_TAG` | `latest` | | `latest` / `dev` / `master` / `sha-xxxxxxx` / `v1.0.0` |
-| `OBJECTSTORE_IMAGE` | `rustfs/rustfs:latest` | | 可换成自备 S3 兼容镜像 |
 | `TZ` | `Asia/Shanghai` | | 所有容器时区 |
 | `PUBLIC_BASE_URL` | — | ✅ | `https://blog.ai-talking-chat.xyz`，图片 URL 前缀 |
 | `FRONTEND_HOST_PORT` | `8081` | | 只绑 `127.0.0.1` |
@@ -943,5 +963,5 @@ docker compose -f docker-compose.prod.yml --env-file .env exec -T backend \
 }
 ```
 
-如果换成自备 MinIO 镜像（`OBJECTSTORE_IMAGE=<你的镜像>`），行为与本地开发一致，一般不需要手动处理。
+如果换成自备 MinIO 镜像（在 `docker-compose.prod.yml` 里改 `objectstore.image`，并同步进 ACR，见 5.6），行为与本地开发一致，一般不需要手动处理。
 
