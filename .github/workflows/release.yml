@@ -174,6 +174,9 @@ jobs:
       SSH_PORT: ${{ secrets.SSH_PORT || 22 }}
       IMAGE_TAG: ${{ needs.prepare.outputs.tag }}
     steps:
+      - name: 检出代码（部署文件从 runner 上传，服务器不需要访问 GitHub）
+        uses: actions/checkout@v4
+
       - name: 准备 SSH 私钥与 known_hosts
         run: |
           install -m 700 -d ~/.ssh
@@ -189,12 +192,21 @@ jobs:
         env:
           SSH_PRIVATE_KEY: ${{ secrets.SSH_PRIVATE_KEY }}
 
-      - name: 服务器同步代码并发布镜像
+      # 国内 ECS 直连 GitHub 的 git fetch 经常被断（GnuTLS recv error -110），
+      # 所以不让服务器拉代码：把 runner 上检出的 compose / 脚本 / SQL 用 tar 覆盖过去。
+      # 只覆盖部署文件，服务器上的 .env 不动（它在 .gitignore 里，不参与覆盖）。
+      - name: 同步部署文件到服务器
+        run: |
+          set -euo pipefail
+          tar -czf - docker-compose.prod.yml deploy sql \
+            | ssh -i ~/.ssh/id_ed25519 -p "$SSH_PORT" \
+                  -o BatchMode=yes -o ConnectTimeout=15 \
+                  "$SSH_USER@$SSH_HOST" \
+                  "cd /opt/blog && tar -xzf - && chmod +x deploy/*.sh && ls -l docker-compose.prod.yml deploy/deploy.sh"
+
+      - name: 远程执行发布脚本
         run: |
           ssh -i ~/.ssh/id_ed25519 -p "$SSH_PORT" \
               -o BatchMode=yes -o ConnectTimeout=15 -o ServerAliveInterval=15 \
               "$SSH_USER@$SSH_HOST" \
-            "set -euo pipefail; cd /opt/blog && \
-             git fetch --prune origin master && \
-             git reset --hard FETCH_HEAD && \
-             IMAGE_TAG='$IMAGE_TAG' ./deploy/deploy.sh"
+            "set -euo pipefail; cd /opt/blog && IMAGE_TAG='$IMAGE_TAG' ./deploy/deploy.sh"
