@@ -497,6 +497,7 @@ gh secret   set ACR_PASSWORD  --body '<ACR 固定密码>'
 > 2. **用户名填错**：填纯数字的阿里云主账号 ID 会 `unauthorized`，要填**账号登录名**；RAM 用户必须带 `@<账号别名>.onaliyun.com` 后缀。
 > 3. **企业版实例默认可能没开公网访问**：GitHub 托管 runner 在公网，推不上去；到实例 → 访问控制 → 开启公网访问入口。个人版无需此步。
 > 4. 个人版共享带宽，首次推大镜像（backend 内含 Maven 依赖）可能偏慢，超时重试即可；后续有层缓存会快很多。
+> 5. **ACR 不认 BuildKit 附加的 provenance / SBOM 证明**：报 `denied: unknown manifest class for application/vnd.oci.empty.v1+json`。工作流已显式 `provenance: false`、`sbom: false`，不要改回 `true`——GHCR 支持这种 OCI image index，ACR 个人版不支持。
 
 ### 5.3 ACR 仓库安全与服务器拉取
 
@@ -768,6 +769,7 @@ docker compose -f docker-compose.prod.yml --env-file .env up -d objectstore back
 | `TOOMANYREQUESTS` | 个人版共享带宽触发限流 | 降低并发拉取、错峰重试；长期稳定需求升级企业版 |
 | Actions Release 卡在「读取 ACR 配置」失败 | 没配 `ACR_REGISTRY` / `ACR_NAMESPACE` | 按 5.2 配好 4 个设置后重跑 |
 | Actions 推 ACR 报 `unauthorized` | Secret 里的用户名/密码不对（填了主账号 ID、密码含 `@` 被 shell 转义） | 用户名用账号登录名或 RAM 全名；固定密码换成不含 `@`/`$` 的 |
+| Actions 推 ACR 报 `denied: unknown manifest class for application/vnd.oci.empty.v1+json` | `docker/build-push-action` v6 默认给镜像附加 provenance/SBOM 证明，推的是 OCI image index，ACR 个人版不认 | 保持 `provenance: false`、`sbom: false`（工作流已配）；只有换回 GHCR 才需要打开 |
 | Actions 推 ACR 超时 | 个人版共享带宽、runner 到杭州链路抖动 | 重跑；只重推失败的 service；或改成本地构建后手动 push（4.2） |
 | `compose config` 报 `MYSQL_ROOT_PASSWORD is required` | `.env` 必填项为空 | 按 4.1 填全；`docker compose --env-file .env config -q` 自检 |
 | 启动后站点 502 | backend 未健康 / frontend 缓存了旧 backend IP | `$COMPOSE ps`、`logs backend`；执行 `--force-recreate frontend`（deploy.sh 已自动做） |
