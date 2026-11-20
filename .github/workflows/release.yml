@@ -149,6 +149,12 @@ jobs:
           push: true
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
+          # 必须关掉 BuildKit 默认附加的 provenance / SBOM 证明：
+          # 否则推的是带 attestation 的 OCI image index，里面有
+          # application/vnd.oci.empty.v1+json 描述符，阿里云 ACR 个人版不认，
+          # 会报 `denied: unknown manifest class for application/vnd.oci.empty.v1+json`。
+          provenance: false
+          sbom: false
           # GitHub Actions 原生缓存，跨工作流复用 Maven / npm 之前的镜像层
           cache-from: type=gha,scope=${{ matrix.service }}
           cache-to: type=gha,mode=max,scope=${{ matrix.service }}
